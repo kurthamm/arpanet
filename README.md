@@ -30,6 +30,8 @@ Then, you can load the file arpanet_home.html into your browser. Or straight on 
 <br><br>
 You might want to skip all the web stuff. A quick way straight onto your Arpanet is to run './do.sh 1'. That gets a TIP session, type @L 6 [return] and it will connect to host #6 on the Arpanet. That's an MIT ITS system.
 <br><br>
+The arpanet simulation consists of a network of IMP routers, which you can inspect and manage. The mini subdirectory contains the entire arpanet simulation, irrespective of the web server stuff. In ./mini, start by running ./impctl.py help. It will give you insight in how to play with the IMP farm. The hosts attached to the IMPs are started through ./mini/arpanet, they are started independently from the Arpanet IMP 'farm', but make sure you start ITS systems straight after starting their IMP. ITS is picky on when it wishes to hear from their IMP. Do 'screen -ls' to see the host systems themselves.
+<br><br>
 To stop, run stop-demo.sh.
 
 <br>Dependencies: node.js, and Python websockets.
