@@ -64,5 +64,6 @@ SET CPU HISTORY=65000
 SET CONSOLE DEBUG=STDERR
 SET WDT DEBUG=LIGHTS
 
-set throttle 50%
+#set throttle 15%
+set throttle 15%
 

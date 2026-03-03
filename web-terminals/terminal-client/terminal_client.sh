@@ -39,7 +39,7 @@ echo ""
 if [ ! -d "venv" ]; then
     echo "Error: Virtual environment not found"
     echo "Please run: python3 -m venv venv && source venv/bin/activate && pip install websockets"
-    exit 1
+#    exit 1
 fi
 
 source venv/bin/activate

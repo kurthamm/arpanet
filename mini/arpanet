@@ -171,20 +171,25 @@ start_network() {
   echo "Starting ARPANET network..."
   echo ""
 
+  # new Network Operation Center
+ 
+  screen -dmS noc ./noc-server.py 
+  sleep 3
+
+  # old style screen setup, now disabled
+
   # Start IMPs first
-  start_imps
+#  start_imps
 
   # Wait for IMPs to initialize
-  echo "Waiting for IMPs to initialize..."
-  sleep 3
-  echo ""
+#  echo "Waiting for IMPs to initialize..."
+#  sleep 3
+#  echo ""
 
   # Start NCPs
-  start_ncpds
+#  start_ncpds
 
   echo "ARPANET network started successfully!"
-  echo "  IMPs running: 36"
-  echo "  NCP daemons: 34"
   echo ""
 }
 
@@ -275,13 +280,22 @@ stop_network() {
   echo ""
 
   # Stop NCPs first (cleaner disconnect)
-  stop_ncpds
+#  stop_ncpds
 
   # Brief pause
-  sleep 1
+#  sleep 1
 
   # Stop IMPs
-  stop_imps
+#  stop_imps
+
+  ./impctl.py quit
+  
+  # Clean up all NCP socket files (only sockets matching ncp[0-9]*)
+  echo "Cleaning up NCP socket files..."
+  for f in ncp[0-9]*; do
+    [ -S "$f" ] && rm -f "$f"
+  done
+  echo ""
 
   # Stop hosts
   stop_hosts
@@ -301,8 +315,6 @@ case "$1" in
     sleep 0.2
     ./host134.sh
     sleep 0.2
-    ./waitsconnect
-    sleep 0.2
     ./host11.sh
     sleep 0.2
     ./host198.sh
@@ -311,18 +323,18 @@ case "$1" in
   stop)
     stop_network
     ;;
-  start-imps)
-    start_imps
-    ;;
-  start-ncpds)
-    start_ncpds
-    ;;
-  stop-imps)
-    stop_imps
-    ;;
-  stop-ncpds)
-    stop_ncpds
-    ;;
+#  start-imps)
+#    start_imps
+#    ;;
+#  start-ncpds)
+#    start_ncpds
+#    ;;
+#  stop-imps)
+#    stop_imps
+#    ;;
+#  stop-ncpds)
+#    stop_ncpds
+#    ;;
   *)
     show_usage
     exit 1

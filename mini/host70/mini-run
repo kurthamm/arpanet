@@ -64,4 +64,6 @@ set imx channel=73;unit2;axis3
 set imx channel=77;unit3;axis0
 set imx channel=76;unit3;axis1;negate
 set imx channel=74;unit3;axis3
+
+set throttle 35%
 b ptr

@@ -9,7 +9,7 @@ echo "cd web-terminals/simh-server"
 cd web-terminals/simh-server
 
 echo "screen -dmS web-server ./start.sh local"
-screen -dmS web-server ./start.sh local
+screen -dmS web-server ./start.sh both
 
 cd ../..
 echo
