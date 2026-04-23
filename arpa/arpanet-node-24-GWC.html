@@ -503,7 +503,7 @@
                 <div class="section">
                     <h2 class="section-title">Overview</h2>
                     <div class="section-content">
-                        Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+                        The GWC node served <a href="https://www.ww35.usafunithistory.com/PDF/F-S/GLOBAL%20WEATHER%20CENTRAL.pdf">Air Force Global Weather Central (AFGWC)</a> which provided weather data and forecasts for military operations.
                     </div>
                 </div>
             </div>
@@ -534,23 +534,29 @@
                 <!-- Geographic Map -->
 					<div class="geo-map-container" id="geo-map-container"></div>
 
+
                 <div class="photo-item">
-                    <a href="images/arpa/24/building.jpg" target="_blank">
-                        <img src="images/arpa/24/building.jpg" alt="GWC Campus" />
-                    </a>
+                    <img src="images/arpa/24/AFGWC_Crest.png" alt="AFGWC Crest" />
+                    
                 </div>
+<!----
                 <div class="photo-item">
                     <a href="images/arpa/24/room.jpg" target="_blank">
                         <img src="images/arpa/24/room.jpg" alt="Server Room" />
                     </a>
                 </div>
+--->
             </div>
         </div>
 
         <!-- Additional Information -->
+
         <div class="section">
             <div class="section-content">
-                Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
+                
+                <p>In the mid 1970s, AFGWC's computers were located in Offutt's Building D, a truly huge building that was originally the Glenn L. Martin Bomber Plant, 
+                the factory where the Enola Gay was built.  Building D's main floor had a number of smaller buildings built inside of it.  
+                One of these housed AFGWC and the ARPANE GWC TIP.</p>
             </div>
         </div>
 
@@ -562,10 +568,12 @@
             <div class="sidebar-wrapper">
                 <div class="sidebar-wrapper-content">
                     <div class="host-content">
-                        Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores.
+                        <p>The GWC node was a Terminal Interface Processor (TIP).  A TIP was a variant of the IMP, special-purpose computer based on a Honeywell 316, built
+                    to connect user terminals to the Arpanet. GWC's TIP had a single ASR-33 teletype terminal as well as a 9-track tape drive for data storage and transfer.</p>
                     </div>
-
+<!---
                     <img class="featured-image" src="" alt="TIP" data-image-path="images/arpa/24/host-2-0" />
+--->
                 </div>
                 <div class="sidebar">
                     <div class="host-info-bar">
@@ -578,7 +586,7 @@
                     <a href="#">TIP Information</a><br>
                 </div>
             </div>
-
+<!----
             <div class="host-content">
                 Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe eveniet ut et voluptates repudiandae sint.
             </div>
@@ -600,20 +608,26 @@
                 Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit.
             </div>
         </div>
-        
+--->    
 
         <!-- People & Anecdotes Section -->
         <div class="section" id="canecdotes">
             <h2 class="section-title">People & Anecdotes</h2>
             <div class="section-content">
-                Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Donec velit neque, auctor sit amet aliquam vel, ullamcorper sit amet ligula.
+                <p>I was an Airman assigned to AFGWC from 1974 to 1977.  Although I did not use the ARPANET there
+                    as part of my normal duties, I did have access to it and used it a bit in the evenings.
+                    I was able to log onto computers at MIT and Stanford an play various games like 
+                    <a href="https://en.wikipedia.org/wiki/PARRY">PARRY</a> and
+                    <a href="https://en.wikipedia.org/wiki/Colossal_Cave_Adventure">ADVENT</a> (The Adventure of the Colossal Cave). I was also able to play with some obscure computer
+                    languages like <a href="https://en.wikipedia.org/wiki/SNOBOL">SNOBOL</a>.</p>
+                <p>-- RCTA ---
             </div>
         </div>
 
         <!-- Footer -->
         <div class="footer">
-            FOOTER TEXT
-        </div>
+            
+        </div
     </div>
 
     <script src="assets/js/arpanet-nodes.js"></script>
@@ -897,8 +911,8 @@
 
             // Set bounds to show entire continental USA
             const usaBounds = L.latLngBounds(
-                L.latLng(24.5, -125.0),  // Southwest
-                L.latLng(49.4, -66.0)    // Northeast
+                L.latLng(41.0, -95.65),  // Southwest
+                L.latLng(41.3, -96.25)    // Northeast
             );
             map.fitBounds(usaBounds);
 
@@ -927,8 +941,8 @@
             }
 
             // Get node's geographic coordinates
-            let latitude = 27.70;
-            let longitude = -82.764;
+            let latitude = 41.13123611111111111111;
+            let longitude = -95.91951111111111111111;
 
             if (nodeCoords && nodeCoords.lat && nodeCoords.lon) {
                 latitude = nodeCoords.lat;
