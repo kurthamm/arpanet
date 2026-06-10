@@ -1,3 +1,17 @@
+# Kurt's hosted terminal notes
+
+This fork branch includes fixes for the hosted web terminal scenarios so the local terminal page can repeatedly connect to the intended ITS hosts:
+
+- `@L 6` connects to ARPANET host `006`.
+- `@L 70` connects to ARPANET host `106` and identifies as `MIT Dynamic Modelling PDP-10`.
+- `@L 126` connects to ARPANET host `176`.
+
+Hosts `6` and `126` may display `Unknown ITS PDP-10` in the ITS banner. That banner is from the ITS disk image; the routing is confirmed by the `TELNET to host ...` line.
+
+The hosted terminal cleanup path now logs out of ITS before closing the local NCP telnet process, which prevents stale sessions from causing later `Open refused` or stalled connections.
+
+---
+
 # arpanet
 
 WORK IN PROGRESS - Probably too early unless you are involved.
