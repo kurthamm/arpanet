@@ -40,7 +40,8 @@ set imp enabled
 set imp ncp
 at -u imp 21062:127.0.0.1:21061
 
-set ch dis 
+set ch enabled
+set ch node=177002
 at ptr ./dskdmp.rim
 at dpa0 ./rp03.2
 at dpa1 ./rp03.3

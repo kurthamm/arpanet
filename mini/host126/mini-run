@@ -47,11 +47,11 @@ at -u mty line=6,10015 speed=9600
 
 set imp enabled
 set imp ncp
-at -u imp 21622:localhost:21621
+at -u imp 21622:127.0.0.1:21621
 
 
-set ch dis 
-#set ch node=177002
+set ch enabled
+set ch node=177002
 #set ch peer=localhost:44041
 #att ch 44042
 at ptr ./dskdmp.rim

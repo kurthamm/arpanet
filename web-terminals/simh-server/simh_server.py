@@ -147,7 +147,16 @@ class SimhSession:
         """Clean up simh process and PTY"""
         self.running = False
 
-        # Try graceful exit first by sending Ctrl-] to telnet client
+        # Try to leave remote ITS cleanly before closing the local NCP telnet.
+        if self.master_fd and self.proc and self.proc.poll() is None:
+            try:
+                os.write(self.master_fd, b'\x1a:logout\r')
+                time.sleep(1.0)
+                logger.debug(f"Sent ITS logout for graceful exit ({self.session_id})")
+            except Exception as e:
+                logger.debug(f"Error sending ITS logout ({self.session_id}): {e}")
+
+        # Try graceful local telnet exit before killing the process group
         if self.master_fd and self.proc and self.proc.poll() is None:
             try:
                 # Send Ctrl-] (ASCII 29) to telnet client to trigger graceful exit

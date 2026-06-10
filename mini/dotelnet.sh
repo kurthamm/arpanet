@@ -31,9 +31,9 @@ fi
 #echo "DEST=$DEST"
 
 TELNET_MODE=""
-if [[ "${4-}" =~ ^[oO]$ ]]; then
+if [[ "${4-}" =~ ^[oO]$ || "$DEST" == "70" || "$DEST" == "106" ]]; then
     TELNET_MODE="-o"
 fi
 
 #echo "NCP=ncp$IMP ./ncp-telnet -c $TELNET_MODE $HOST $DEST"
-NCP="ncp$IMP" ./ncp-telnet -c $TELNET_MODE $HOST $DEST
+exec env NCP="ncp$IMP" ./ncp-telnet -c $TELNET_MODE $HOST $DEST

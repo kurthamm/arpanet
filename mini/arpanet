@@ -49,7 +49,7 @@ declare -a IMPS=(
   "35:UCSD"
   "36:HAWAII"
   "37:RML"
-#  "62:HILTON"
+  "62:HILTON"
 )
 
 # ============================================================
@@ -311,13 +311,13 @@ stop_network() {
 case "$1" in
   start)
     start_network
+    ./host06.sh
+    sleep 0.2
     ./host70.sh
     sleep 0.2
-    ./host134.sh
+    ./host126.sh
     sleep 0.2
     ./host11.sh
-    sleep 0.2
-    ./host198.sh
 
     ;;
   stop)
