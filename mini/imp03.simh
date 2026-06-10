@@ -18,12 +18,12 @@ attach -u mi2 11203::11233
 
 set hi1 enabled
 set hi1 debug
-attach -u hi1 20031:localhost:20032
+attach -u hi1 20031:127.0.0.1:20032
 # Host 0: UCSB-MOD75
 
 set hi2 enabled
 set hi2 debug
-attach -u hi2 21031:localhost:21032
+attach -u hi2 21031:127.0.0.1:21032
 # Host 1: SCRL
 
 go

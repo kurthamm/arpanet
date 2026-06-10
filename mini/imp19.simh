@@ -18,7 +18,7 @@ attach -u mi2 11219::11120
 
 set hi1 enabled
 set hi1 debug
-attach -u hi1 20191:localhost:20192
+attach -u hi1 20191:127.0.0.1:20192
 # Host 0: NBS-ICST
 
 go

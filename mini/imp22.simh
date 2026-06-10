@@ -21,7 +21,7 @@ attach -u mi3 11322::11237
 
 set hi2 enabled
 set hi2 debug
-attach -u hi2 21221:localhost:21222
+attach -u hi2 21221:127.0.0.1:21222
 # Host 1: USC-ISI
 
 go

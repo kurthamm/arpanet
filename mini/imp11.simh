@@ -18,7 +18,7 @@ attach -u mi2 11211::11216
 
 set hi1 enabled
 set hi1 debug
-attach -u hi1 20111:localhost:20112
+attach -u hi1 20111:127.0.0.1:20112
 # Host 0: SU-AI
 
 go

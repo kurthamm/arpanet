@@ -38,7 +38,7 @@ at -u mty line=6,16015 speed=9600
 
 set imp enabled
 set imp ncp
-at -u imp 22062:localhost:22061
+at -u imp 22062:127.0.0.1:22061
 
 set ch dis 
 at ptr ./dskdmp.rim

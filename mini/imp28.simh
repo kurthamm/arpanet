@@ -18,7 +18,7 @@ attach -u mi2 11228::11217
 
 set hi1 enabled
 set hi1 debug
-attach -u hi1 20281:localhost:20282
+attach -u hi1 20281:127.0.0.1:20282
 # Host 0: ARPA-DMS
 
 go

@@ -21,7 +21,7 @@ attach -u mi3 11313::11318
 
 set hi1 enabled
 set hi1 debug
-attach -u hi1 20131:localhost:20132
+attach -u hi1 20131:127.0.0.1:20132
 # Host 0: CASE-10
 
 go

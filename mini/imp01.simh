@@ -21,12 +21,12 @@ attach -u mi3 11301::11135
 
 set hi1 enabled
 set hi1 debug
-attach -u hi1 20011:localhost:20012
+attach -u hi1 20011:127.0.0.1:20012
 # Host 0: UCLA-NMC
 
 set hi2 enabled
 set hi2 debug
-attach -u hi2 21011:localhost:21012
+attach -u hi2 21011:127.0.0.1:21012
 # Host 1: UCLA-CCn
 
 go
