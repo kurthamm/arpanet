@@ -99,3 +99,31 @@ dispatch) wedges, or whether `USTRA` (job slot creation) fails each tick.
 Key kernel addresses (KA ITS 1652, host126 build): IMPRFC=60201
 IMPRFQ=60322 NTRFCL=55721 NUJBST=146165 NETUSW=210033 TREESW=210060
 UTTYS=207155 UTTYI=207162 UTTYO=207163 UTTYCT=207164 NETCL1=100165
+
+### Fixed: emulator IMP interrupt bug — ITS now ANSWERS network logins
+
+The bundled `pdp10-ka` (built Dec 2024 from rcornwell/sims b45fedc0) is
+missing the KAIMP fix from larsbrinkhoff/ka10-simh `lars/ncp` commit
+a7c902ff (2026-01-10), which resolves PDP-10/its issue #2376
+("LOCK NET hangs ITS"):
+
+1. CONO with IMPIR clear must clear IMPIC — otherwise interrupt-on-IMP-
+   ready stays latched, the IMP interrupt fires forever, IMPOST never
+   returns, and the clock level is starved. This was the cause of the
+   stuck UTTYS ring (no NETRFC spawn) and of terminals dying after
+   network activity.
+2. `STATUS &= IMPR` typo (missing `~`) corrupted device status on
+   incoming packets without the ready flag.
+
+Rebuilt `pdp10-ka` from larsbrinkhoff/ka10-simh @ lars/ncp (a7c902ff)
+as `mini/host126/pdp10-ka-fixed`. Result: with this binary plus the
+Chaosnet fix, an incoming `ncp-telnet -c 126` from IMP 31 received the
+ITS TELSER login banner ("It's a lovely day to be a turist!") — the
+first successful network login answer from host126.
+
+Remaining flakiness: acceptance is intermittent across boots
+("Open refused" CLS on some attempts); the pathological self-telnet
+(:TELNET 176 to self) breaks RFNM accounting ("IMP: neg RFNM-wait cnt")
+and should be avoided. Note: open-simh PR #522 (H316 host port 3/4
+device address swap) is also needed for hosts on IMP ports 3-4
+(MIT-AI 134, MIT-ML 198); host126 (port 2) is unaffected.
