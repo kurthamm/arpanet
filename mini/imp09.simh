@@ -18,12 +18,12 @@ attach -u mi2 11209::11129
 
 set hi1 enabled
 set hi1 debug
-attach -u hi1 20091:localhost:20092
+attach -u hi1 20091:127.0.0.1:20092
 # Host 0: HARV-10
 
 set hi2 enabled
 set hi2 debug
-attach -u hi2 21091:localhost:21092
+attach -u hi2 21091:127.0.0.1:21092
 # Host 1: HARV-1
 
 go

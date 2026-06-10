@@ -21,7 +21,7 @@ attach -u mi3 11305::11130
 
 set hi1 enabled
 set hi1 debug
-attach -u hi1 20051:localhost:20052
+attach -u hi1 20051:127.0.0.1:20052
 # Host 0: BBN-NCC
 
 #set hi2 enabled

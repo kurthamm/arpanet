@@ -18,12 +18,12 @@ attach -u mi2 11232::11133
 
 set hi1 enabled
 set hi1 debug
-attach -u hi1 20321:localhost:20322
+attach -u hi1 20321:127.0.0.1:20322
 # Host 0: PARC-MAXC
 
 set hi2 enabled
 set hi2 debug
-attach -u hi2 21321:localhost:21322
+attach -u hi2 21321:127.0.0.1:21322
 # Host 1: PARC-VTS
 
 go

@@ -30,5 +30,10 @@ fi
 #echo "HOST=$HOST"
 #echo "DEST=$DEST"
 
-#echo "NCP=ncp$IMP ./ncp-telnet -c $HOST  $DEST"
-NCP="ncp$IMP" ./ncp-telnet -c $HOST $DEST
+TELNET_MODE=""
+if [[ "${4-}" =~ ^[oO]$ ]]; then
+    TELNET_MODE="-o"
+fi
+
+#echo "NCP=ncp$IMP ./ncp-telnet -c $TELNET_MODE $HOST $DEST"
+NCP="ncp$IMP" ./ncp-telnet -c $TELNET_MODE $HOST $DEST

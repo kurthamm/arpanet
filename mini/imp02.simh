@@ -21,16 +21,16 @@ attach -u mi3 11302::11132
 
 set hi1 enabled
 set hi1 debug
-attach -u hi1 20021:localhost:20022
+attach -u hi1 20021:127.0.0.1:20022
 # Host 0: SRI-ARC
 
 set hi2 enabled
 set hi2 debug
-attach -u hi2 21021:localhost:21022
+attach -u hi2 21021:127.0.0.1:21022
 # Host 1: SRI-AI
 
 #set hi2 enabled
-#attach -u hi2 21021:localhost:21022
+#attach -u hi2 21021:127.0.0.1:21022
 # Host 1: SRI-AI
 
 go

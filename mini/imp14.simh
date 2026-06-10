@@ -18,12 +18,12 @@ attach -u mi2 11214::11113
 
 set hi1 enabled
 set hi1 debug
-attach -u hi1 20141:localhost:20142
+attach -u hi1 20141:127.0.0.1:20142
 # Host 0: CMU-10B
 
 set hi2 enabled
 set hi2 debug
-attach -u hi2 21141:localhost:21142
+attach -u hi2 21141:127.0.0.1:21142
 # Host 1: CMU-10A
 
 go

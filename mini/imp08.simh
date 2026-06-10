@@ -18,11 +18,11 @@ attach -u mi2 11208::11101
 
 set hi1 enabled
 set hi1 debug
-attach -u hi1 20081:localhost:20082
+attach -u hi1 20081:127.0.0.1:20082
 # Host 0: SDC-LAB
 
 #set hi1 enabled
-#attach -u hi1 20081:localhost:20082
+#attach -u hi1 20081:127.0.0.1:20082
 # Host 0: ?
 
 go

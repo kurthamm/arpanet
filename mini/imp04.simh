@@ -18,7 +18,7 @@ attach -u mi2 11204::11112
 
 set hi1 enabled
 set hi1 debug
-attach -u hi1 20041:localhost:20042
+attach -u hi1 20041:127.0.0.1:20042
 # Host 0: UTAH-10
 
 go

@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+cd "$(dirname "$0")"
 
 # SESSION_NUMBER: argument, if given, overrides environment SESSION_NUMBER
 if [[ -n "${1-}" ]]; then
@@ -49,8 +50,9 @@ while IFS= read -r line; do
     line=${line%$'\r'}
 
 #    if [[ $line =~ ^@L[[:space:]]*([0-9]+) ]]; then
-if [[ $line =~ ^@[lLoO][[:space:]]*([0-9]+) ]]; then
-        DEST="${BASH_REMATCH[1]}"
+if [[ $line =~ ^@([lLoO])[[:space:]]*([0-9]+) ]]; then
+        COMMAND="${BASH_REMATCH[1]}"
+        DEST="${BASH_REMATCH[2]}"
 	break
     fi
 done
@@ -63,5 +65,5 @@ done
 #fi
 
 cd ./mini
-./dotelnet.sh "$IMP_NUMBER" "$HOST_NUMBER" "$DEST"
+./dotelnet.sh "$IMP_NUMBER" "$HOST_NUMBER" "$DEST" "$COMMAND"
 
