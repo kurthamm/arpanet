@@ -50,8 +50,7 @@ set imp ncp
 at -u imp 21622:127.0.0.1:21621
 
 
-set ch enabled
-set ch node=177002
+set ch dis 
 #set ch peer=localhost:44041
 #att ch 44042
 at ptr ./dskdmp.rim
