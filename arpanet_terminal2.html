@@ -439,6 +439,89 @@
             gap: 8px;
         }
 
+        body.terminal-focus-mode {
+            padding: 0;
+            overflow: hidden;
+            height: 100vh;
+            background: #000;
+        }
+
+        body.terminal-focus-mode .container {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: #000;
+        }
+
+        body.terminal-focus-mode .header,
+        body.terminal-focus-mode .main-content > .panel:not(#terminal-panel),
+        body.terminal-focus-mode .misc-content > .panel:not(#terminal-controls-panel),
+        body.terminal-focus-mode .tape-content,
+        body.terminal-focus-mode #fullscreen-container {
+            display: none !important;
+        }
+
+        body.terminal-focus-mode .main-content,
+        body.terminal-focus-mode .misc-content {
+            display: block;
+        }
+
+        body.terminal-focus-mode #terminal-panel {
+            position: fixed;
+            inset: 0 0 58px 0;
+            z-index: 1000;
+            padding: 0 !important;
+            display: flex !important;
+            flex-direction: column;
+            background: #000;
+        }
+
+        body.terminal-focus-mode #terminal-panel .panel-header {
+            margin: 0;
+            padding: 8px 12px !important;
+            min-height: 44px;
+            background: var(--slate);
+            color: var(--cream);
+        }
+
+        body.terminal-focus-mode #terminal-panel .mobile-terminal-controls span {
+            display: none;
+        }
+
+        body.terminal-focus-mode #terminal-container {
+            flex: 1;
+            min-height: 0;
+            height: auto !important;
+            background: #000 !important;
+            overflow: hidden !important;
+        }
+
+        body.terminal-focus-mode #terminal-controls-panel {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1001;
+            min-height: 58px;
+            padding: 8px 12px;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            background: var(--slate);
+            color: var(--cream);
+        }
+
+        body.terminal-focus-mode #terminal-controls-panel .panel-header,
+        body.terminal-focus-mode #terminal-controls-panel #messages {
+            display: none;
+        }
+
+        body.terminal-focus-mode #terminal-controls-panel .header-controls {
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
         /* Type 30 Display */
         #display-container {
             margin: auto;
@@ -857,7 +940,7 @@
 
         <div class="main-content">
             <!-- Terminal Panel -->
-            <div class="panel" style="padding: 0; display: flex; flex-direction: column;">
+            <div class="panel" id="terminal-panel" style="padding: 0; display: flex; flex-direction: column;">
                 <div class="panel-header" style="padding: 12px;">
                     Terminal
                     <div class="mobile-terminal-controls" style="display: flex; align-items: center; gap: 8px; margin-left: 10px;">
@@ -936,7 +1019,7 @@
 
         <div class="misc-content">
             <!-- Controls below Terminal -->
-            <div class="panel">
+            <div class="panel" id="terminal-controls-panel">
                 <div class="panel-header">
                     Terminal Controls
                 </div>
@@ -944,7 +1027,7 @@
 					<button class="button" id="Disconnect-button">Disconnect</button>
 					<button class="button" id="switch-terminal-button">VT-05</button>
 					<button class="button" id="mute-button" style="display: none;">Unmute</button>
-					<button class="button" id="fullscreen-button">Full Screen</button>
+					<button class="button" id="fullscreen-button">Focus Terminal</button>
 				</div>
 		        <div id="messages"></div>
 	        </div>
@@ -1203,6 +1286,7 @@
         let isConnected = false;
         let term = null; // xterm.js terminal instance
         let ws = null; // WebSocket connection
+        let terminalFocusMode = false;
 
         // Character pacing for baud rate simulation
         let charQueue = [];
@@ -1300,6 +1384,58 @@
             }
           }
         };
+
+        function calculateTerminalLayout() {
+          const terminalEl = document.getElementById('terminal');
+          const config = terminalConfigs[selectedTerminalType];
+          const cols = config.cols;
+          let rows = config.rows;
+          let fontSize = config.fontSize;
+
+          if (!terminalEl) {
+            return { cols, rows, fontSize };
+          }
+
+          const container = terminalEl.parentElement;
+          const containerWidth = Math.max(container?.clientWidth || terminalEl.clientWidth || 0, 1);
+          const containerHeight = Math.max(container?.clientHeight || terminalEl.clientHeight || 0, 1);
+          const focusMaxFontSize = terminalFocusMode ? 48 : 24;
+
+          if (selectedTerminalType === 'teletype33') {
+            const lineHeight = fontSize * 1.2;
+            rows = Math.floor((containerHeight - 4) / lineHeight);
+            rows = Math.max(5, Math.min(rows, terminalFocusMode ? 80 : 50));
+          } else if (selectedTerminalType === 'vt05') {
+            const widthFontSize = Math.floor(containerWidth / (cols * 0.6));
+            const heightFontSize = Math.floor((containerHeight - 8) / (config.rows * 1.2));
+            fontSize = Math.min(widthFontSize, heightFontSize || widthFontSize);
+            fontSize = Math.max(8, Math.min(fontSize, focusMaxFontSize));
+          }
+
+          return { cols, rows, fontSize };
+        }
+
+        function refitTerminalToContainer() {
+          if (!term) return;
+          const layout = calculateTerminalLayout();
+          term.options.fontSize = layout.fontSize;
+          term.resize(layout.cols, layout.rows);
+          term.refresh(0, Math.max(term.rows - 1, 0));
+          term.scrollToBottom();
+        }
+
+        function setTerminalFocusMode(enabled) {
+          terminalFocusMode = enabled;
+          document.body.classList.toggle('terminal-focus-mode', enabled);
+
+          const fullscreenBtn = document.getElementById('fullscreen-button');
+          if (fullscreenBtn) {
+            fullscreenBtn.textContent = enabled ? 'Exit Focus' : 'Focus Terminal';
+          }
+
+          window.setTimeout(refitTerminalToContainer, 0);
+          window.setTimeout(refitTerminalToContainer, 150);
+        }
 
         // Character pacing functions
         function startCharacterPacing() {
@@ -1483,30 +1619,10 @@
           const config = terminalConfigs[selectedTerminalType];
 
           // Calculate dynamic dimensions
-          let dynamicRows = config.rows; // default fallback
-          let dynamicFontSize = config.fontSize; // default fallback
-
-          if (selectedTerminalType === 'teletype33' && terminalEl) {
-            // Teletype: dynamic rows to fill height
-            // Get the parent container (terminal-container) height for more reliable sizing
-            const containerHeight = terminalEl.parentElement.clientHeight;
-            // Approximate line height based on font size (typically 1.2x font size)
-            const lineHeight = dynamicFontSize * 1.2;
-            dynamicRows = Math.floor((containerHeight - 4) / lineHeight); // subtract 4px for padding
-            // Ensure minimum reasonable rows (but max out at config default if container is large)
-            dynamicRows = Math.max(5, Math.min(dynamicRows, 50));
-            console.log(`Terminal container height: ${containerHeight}px, font size: ${dynamicFontSize}px, calculated rows: ${dynamicRows}`);
-          } else if (selectedTerminalType === 'vt05' && terminalEl) {
-            // VT-05: dynamic font size so 72 columns fits in available width
-            const containerWidth = terminalEl.clientWidth;
-            // For monospace fonts, approximate character width is about 0.6 * font-size
-            // We want: 72 chars * (font-size * 0.6) <= containerWidth
-            // So: font-size <= containerWidth / (72 * 0.6)
-            dynamicFontSize = Math.floor(containerWidth / (config.cols * 0.6));
-            // Ensure minimum reasonable font size
-            dynamicFontSize = Math.max(8, Math.min(dynamicFontSize, 24));
-            console.log(`VT-05 width: ${containerWidth}px, calculated font size: ${dynamicFontSize}px for ${config.cols} columns`);
-          }
+          const layout = calculateTerminalLayout();
+          let dynamicRows = layout.rows;
+          let dynamicFontSize = layout.fontSize;
+          console.log(`Terminal layout: ${layout.cols} cols, ${dynamicRows} rows, ${dynamicFontSize}px font`);
 
           // Create terminal with the selected configuration
           term = new Terminal({
@@ -1752,6 +1868,26 @@
             muteBtn.textContent = isNowEnabled ? 'Mute' : 'Unmute';
           });
         }
+
+        const fullscreenBtn = document.getElementById('fullscreen-button');
+        if (fullscreenBtn) {
+          fullscreenBtn.textContent = 'Focus Terminal';
+          fullscreenBtn.addEventListener('click', () => {
+            setTerminalFocusMode(!terminalFocusMode);
+          });
+        }
+
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape' && terminalFocusMode) {
+            setTerminalFocusMode(false);
+          }
+        });
+
+        window.addEventListener('resize', () => {
+          if (term) {
+            window.setTimeout(refitTerminalToContainer, 0);
+          }
+        });
 
         // Mobile terminal control buttons
         const ctrlZBtn = document.getElementById('ctrl-z-button');
