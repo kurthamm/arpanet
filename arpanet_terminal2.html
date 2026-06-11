@@ -1261,9 +1261,15 @@
               TERMINAL_SERVER = 'ws://localhost:8080';
               console.log('Local mode detected - using relay server:', TERMINAL_SERVER);
             } else {
-              // VPS mode: connect to relay server on the web server
+              // VPS mode: connect to relay server on the web server.
+              // Cloudflare Tunnel exposes normal HTTPS/WSS on port 443, so use
+              // a path-based WebSocket route there instead of forcing :8080.
               const wsProtocol = protocol === 'https:' ? 'wss' : 'ws';
-              TERMINAL_SERVER = `${wsProtocol}://${hostname}:8080`;
+              if (protocol === 'https:' && hostname.endsWith('.hamm.me')) {
+                TERMINAL_SERVER = `${wsProtocol}://${hostname}/ws`;
+              } else {
+                TERMINAL_SERVER = `${wsProtocol}://${hostname}:8080`;
+              }
               console.log('VPS mode detected - using relay server:', TERMINAL_SERVER);
             }
           } else {
