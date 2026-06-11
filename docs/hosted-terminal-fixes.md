@@ -1,96 +1,83 @@
-# Hosted Terminal Fixes
+# Hosted Terminal Operation
 
-This document summarizes the ARPANET simulation work in this fork. It is separate from the physical PiDP-10 integration work, which lives in a companion repository.
+This fork supports the hosted browser terminal for the ARPANET simulation and, when configured locally, an external PiDP-10 host at ARPANET host `41` / octal `051`.
 
-## Scope
+## Browser Commands
 
-These changes belong to the ARPANET simulation and hosted terminal workflow:
-
-- Repeated hosted terminal sessions should connect cleanly.
-- `@L` and `@O` commands should route to the intended hosts.
-- Session cleanup should avoid stale NCP TELNET state.
-- Host banners should be interpreted correctly.
-
-Physical PiDP-10 replica integration is documented separately:
-
-- https://github.com/kurthamm/pidp10-arpanet-node
-
-## User-facing behavior
-
-From the hosted terminal page:
+Use the hosted terminal page and type one of these commands at the TIP prompt:
 
 ```text
 @L 6
 @L 70
 @L 126
+@L 41
 ```
 
-Expected behavior:
+Expected routing:
 
-- `@L 6` reaches ARPANET host `006`.
-- `@L 70` reaches ARPANET host `106` / octal `106` and identifies as `MIT Dynamic Modelling PDP-10`.
-- `@L 126` reaches ARPANET host `176` / octal `176`.
+| Command | Target | Notes |
+| --- | --- | --- |
+| `@L 6` | host `006` | MIT ITS host. |
+| `@L 70` | host `106` | MIT Dynamic Modelling PDP-10; uses old TELNET mode automatically. |
+| `@L 126` | host `176` | ITS host. |
+| `@L 41` | host `051` | External PiDP-10, if the site-local IMP41 link is configured. |
+| `@L 051` | host `051` | Accepted spelling for the same PiDP-10 host. |
 
-Some hosts may display:
+Some ITS hosts may display `Unknown ITS PDP-10` and `It's a lovely day to be a turist!`. That text is an ITS/TELSER banner and does not by itself indicate wrong routing. Use the `TELNET to host ...` line and NCP tests for routing verification.
+
+## PiDP-10 Host 41 Routing
+
+The browser launcher treats host `41` specially:
+
+- `@L 41` and `@L 051` are routed through source NCP `ncp31`.
+- `41` / `051` use old TELNET mode (`-o`) automatically.
+- Users should not need to type `@O 41` for the hosted page.
+
+The site-local IMP41 link is intentionally not committed as a generic upstream setting. Keep deployment-specific IMP41/Tailscale details in the companion repository:
 
 ```text
-Unknown ITS PDP-10
-It's a lovely day to be a turist!
+https://github.com/kurthamm/pidp10-arpanet-node
 ```
 
-That greeting comes from ITS/TELSER for a generic ITS machine identity. It does not by itself prove incorrect routing. The stronger routing evidence is the `TELNET to host ...` line.
+## Direct Validation
 
-## Repeated connection cleanup
+From `mini/`, verify the hosted hosts and PiDP host path:
 
-The hosted terminal must clean up the ITS/NCP session when a browser terminal disconnects. Otherwise later `@L` sessions can fail with symptoms such as:
-
-```text
-Open refused
+```sh
+NCP=ncp31 ./ncp-ping -c1 6
+NCP=ncp31 ./ncp-ping -c1 70
+NCP=ncp31 ./ncp-ping -c1 126
+NCP=ncp31 ./ncp-ping -c1 41
 ```
 
-or a stalled connection.
+Check the launcher path without using the browser:
 
-The fix is to close the local NCP TELNET process cleanly and allow ITS to release the server-side session.
-
-## Testing
-
-Recommended smoke tests from the hosted terminal:
-
-```text
-@L 6
+```sh
+printf '@L 41\r\n' | SESSION_NUMBER=0 ../do.sh
+printf '@L 051\r\n' | SESSION_NUMBER=0 ../do.sh
 ```
 
-Disconnect, reconnect, then:
-
-```text
-@L 70
-```
-
-Disconnect, reconnect, then:
-
-```text
-@L 126
-```
-
-The important check is that each session reaches a distinct host target and later sessions are not blocked by stale state from earlier sessions.
-
-## External PiDP-10 host
-
-This fork can also be used with an external PiDP-10 replica attached as host `41` / octal `051`, but that integration is intentionally documented outside this repository:
-
-- https://github.com/kurthamm/pidp10-arpanet-node
-
-Keep site-specific PiDP-10/Tailscale/IMP41 configuration out of this repository unless it becomes a generic upstream-supported scenario.
+Both commands should attempt `TELNET to host 051.`
 
 ## Relay Session Diagnostics
 
-If a browser terminal session hangs after `@L`, check for relay-owned TELNET children before restarting hosts or IMPs:
+If the hosted browser terminal hangs after an `@L` command, check relay-owned TELNET children before restarting hosts or IMPs:
 
 ```sh
 ps -eo pid,ppid,pgid,sid,stat,args | grep '[n]cp-telnet'
 pgrep -af simh_server.py
 ```
 
-A stale `ncp-telnet` whose parent is the running `simh_server.py` belongs to the browser relay. Clean that relay session/process group; do not restart hosted ITS hosts for this symptom unless direct `ncp-ping` also fails.
+A stale `ncp-telnet` whose parent is the running `simh_server.py` belongs to the browser relay. Clean that relay session/process group; do not restart hosted ITS hosts unless direct `ncp-ping` fails.
 
-Host `41` / `051` requires old TELNET mode (`-o`), so browser `@L 41` is mapped to the same mode as `@O 41`.
+## Hosted Host Operations
+
+Use `mini/hostctl.sh` for hosted ITS hosts `6`, `70`, and `126`:
+
+```sh
+mini/hostctl.sh status all
+mini/hostctl.sh verify all
+mini/hostctl.sh restart 70
+```
+
+Do not use raw `screen -X quit` plus manual `screen -dmS` for these hosts. See `docs/host-lifecycle.md`.

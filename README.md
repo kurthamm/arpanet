@@ -1,33 +1,41 @@
+# Kurt's fork documentation
+
+This branch documents and supports two related but separate work streams:
+
+- Hosted ARPANET terminal operation: see [docs/hosted-terminal-fixes.md](docs/hosted-terminal-fixes.md).
+- Safe hosted ITS host lifecycle commands: see [docs/host-lifecycle.md](docs/host-lifecycle.md).
+- Physical PiDP-10 external host integration: see [kurthamm/pidp10-arpanet-node](https://github.com/kurthamm/pidp10-arpanet-node).
+
+## Hosted Terminal Quick Use
+
+From the hosted terminal page:
+
+```text
+@L 6
+@L 70
+@L 126
+@L 41
+```
+
+Host `41` / octal `051` is an optional external PiDP-10 path. The launcher maps `@L 41` and `@L 051` through the working source NCP and old TELNET mode automatically.
 
 ## Hosted ITS Host Operations
 
-For safe restart/status/verification of hosted ITS hosts `6`, `70`, and `126`, use `mini/hostctl.sh`. It kills orphan simulator process groups, waits for ports to clear, restores clean packs, and verifies NCP reachability. See `docs/host-lifecycle.md`.
+For safe status, restart, and verification of hosted ITS hosts `6`, `70`, and `126`, use:
 
-# Kurt's fork documentation
+```sh
+mini/hostctl.sh status all
+mini/hostctl.sh verify all
+mini/hostctl.sh restart 70
+```
 
-This fork tracks two separate work streams:
+`mini/hostctl.sh` stops simulator process groups, waits for ports to clear, restores clean packs, and verifies NCP reachability. Do not restart these hosts with raw `screen` commands.
 
-- Hosted ARPANET terminal fixes: see [docs/hosted-terminal-fixes.md](docs/hosted-terminal-fixes.md).
-- Physical PiDP-10 external host integration: see [kurthamm/pidp10-arpanet-node](https://github.com/kurthamm/pidp10-arpanet-node).
+## Repository Split
 
-The PiDP-10 work is intentionally kept in a separate companion repository because it documents home-lab replica hardware, IMP41 bridging, and overlay networking.
-
----
-
-# Kurt's hosted terminal notes
-
-This fork branch includes fixes for the hosted web terminal scenarios so the local terminal page can repeatedly connect to the intended ITS hosts:
-
-- `@L 6` connects to ARPANET host `006`.
-- `@L 70` connects to ARPANET host `106` and identifies as `MIT Dynamic Modelling PDP-10`.
-- `@L 126` connects to ARPANET host `176`.
-
-Hosts `6` and `126` may display `Unknown ITS PDP-10` in the ITS banner. That banner is from the ITS disk image; the routing is confirmed by the `TELNET to host ...` line.
-
-The hosted terminal cleanup path now logs out of ITS before closing the local NCP telnet process, which prevents stale sessions from causing later `Open refused` or stalled connections.
+The PiDP-10 work is intentionally kept in a separate companion repository because it documents home-lab replica hardware, IMP41 bridging, and overlay networking. Site-specific PiDP-10/Tailscale configuration should stay out of this repository unless it becomes a generic upstream-supported scenario.
 
 ---
-
 # arpanet
 
 WORK IN PROGRESS - Probably too early unless you are involved.
