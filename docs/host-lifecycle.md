@@ -40,3 +40,19 @@ Valid host targets are `6`, `70`, `126`, or `all`.
 ## Safety Rule
 
 Do not restart these hosts with raw `screen -X quit` followed by `screen -dmS ...`. That can leave orphan PDP-10 simulators running and cause the next start to fail with `Address already in use` or `Host is not up`.
+
+## Full Health Audit
+
+Before changing runtime state, run the read-only full-system audit:
+
+```sh
+mini/arpanet-health.sh
+```
+
+The audit checks hosted ITS hosts, direct NCP reachability, browser relay sessions, stale `ncp-telnet` processes, IMP62/IMP41 sockets, and the PiDP-side screens when SSH is available. It reports `OK`, `WARN`, and `FAIL` without restarting or killing anything.
+
+If the Pi cannot be reached from the current shell, skip only that portion with:
+
+```sh
+ARPANET_CHECK_PI=0 mini/arpanet-health.sh
+```

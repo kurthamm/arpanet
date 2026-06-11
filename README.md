@@ -29,6 +29,12 @@ mini/hostctl.sh verify all
 mini/hostctl.sh restart 70
 ```
 
+Before changing runtime state, run:
+
+```sh
+mini/arpanet-health.sh
+```
+
 `mini/hostctl.sh` stops simulator process groups, waits for ports to clear, restores clean packs, and verifies NCP reachability. Do not restart these hosts with raw `screen` commands.
 
 ## Repository Split
