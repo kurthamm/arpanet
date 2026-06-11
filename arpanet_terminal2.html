@@ -469,7 +469,7 @@
 
         body.terminal-focus-mode #terminal-panel {
             position: fixed;
-            inset: 0 0 58px 0;
+            inset: 0;
             z-index: 1000;
             padding: 0 !important;
             display: flex !important;
@@ -481,7 +481,7 @@
             margin: 0;
             padding: 8px 12px !important;
             min-height: 44px;
-            background: var(--slate);
+            background: rgba(44, 62, 80, 0.94);
             color: var(--cream);
         }
 
@@ -499,17 +499,30 @@
 
         body.terminal-focus-mode #terminal-controls-panel {
             position: fixed;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            z-index: 1001;
-            min-height: 58px;
-            padding: 8px 12px;
+            top: 10px;
+            right: 10px;
+            z-index: 2000;
+            min-height: 0;
+            padding: 8px;
             display: flex !important;
             align-items: center;
             justify-content: center;
-            background: var(--slate);
+            background: rgba(44, 62, 80, 0.96);
             color: var(--cream);
+            border: 2px solid var(--cream);
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+            overflow: visible;
+        }
+
+        body.terminal-focus-mode #terminal-controls-panel::before {
+            content: "Focus Mode";
+            color: var(--cream);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-right: 8px;
+            text-transform: uppercase;
         }
 
         body.terminal-focus-mode #terminal-controls-panel .panel-header,
@@ -520,6 +533,13 @@
         body.terminal-focus-mode #terminal-controls-panel .header-controls {
             justify-content: center;
             flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        body.terminal-focus-mode #terminal-controls-panel .button {
+            padding: 6px 10px;
+            font-size: 12px;
+            border-color: var(--cream);
         }
 
         /* Type 30 Display */
