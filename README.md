@@ -1,3 +1,8 @@
+
+## Hosted ITS Host Operations
+
+For safe restart/status/verification of hosted ITS hosts `6`, `70`, and `126`, use `mini/hostctl.sh`. It kills orphan simulator process groups, waits for ports to clear, restores clean packs, and verifies NCP reachability. See `docs/host-lifecycle.md`.
+
 # Kurt's fork documentation
 
 This fork tracks two separate work streams:
