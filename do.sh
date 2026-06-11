@@ -58,6 +58,13 @@ if [[ $line =~ ^@([lLoO])[[:space:]]*([0-9]+) ]]; then
 done
 #echo "---> connect $DEST"
 
+# Host 41 is the external PiDP-10 path.  It is reachable for NCP ping from
+# multiple sources, but TELNET is reliable through the CCA source NCP.
+if [[ "$DEST" == "41" || "$DEST" == "051" ]]; then
+    IMP_NUMBER=31
+    HOST_NUMBER=0
+fi
+
 # DEST: either 2nd argument or prompt
 #DEST="${2:-}"
 #if [[ -z "$DEST" ]]; then
