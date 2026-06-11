@@ -4,6 +4,7 @@ This branch documents and supports two related but separate work streams:
 
 - Hosted ARPANET terminal operation: see [docs/hosted-terminal-fixes.md](docs/hosted-terminal-fixes.md).
 - Safe hosted ITS host lifecycle commands: see [docs/host-lifecycle.md](docs/host-lifecycle.md).
+- DigitalOcean migration and runtime hardening: see [docs/digitalocean-migration.md](docs/digitalocean-migration.md).
 - Physical PiDP-10 external host integration: see [kurthamm/pidp10-arpanet-node](https://github.com/kurthamm/pidp10-arpanet-node).
 
 ## Hosted Terminal Quick Use
