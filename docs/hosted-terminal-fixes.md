@@ -81,3 +81,16 @@ This fork can also be used with an external PiDP-10 replica attached as host `41
 - https://github.com/kurthamm/pidp10-arpanet-node
 
 Keep site-specific PiDP-10/Tailscale/IMP41 configuration out of this repository unless it becomes a generic upstream-supported scenario.
+
+## Relay Session Diagnostics
+
+If a browser terminal session hangs after `@L`, check for relay-owned TELNET children before restarting hosts or IMPs:
+
+```sh
+ps -eo pid,ppid,pgid,sid,stat,args | grep '[n]cp-telnet'
+pgrep -af simh_server.py
+```
+
+A stale `ncp-telnet` whose parent is the running `simh_server.py` belongs to the browser relay. Clean that relay session/process group; do not restart hosted ITS hosts for this symptom unless direct `ncp-ping` also fails.
+
+Host `41` / `051` requires old TELNET mode (`-o`), so browser `@L 41` is mapped to the same mode as `@O 41`.

@@ -26,12 +26,18 @@ else
     DEST=126
 fi
 
+# Normalize octal-style ARPANET host spelling used in the UI/docs.
+# ncp-telnet expects decimal input and prints octal host numbers.
+if [[ "$DEST" == "051" ]]; then
+    DEST=41
+fi
+
 #echo "IMP=$IMP"
 #echo "HOST=$HOST"
 #echo "DEST=$DEST"
 
 TELNET_MODE=""
-if [[ "${4-}" =~ ^[oO]$ || "$DEST" == "70" || "$DEST" == "106" ]]; then
+if [[ "${4-}" =~ ^[oO]$ || "$DEST" == "70" || "$DEST" == "106" || "$DEST" == "41" || "$DEST" == "051" ]]; then
     TELNET_MODE="-o"
 fi
 
