@@ -1,3 +1,14 @@
+# Kurt's fork documentation
+
+This fork tracks two separate work streams:
+
+- Hosted ARPANET terminal fixes: see [docs/hosted-terminal-fixes.md](docs/hosted-terminal-fixes.md).
+- Physical PiDP-10 external host integration: see [kurthamm/pidp10-arpanet-node](https://github.com/kurthamm/pidp10-arpanet-node).
+
+The PiDP-10 work is intentionally kept in a separate companion repository because it documents home-lab replica hardware, IMP41 bridging, and overlay networking.
+
+---
+
 # Kurt's hosted terminal notes
 
 This fork branch includes fixes for the hosted web terminal scenarios so the local terminal page can repeatedly connect to the intended ITS hosts:
