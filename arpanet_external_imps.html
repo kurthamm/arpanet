@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Connect IMP and PiDP Replicas</title>
+    <meta name="description" content="How external IMP and PiDP replicas can connect to the ARPANET Reconstruction Project">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=swap');
+        :root { --cream:#e5dac3; --slate:#5b6d7a; --dark-slate:#445561; --dark-text:#293238; --light-text:#f2ebd5; }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:'Jost',sans-serif; background:var(--slate); color:var(--dark-text); line-height:1.55; padding:15px; font-size:18px; }
+        .container { max-width:1100px; margin:0 auto; background:var(--cream); padding:25px; }
+        .header { margin-bottom:30px; border-bottom:2px solid var(--slate); padding-bottom:20px; }
+        .back-button,.button { display:inline-block; padding:8px 16px; background:var(--slate); color:var(--cream); text-decoration:none; font-weight:600; font-size:14px; text-transform:uppercase; border-radius:4px; transition:background-color .2s; }
+        .back-button:hover,.button:hover { background:var(--dark-slate); }
+        .button-row { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+        .breadcrumb { font-size:16px; margin-bottom:15px; color:var(--slate); font-weight:500; }
+        .breadcrumb a { color:var(--slate); text-decoration:none; border-bottom:1px dotted var(--slate); }
+        .page-title { font-size:32px; font-weight:700; color:var(--slate); text-transform:uppercase; letter-spacing:1px; }
+        .subtitle { margin-top:10px; color:var(--dark-slate); font-size:20px; }
+        .section { margin-bottom:34px; }
+        .section-title { font-size:24px; font-weight:600; color:var(--slate); margin-bottom:15px; text-transform:uppercase; letter-spacing:.5px; border-bottom:2px solid var(--slate); padding-bottom:10px; }
+        p { margin-bottom:14px; }
+        ul,ol { margin:0 0 16px 28px; }
+        li { margin-bottom:8px; }
+        code { background:rgba(91,109,122,.18); padding:2px 5px; border-radius:3px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+        .callout { border-left:5px solid var(--slate); background:rgba(255,255,255,.24); padding:14px 16px; margin:16px 0; }
+        .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+        .card { background:rgba(255,255,255,.22); border:1px solid rgba(91,109,122,.45); padding:16px; }
+        .diagram { white-space:pre-wrap; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; background:#293238; color:#f2ebd5; padding:16px; overflow:auto; font-size:15px; }
+        @media (max-width:800px) { .grid { grid-template-columns:1fr; } body { font-size:16px; padding:8px; } .container { padding:16px; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <a href="./arpanet_home.html" class="back-button">? Back to Main Page</a>
+        <div class="breadcrumb"><a href="./arpanet_home.html">Arpanet Reconstruction Project</a> <span>?</span> External IMPs and Replicas</div>
+        <h1 class="page-title">Connect Your IMP &amp; PiDP Replicas</h1>
+        <div class="subtitle">A practical path for attaching external replica hardware to the reconstructed ARPANET.</div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">What Works Today</h2>
+        <p>The project can accept an external simulated IMP over a stable network link. That external IMP can then attach to a local host simulator, including a PiDP-10 running ITS with NCP enabled.</p>
+        <p>A tested example is a physical PiDP-10 replica attached as ARPANET host <code>41</code>, shown by NCP as octal host <code>051</code>. From the hosted terminal, <code>@L 41</code> reaches that external PiDP-10 host.</p>
+        <div class="callout">This is not a promise that every replica machine is plug-and-play. It is a working pattern that can be reproduced and adapted.</div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Architecture</h2>
+        <div class="diagram">hosted terminal
+  ? ARPANET simulation host
+  ? simulated IMP mesh
+  ? remote IMP link over UDP
+  ? your local IMP replica
+  ? local host simulator or replica machine
+  ? NCP service on the attached host</div>
+    </div>
+
+    <div class="section grid">
+        <div class="card">
+            <h2 class="section-title">Minimum Ingredients</h2>
+            <ul>
+                <li>A local IMP simulator or compatible bridge.</li>
+                <li>A stable UDP path to the ARPANET simulation host.</li>
+                <li>A host simulator or replica with matching network support.</li>
+                <li>A unique ARPANET host number and IMP attachment point.</li>
+                <li>Layered validation: IMP link, NCP ping, NCP TELNET.</li>
+            </ul>
+        </div>
+        <div class="card">
+            <h2 class="section-title">Tested PiDP-10 Pattern</h2>
+            <ul>
+                <li>Pi-side H316 IMP configured as IMP <code>41</code>.</li>
+                <li>PiDP-10 KA10 simulator running a separate ARPA51 ITS profile.</li>
+                <li>NCP-capable KA10 simulator rebuilt with PiDP front-panel support.</li>
+                <li>Tailscale or equivalent overlay network for stable UDP routing.</li>
+                <li>Hosted terminal command: <code>@L 41</code>.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Reproduce the PiDP-10 Example</h2>
+        <p>The detailed, reproducible PiDP-10 integration is maintained in a companion repository. It includes the ARPA51 profile, IMP41 bridge, Tailscale notes, validation steps, troubleshooting, and front-panel-capable simulator build notes.</p>
+        <div class="button-row">
+            <a class="button" href="https://github.com/kurthamm/pidp10-arpanet-node" target="_blank" rel="noopener">PiDP-10 ARPANET Node Docs</a>
+            <a class="button" href="https://github.com/kurthamm/arpanet/tree/fix-hosted-scenario-terminals" target="_blank" rel="noopener">Tested ARPANET Fork</a>
+            <a class="button" href="https://github.com/obsolescence/arpanet/" target="_blank" rel="noopener">Upstream ARPANET Project</a>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Support and Coordination</h2>
+        <p>External node attachment affects shared topology, host numbering, and remote IMP links. Coordinate before expecting a permanent public link.</p>
+        <ul>
+            <li>Use GitHub issues or repository discussions for reproducible setup questions.</li>
+            <li>Use the PiDP-10 Google Group for replica-specific hardware and software discussion.</li>
+            <li>Keep private IPs, tunnel credentials, disk packs, and passwords out of public posts.</li>
+        </ul>
+        <div class="button-row">
+            <a class="button" href="https://groups.google.com/g/pidp-10" target="_blank" rel="noopener">PiDP-10 Google Group</a>
+            <a class="button" href="./arpanet_external_terminals.html">Use Your Own Terminal</a>
+        </div>
+    </div>
+</div>
+</body>
+</html>
