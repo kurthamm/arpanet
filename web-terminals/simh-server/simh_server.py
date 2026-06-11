@@ -31,6 +31,7 @@ import termios
 import struct
 import select
 import time
+from pathlib import Path
 
 try:
     import websockets
@@ -71,6 +72,79 @@ def safe_kill_process_group(proc):
                 proc.kill()
             except:
                 pass
+
+
+def process_exists(pid):
+    """Return True if a process exists."""
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def read_proc_stat(pid):
+    """Read minimal process metadata from /proc."""
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text()
+        close_paren = stat.rfind(')')
+        fields = stat[close_paren + 2:].split()
+        return {
+            'pid': pid,
+            'state': fields[0],
+            'ppid': int(fields[1]),
+            'pgid': int(fields[2]),
+        }
+    except Exception:
+        return None
+
+
+def read_proc_cmdline(pid):
+    """Read a process command line from /proc."""
+    try:
+        raw = Path(f"/proc/{pid}/cmdline").read_bytes()
+        return raw.replace(b'\x00', b' ').decode('utf-8', errors='replace').strip()
+    except Exception:
+        return ""
+
+
+def descendant_pids(root_pid):
+    """Return all descendants of root_pid using /proc parent links."""
+    children = {}
+    for entry in Path('/proc').iterdir():
+        if not entry.name.isdigit():
+            continue
+        pid = int(entry.name)
+        info = read_proc_stat(pid)
+        if info:
+            children.setdefault(info['ppid'], []).append(pid)
+
+    found = []
+    stack = list(children.get(root_pid, []))
+    while stack:
+        pid = stack.pop()
+        found.append(pid)
+        stack.extend(children.get(pid, []))
+    return found
+
+
+def kill_process_group_by_pgid(pgid, reason):
+    """Terminate a process group by pgid with logging."""
+    try:
+        logger.warning(f"Terminating stale session process group {pgid}: {reason}")
+        os.killpg(pgid, signal.SIGTERM)
+        deadline = time.time() + 2.0
+        while time.time() < deadline:
+            if not process_exists(pgid):
+                return
+            time.sleep(0.1)
+        if process_exists(pgid):
+            logger.warning(f"Killing stale session process group {pgid}: still running after SIGTERM")
+            os.killpg(pgid, signal.SIGKILL)
+    except ProcessLookupError:
+        return
+    except Exception as e:
+        logger.warning(f"Failed to terminate process group {pgid}: {e}")
 
 
 class ConnectionState:
@@ -200,6 +274,39 @@ class SimhServer:
         # 4 IMPs × 2 hosts each = 8 concurrent sessions
         self.available_session_numbers = set(range(8))  # {0,1,2,3,4,5,6,7}
         self.session_numbers = {}  # session_id → session_number
+
+    def cleanup_stale_session_artifacts(self, reason="reconcile"):
+        """Clean orphaned ncp-telnet processes owned by this relay.
+
+        Browser disconnects can leave ncp-telnet process groups alive if the
+        websocket disappears before a close_session message arrives. Only kill
+        descendants of this simh_server process whose process group is not owned
+        by a currently tracked session.
+        """
+        active_pgids = set()
+        for session in self.sessions.values():
+            if session.proc and session.proc.poll() is None:
+                try:
+                    active_pgids.add(os.getpgid(session.proc.pid))
+                except ProcessLookupError:
+                    pass
+
+        stale_pgids = {}
+        for pid in descendant_pids(os.getpid()):
+            info = read_proc_stat(pid)
+            if not info:
+                continue
+            pgid = info['pgid']
+            if pgid in active_pgids:
+                continue
+            cmdline = read_proc_cmdline(pid)
+            if 'ncp-telnet' in cmdline or self.script_path in cmdline:
+                stale_pgids.setdefault(pgid, []).append((pid, cmdline))
+
+        for pgid, processes in stale_pgids.items():
+            details = ', '.join(f"{pid}:{cmdline}" for pid, cmdline in processes[:3])
+            kill_process_group_by_pgid(pgid, f"{reason}; {details}")
+
 
     def _get_connection_id(self, url):
         """Generate friendly name for connection based on URL"""
@@ -363,6 +470,12 @@ class SimhServer:
 
     async def create_session(self, session_id):
         """Create new simh session"""
+        self.cleanup_stale_session_artifacts("before new session")
+
+        if session_id in self.sessions:
+            logger.warning(f"Session {session_id} already exists; replacing stale session")
+            await self.destroy_session(session_id)
+
         if len(self.sessions) >= self.max_sessions:
             logger.warning(f"Session limit reached ({self.max_sessions}), rejecting {session_id}")
             # Send busy message to terminal-client
@@ -377,10 +490,6 @@ class SimhServer:
                 'type': 'exit',
                 'data': 'Connection closed - terminal busy'
             })
-            return
-
-        if session_id in self.sessions:
-            logger.warning(f"Session {session_id} already exists")
             return
 
         # Allocate session number from pool (0-7)
@@ -433,6 +542,8 @@ class SimhServer:
             else:
                 logger.warning(f"Destroyed session {session_id} but no session number found in mapping")
                 logger.info(f"Destroyed session {session_id} ({len(self.sessions)}/{self.max_sessions})")
+
+            self.cleanup_stale_session_artifacts("after session destroy")
 
     async def handle_input(self, session_id, data):
         """Write user input to simh PTY"""
