@@ -2101,8 +2101,8 @@ document.addEventListener('DOMContentLoaded', function() {
         nccTerm = new Terminal({
             cols: 72,
             rows: 24,
-            fontFamily: '"VT52", monospace',
-            fontSize: 16,
+            fontFamily: '"Courier New", monospace',
+            fontSize: 15,
             cursorBlink: true,
             cursorStyle: 'block',
             theme: {
@@ -2119,27 +2119,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Feed the text after initialization
         const textToSend = [
-            'ARPANET DEPLOYMENT STATUS - KURT HAMM',
-            'Cycle: 051 | Active hosts: 4/4 | Source NCP: CCA-31 | Mode: read-only',
             '',
-            'CURRENT PUBLIC TERMINAL HOSTS',
+            'Cycle: 051 | Active: 4/4 | Msgs: 0000 | Time: 0s',
             '',
-            'Host  Octal  IMP   System              Browser path      Network check',
-            '----  -----  ----  ------------------  ----------------  -------------',
-            '6     006    06    MIT-AI ITS          @L 6              NCP echo OK',
-            '70    106    06    MIT-DM ITS          @L 70             NCP echo OK',
-            '126   176    06    MIT-ML ITS          @L 126            NCP echo OK',
-            '41    051    41    PiDP-10 ARPA51      @L 41 / @L 051    NCP echo OK',
             '',
-            'IMP PATHS IN THIS DEPLOYMENT',
             '',
-            'Hosted trio:  CCA IMP31 -> MIT IMP06 -> hosts 006, 106, 176',
-            'Home node:    CCA IMP31 -> HILTON IMP62 -> HOME IMP41 -> host 051',
-            'Overlay:      IMP62 UDP 11262 <-> Pi IMP41 UDP 11141 over Tailscale',
             '',
-            'NOTE',
-            'Browser sessions use simulator terminal lines for reliability.',
-            'ARPANET reachability is verified separately with NCP ping from ncp31.'
+            '                                                             MIT',
+            '                                                             06-71',
+            '',
+            '                                                        CCA',
+            '                                                        31-71',
+            '',
+            '                                          HILTON',
+            '                                          62-71',
+            '',
+            '                      HOME',
+            '                      41-71',
+            '',
+            'HOSTS  006 MIT-AI   106 MIT-DM   176 MIT-ML   051 PiDP-10',
+            '',
+            'PATH   CCA31 -> HILTON62 -> HOME41',
+            'LINK   IMP62 UDP 11262 <-> IMP41 UDP 11141 OVER TAILSCALE',
+            '',
+            'NOTE   MTY browser path; NCP echo is checked separately from CCA31'
         ].join('\r\n');
         nccCharQueue = textToSend.split('');
         nccTerm.write('\x1b[2J\x1b[H');
