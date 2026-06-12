@@ -767,6 +767,14 @@
             padding: 8px;
             overflow: hidden;
         }
+
+        #ncc-terminal-container .xterm-viewport {
+            overflow: hidden !important;
+        }
+
+        #ncc-terminal-container .xterm-screen {
+            overflow: hidden;
+        }
     </style>
     <style>
         /*
@@ -2102,6 +2110,8 @@ document.addEventListener('DOMContentLoaded', function() {
             rows: 23,
             fontFamily: '"Courier New", monospace',
             fontSize: 14,
+            scrollback: 0,
+            disableStdin: true,
             cursorBlink: true,
             cursorStyle: 'block',
             theme: {
