@@ -20,17 +20,19 @@ Expected routing:
 | `@L 6` | host `006` | Hosted MIT ITS simulator, reached through a localhost-only simulator terminal line. |
 | `@L 70` | host `106` | Hosted MIT Dynamic Modelling PDP-10, reached through a localhost-only simulator terminal line. |
 | `@L 126` | host `176` | Hosted ITS simulator, reached through a localhost-only simulator terminal line. |
-| `@L 41` | host `051` | External PiDP-10, reached through ARPANET NCP TELNET if the site-local IMP41 link is configured. |
+| `@L 41` | host `051` | External PiDP-10, reached through its Pi-side SIMH terminal line over Tailscale. |
 | `@L 051` | host `051` | Accepted spelling for the same PiDP-10 host. |
 
 Some ITS hosts may display `Unknown ITS PDP-10` and `It's a lovely day to be a turist!`. That text is an ITS/TELSER banner and does not by itself indicate wrong routing. Use the `TELNET to host ...` line and NCP tests for routing verification.
 
 ## Hosted Browser Routing
 
-The hosted trio and the PiDP lane intentionally use different browser paths:
+The browser terminal path is intentionally separate from the ARPANET health path:
 
-- `@L 6`, `@L 70`, and `@L 126` run `mini/local-host-terminal.py` and connect to localhost-only SIMH terminal lines (`16015`, `17015`, and `10015`). This does not open public emulator ports; the browser still reaches the relay only through Cloudflare Tunnel.
-- `@L 41` and `@L 051` remain ARPANET NCP TELNET sessions from source `ncp31` using old TELNET mode.
+- `@L 6`, `@L 70`, and `@L 126` run `mini/local-host-terminal.py` and connect to localhost-only SIMH terminal lines (`16015`, `17015`, and `10015`).
+- `@L 41` and `@L 051` use the same helper to connect to the PiDP-10 MTY line at the Pi's Tailscale address.
+- This does not open public emulator ports; the browser still reaches the relay only through Cloudflare Tunnel.
+- ARPANET connectivity for all four hosts is validated with `NCP=ncp31 ./ncp-ping`, not by relying on fragile historical NCP TELNET sessions for the browser.
 
 This split keeps the hosted machines usable while preserving NCP reachability checks separately. In the DigitalOcean runtime, `ncp31` is the only reliable application NCP source, and the MIT hosted images may reject ARPANET TELNET from host `037` even while NCP echo works.
 
@@ -38,8 +40,8 @@ This split keeps the hosted machines usable while preserving NCP reachability ch
 
 The browser launcher treats host `41` specially:
 
-- `@L 41` and `@L 051` are routed through source NCP `ncp31`.
-- `41` / `051` use old TELNET mode (`-o`) automatically.
+- `@L 41` and `@L 051` route to host label `051`.
+- The relay attaches to the PiDP-10 SIMH MTY line over Tailscale.
 - Users should not need to type `@O 41` for the hosted page.
 
 The site-local IMP41 link is intentionally not committed as a generic upstream setting. Keep deployment-specific IMP41/Tailscale details in the companion repository:
@@ -77,7 +79,7 @@ printf '@L 41\r\n' | SESSION_NUMBER=0 ../do.sh
 printf '@L 051\r\n' | SESSION_NUMBER=0 ../do.sh
 ```
 
-The hosted commands should print the matching `TELNET to host ...` line and an ITS banner from the local simulator terminal. The PiDP commands should attempt `TELNET to host 051.`
+The commands should print the matching `TELNET to host ...` line and an ITS banner from the target simulator terminal.
 
 ## Relay Session Diagnostics
 

@@ -152,7 +152,7 @@ The original runtime relies heavily on `screen` and broad process cleanup. This 
 - Startup timing matters: hosts and NCP daemons can start before IMPs are fully converged.
 - Site-specific PiDP/Tailscale changes can leak into upstream-friendly files if not kept separate.
 - The hosted host `tk` listeners must be unique per host; `6`, `70`, and `126` now use `16012`, `17012`, and `10012` respectively.
-- Browser access to hosted hosts `6`, `70`, and `126` uses localhost-only simulator terminal lines; PiDP host `41` remains on the ARPANET NCP TELNET path.
+- Browser access to hosted hosts `6`, `70`, `126`, and PiDP host `41` uses simulator terminal lines. ARPANET reachability is validated separately with NCP ping and the IMP62/IMP41 link.
 
 The target deployment should keep vintage software behavior fixed and improve only the modern orchestration around it.
 
@@ -301,7 +301,7 @@ PiDP tests should be separate and run only after hosted hosts are stable:
 - Tailscale path between droplet and Pi is active.
 - IMP62 to IMP41 UDP path is configured as site-local runtime config.
 - NCP ping to `41` works.
-- Browser `@L 41` behavior is tested without restarting hosted hosts. If NCP ping works but TELNET stalls at `TELNET to host 051.`, diagnose the Pi-side TELNET/TELSER path in the companion repository.
+- Browser `@L 41` behavior is tested without restarting hosted hosts. If NCP ping works but historical NCP TELNET stalls at `TELNET to host 051.`, keep the browser route on the PiDP SIMH terminal line and diagnose the Pi-side TELNET/TELSER path separately in the companion repository.
 
 ## Rollback and Reference
 

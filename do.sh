@@ -42,9 +42,9 @@ if [[ -z "${DEST-}" ]]; then
 fi
 #echo "---> connect $DEST"
 
-# Hosts 6 and 70 currently reject ARPANET TELNET from the only reliable
-# browser-side source NCP (host 037). Route hosted simulators through their
-# localhost-only MTY lines, and keep the external PiDP lane on ARPANET TELNET.
+# Several ITS hosts reject or stall ARPANET TELNET from the only reliable
+# browser-side source NCP (host 037). Route browser terminal sessions through
+# SIMH terminal lines while NCP ping remains the ARPANET health check.
 if [[ "$COMMAND" =~ ^[lL]$ ]]; then
     case "$DEST" in
         6|006)
@@ -58,6 +58,10 @@ if [[ "$COMMAND" =~ ^[lL]$ ]]; then
         126|176)
             cd ./mini
             exec ./local-host-terminal.py 176 10015
+            ;;
+        41|051)
+            cd ./mini
+            exec ./local-host-terminal.py 051 10015 --connect-host 100.105.230.31
             ;;
     esac
 fi

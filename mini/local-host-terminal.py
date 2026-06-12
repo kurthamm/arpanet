@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bridge stdin/stdout to a local hosted ITS simulator terminal."""
+"""Bridge stdin/stdout to a SIMH ITS simulator terminal."""
 
 import argparse
 import os
@@ -55,6 +55,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("host_label")
     parser.add_argument("port", type=int)
+    parser.add_argument("--connect-host", default="127.0.0.1")
     args = parser.parse_args()
 
     running = True
@@ -66,7 +67,7 @@ def main():
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
 
-    sock = socket.create_connection(("127.0.0.1", args.port), timeout=5)
+    sock = socket.create_connection((args.connect_host, args.port), timeout=5)
     sock.setblocking(False)
     os.set_blocking(0, False)
 
