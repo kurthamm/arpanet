@@ -45,19 +45,25 @@
         <h2 class="section-title">What Works Today</h2>
         <div class="callout">This page describes Kurt Hamm's hosted deployment and companion PiDP-10 integration. It is not official upstream ARPANET project documentation.</div>
         <p>This hosted implementation can accept an external simulated IMP over a stable network link. That external IMP can then attach to a local host simulator, including a PiDP-10 running ITS with NCP enabled.</p>
-        <p>The tested example in this deployment is a physical PiDP-10 replica attached as ARPANET host <code>41</code>, shown by NCP as octal host <code>051</code>. From this site's hosted terminal, <code>@L 41</code> reaches that external PiDP-10 host.</p>
+        <p>The tested example in this deployment is a physical PiDP-10 replica attached as ARPANET host <code>41</code>, shown by NCP as octal host <code>051</code>. The ARPANET path is verified with the IMP62-to-IMP41 link and <code>ncp-ping 41</code>.</p>
+        <p>The browser terminal path is separate: this site's <code>@L 41</code> command attaches to the PiDP-10 SIMH MTY terminal line over Tailscale. That keeps the public terminal usable even when historical NCP TELNET is unreliable.</p>
         <div class="callout">This is not a promise that every replica machine is plug-and-play. It is a working pattern that can be reproduced and adapted.</div>
     </div>
 
     <div class="section">
         <h2 class="section-title">Architecture</h2>
-        <div class="diagram">this site's hosted terminal
-  ? Kurt's ARPANET simulation host
-  ? simulated IMP mesh
-  ? remote IMP link over UDP
-  ? your local IMP replica
-  ? local host simulator or replica machine
-  ? NCP service on the attached host</div>
+        <div class="diagram">Browser terminal path:
+  this site's hosted terminal
+  -> WebSocket relay on the DigitalOcean droplet
+  -> PiDP-10 SIMH MTY terminal over Tailscale
+  -> physical PiDP-10 replica running ITS
+
+ARPANET validation path:
+  Kurt's ARPANET simulation host
+  -> simulated IMP mesh
+  -> IMP62 site-local remote link
+  -> Pi IMP41 over Tailscale UDP
+  -> PiDP-10 NCP host 41 / octal 051</div>
     </div>
 
     <div class="section grid">
@@ -68,7 +74,7 @@
                 <li>A stable UDP path to the ARPANET simulation host.</li>
                 <li>A host simulator or replica with matching network support.</li>
                 <li>A unique ARPANET host number and IMP attachment point.</li>
-                <li>Layered validation: IMP link, NCP ping, NCP TELNET.</li>
+                <li>Layered validation: IMP link, NCP ping, and a separate browser terminal path.</li>
             </ul>
         </div>
         <div class="card">
@@ -78,14 +84,15 @@
                 <li>PiDP-10 KA10 simulator running a separate ARPA51 ITS profile.</li>
                 <li>NCP-capable KA10 simulator rebuilt with PiDP front-panel support.</li>
                 <li>Tailscale or equivalent overlay network for stable UDP routing.</li>
-                <li>This site's hosted terminal command: <code>@L 41</code>.</li>
+                <li>Droplet-side IMP62 link loaded from site-local runtime configuration.</li>
+                <li>This site's hosted terminal command <code>@L 41</code> attaches to the PiDP SIMH MTY line, not historical NCP TELNET.</li>
             </ul>
         </div>
     </div>
 
     <div class="section">
         <h2 class="section-title">Reproduce the PiDP-10 Example</h2>
-        <p>The detailed, reproducible PiDP-10 integration for this deployment is maintained in a companion repository. It includes the ARPA51 profile, IMP41 bridge, Tailscale notes, validation steps, troubleshooting, and front-panel-capable simulator build notes.</p>
+        <p>The detailed, reproducible PiDP-10 integration for this deployment is maintained in a companion repository. It includes the ARPA51 profile, IMP41 bridge, Tailscale notes, validation steps, troubleshooting, and front-panel-capable simulator build notes. The main ARPANET fork documents the browser terminal routing used by this deployment.</p>
         <div class="button-row">
             <a class="button" href="https://github.com/kurthamm/pidp10-arpanet-node" target="_blank" rel="noopener">PiDP-10 ARPANET Node Docs</a>
             <a class="button" href="https://github.com/kurthamm/arpanet/tree/fix-hosted-scenario-terminals" target="_blank" rel="noopener">This Deployment's ARPANET Fork</a>
