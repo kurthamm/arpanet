@@ -55,10 +55,17 @@
 
 static pid_t reader_pid = 0;
 static pid_t writer_pid = 0;
+static volatile sig_atomic_t terminate_requested = 0;
 
 static int debug_mode = 0;
 #define DEBUG_PRINTF(...) \
     do { if (debug_mode) fprintf(stderr, __VA_ARGS__); } while (0)
+
+static void handle_term (int sig)
+{
+  (void)sig;
+  terminate_requested = 1;
+}
 
 static const unsigned char old_client_options[] = {
   OECHO, NUL
@@ -361,6 +368,8 @@ static void telnet_client (int host, int sock,
     FD_SET (0, &rfds);
     FD_SET (reader_fd, &rfds);
     n = select (reader_fd + 1, &rfds, NULL, NULL, NULL);
+    if (terminate_requested)
+      goto end;
     if (n <= 0)
       break;
 
@@ -527,6 +536,13 @@ int main (int argc, char **argv)
   int opt;
   int host = -1;
   int sock = -1;
+  struct sigaction sa;
+
+  memset (&sa, 0, sizeof sa);
+  sa.sa_handler = handle_term;
+  sigemptyset (&sa.sa_mask);
+  sigaction (SIGTERM, &sa, NULL);
+  sigaction (SIGINT, &sa, NULL);
 
   while ((opt = getopt (argc, argv, "bcnosp:d")) != -1) {
     switch (opt) {
@@ -602,6 +618,8 @@ int main (int argc, char **argv)
       fprintf (stderr, "Is the NCP environment variable set?\n");
     exit (1);
   }
+  sigaction (SIGTERM, &sa, NULL);
+  sigaction (SIGINT, &sa, NULL);
 
   if (telnet == telnet_client)
     options = client_options;

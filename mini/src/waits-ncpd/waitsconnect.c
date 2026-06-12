@@ -90,6 +90,7 @@ static void handle_imp(void);
 static void handle_console_input(void);
 static void flush_output_buffer(void);
 static void send_rrp(uint8_t host);
+static void send_erp(uint8_t host, uint8_t data);
 static void send_rts(uint8_t host, uint32_t lsock, uint32_t rsock, uint8_t link);
 static void send_str(uint8_t host, uint32_t lsock, uint32_t rsock, uint8_t size);
 static void send_cls(uint8_t host, uint32_t lsock, uint32_t rsock);
@@ -98,6 +99,8 @@ static void send_data(uint8_t host, uint8_t link, uint8_t *data, int len);
 static void send_socket_number(uint8_t host, uint8_t link, uint32_t socket);
 static int connect_to_console(void);
 static void disconnect_console(void);
+static void reset_connection_state(void);
+static int establish_connection(void);
 static void process_old_telnet(uint8_t *data, int len);
 static void process_new_telnet(uint8_t *data, int len);
 
@@ -148,6 +151,29 @@ static void send_rrp(uint8_t host) {
 
     imp_send_message(packet, 5);  /* (1 + 9 + 1) / 2 = 5 words */
     fprintf(stderr, "WAITSCONNECT: Sent RRP to host %03o\n", host);
+}
+
+/* Send NCP ERP (echo reply) message */
+static void send_erp(uint8_t host, uint8_t data) {
+    uint8_t packet[200];
+
+    /* IMP header */
+    packet[12] = IMP_REGULAR;
+    packet[13] = host;
+    packet[14] = 0;   /* Control link */
+    packet[15] = 0;
+
+    /* NCP header + message */
+    packet[16] = 0;
+    packet[17] = 8;   /* Byte size */
+    packet[18] = 0;   /* Count high */
+    packet[19] = 2;   /* Count low: opcode + echo byte */
+    packet[20] = 0;
+    packet[21] = NCP_ERP;
+    packet[22] = data;
+
+    imp_send_message(packet, 6);  /* (2 + 9 + 1) / 2 = 6 words */
+    fprintf(stderr, "WAITSCONNECT: Sent ERP %03o to host %03o\n", data, host);
 }
 
 /* Send NCP RTS (Request To Send) message */
@@ -318,6 +344,12 @@ static void handle_rts(uint8_t source, uint8_t *data) {
     fprintf(stderr, "WAITSCONNECT: Received RTS from host %03o, sockets %u:%u link %u\n",
             source, remote_sock, local_sock, link);
 
+    if (conn.state != CONN_LISTENING &&
+        (local_sock == OLD_TELNET || local_sock == NEW_TELNET)) {
+        fprintf(stderr, "WAITSCONNECT: New TELNET RTS while busy; resetting stale connection\n");
+        reset_connection_state();
+    }
+
     if (conn.state == CONN_LISTENING) {
         /* Phase 1: Initial RTS on listen socket (1 or 23) */
         if (local_sock != OLD_TELNET && local_sock != NEW_TELNET) {
@@ -480,6 +512,7 @@ static void handle_all(uint8_t source, uint8_t *data) {
         conn.data_recv_local = conn.data_socket;      /* e.g., 100 - client sends here */
         conn.data_send_local = conn.data_socket + 1;  /* e.g., 101 - we send from here */
         conn.data_send_link = 45;  /* Our chosen send link */
+        conn.data_recv_link = conn.data_send_link;
         conn.got_str = 0;
         conn.got_rts = 0;
 
@@ -497,6 +530,19 @@ static void handle_all(uint8_t source, uint8_t *data) {
 
         conn.state = CONN_ICP_PHASE2;
         fprintf(stderr, "WAITSCONNECT: ICP phase 2 started, sent socket %u\n", conn.data_socket);
+
+    } else if (conn.state == CONN_ICP_PHASE2) {
+        if (link != conn.data_send_link) {
+            fprintf(stderr, "WAITSCONNECT: ALL for wrong link (expected %u)\n", conn.data_send_link);
+            return;
+        }
+
+        conn.send_allocation += messages;
+        fprintf(stderr, "WAITSCONNECT: Send allocation now %d\n", conn.send_allocation);
+
+        if (establish_connection() == 0) {
+            flush_output_buffer();
+        }
 
     } else if (conn.state == CONN_ESTABLISHED) {
         /* This is ALL for our send link on data connection */
@@ -570,7 +616,10 @@ static void process_ncp(uint8_t source, uint8_t *data, int count) {
             break;
         case NCP_ECO:
             fprintf(stderr, "WAITSCONNECT: Received ECO from host %03o\n", source);
-            /* Could send ERP reply */
+            if (i < count) {
+                send_erp(source, data[i]);
+                i += 1;
+            }
             break;
         case NCP_ERR:
             fprintf(stderr, "WAITSCONNECT: Received ERR from host %03o\n", source);
@@ -823,13 +872,64 @@ static void disconnect_console(void) {
     }
 }
 
+/* Reset transient NCP/TELNET state after a dropped or interrupted session. */
+static void reset_connection_state(void) {
+    if (conn.console_fd >= 0) {
+        write(conn.console_fd, "logout\r\n", 8);
+        usleep(250000);
+    }
+    disconnect_console();
+    conn.state = CONN_LISTENING;
+    conn.remote_host = 0;
+    conn.listen_socket = 0;
+    conn.icp_remote_socket = 0;
+    conn.icp_link = 0;
+    conn.data_socket = 0;
+    conn.data_recv_local = 0;
+    conn.data_recv_remote = 0;
+    conn.data_recv_link = 0;
+    conn.data_send_local = 0;
+    conn.data_send_remote = 0;
+    conn.data_send_link = 0;
+    conn.got_str = 0;
+    conn.got_rts = 0;
+    conn.send_allocation = 0;
+    conn.last_all_time = 0;
+    conn.output_buffer_len = 0;
+    conn.console_close_time = 0;
+    conn.console_login_time = 0;
+    conn.iac_state = 0;
+    conn.iac_cmd = 0;
+}
+
+/* Establish the SIMH console side once the NCP data path is usable. */
+static int establish_connection(void) {
+    if (conn.state == CONN_ESTABLISHED)
+        return 0;
+
+    conn.state = CONN_ESTABLISHED;
+    conn.console_fd = connect_to_console();
+    if (conn.console_fd < 0) {
+        fprintf(stderr, "WAITSCONNECT: Failed to connect to console, closing\n");
+        if (conn.data_send_local && conn.data_send_remote)
+            send_cls(conn.remote_host, conn.data_send_local, conn.data_send_remote);
+        if (conn.data_recv_local && conn.data_recv_remote)
+            send_cls(conn.remote_host, conn.data_recv_local, conn.data_recv_remote);
+        reset_connection_state();
+        return -1;
+    }
+
+    conn.console_login_time = time_tick + 1;
+    fprintf(stderr, "WAITSCONNECT: Connection established, discarding console data for 1 second\n");
+    return 0;
+}
+
 /* Periodic tasks */
 static void periodic_tasks(void) {
     /* Check if we need to send login after initial delay */
     if (conn.console_login_time > 0 && time_tick >= conn.console_login_time) {
         fprintf(stderr, "WAITSCONNECT: Sending login to console\n");
         write(conn.console_fd, "login\r", 6);
-//write(conn.console_fd, "\003\rlogin\r", 8);
 
         /* Grant client send permission */
         send_all(conn.remote_host, conn.data_recv_link, 10, 16000);
@@ -864,7 +964,7 @@ int main(int argc, char **argv) {
     signal(SIGTERM, cleanup);
 
     /* Initialize IMP connection (hardcoded) */
-    char *imp_argv[] = { "waitsconnect", "localhost", "20111", "20112" };
+    char *imp_argv[] = { "waitsconnect", "127.0.0.1", "20111", "20112" };
     imp_init(4, imp_argv);
     imp_host_ready(1);
 

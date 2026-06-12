@@ -63,6 +63,25 @@ check_hosted_hosts() {
     done
 }
 
+check_stanford_host() {
+    section "Stanford/SU-AI WAITS Host"
+    if [[ ! -x "$ROOT/host11ctl.sh" ]]; then
+        fail "mini/host11ctl.sh is missing or not executable"
+        return
+    fi
+
+    "$ROOT/host11ctl.sh" status 11
+
+    local verify_output
+    verify_output="$($ROOT/host11ctl.sh verify 11 2>&1)"
+    printf '%s\n' "$verify_output"
+    if grep -q "host 11: NCP verified" <<<"$verify_output"; then
+        ok "host 11 NCP verified"
+    else
+        fail "host 11 NCP verification missing or failed"
+    fi
+}
+
 check_ncp_pings() {
     section "NCP Reachability"
     local host output rc
@@ -76,6 +95,15 @@ check_ncp_pings() {
             fail "NCP ping host $host failed rc=$rc"
         fi
     done
+
+    output="$(cd "$ROOT" && timeout 10 env NCP=ncp16 ./ncp-ping -c1 11 2>&1)"
+    rc=$?
+    printf '%s\n' "$output"
+    if [[ $rc -eq 0 ]]; then
+        ok "NCP ping host 11 from AMES NCP16"
+    else
+        fail "NCP ping host 11 from AMES NCP16 failed rc=$rc"
+    fi
 }
 
 check_relay() {
@@ -193,6 +221,7 @@ main() {
     date
     check_repo_state
     check_hosted_hosts
+    check_stanford_host
     check_ncp_pings
     check_relay
     check_imp_links

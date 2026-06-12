@@ -15,7 +15,9 @@ mini/host11/SYSTEM.DMP.*
 mini/host11/*.log
 mini/host11/*.zip
 mini/src/bbn-ncc/bbn-ncc
+mini/src/apps/ncp-telnet
 mini/src/ncpd-scanner/ncc
+mini/src/waits-ncpd/waitsconnect
 mini/topol/venv
 web-terminals/*/venv
 mini/imp62.local.simh

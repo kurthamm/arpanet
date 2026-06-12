@@ -1,7 +1,7 @@
-CFLAGS=-g -Wall -I../ncc
+CFLAGS=-g -Wall -I../ncpd-ovREUSE/src
 
-NCP=-L../ncc -lncp
-LIBNCP=../ncc/libncp.a
+NCP=-L../ncpd-ovREUSE/src -lncp
+LIBNCP=../ncpd-ovREUSE/src/libncp.a
 PREFIX=ncp-
 
 APPS=discard echo finger finser gateway ping telnet

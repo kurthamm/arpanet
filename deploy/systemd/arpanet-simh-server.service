@@ -1,7 +1,7 @@
 [Unit]
 Description=ARPANET terminal session launcher
-After=arpanet-terminal-client.service arpanet-host@6.service arpanet-host@70.service arpanet-host@126.service
-Wants=arpanet-terminal-client.service
+After=arpanet-terminal-client.service arpanet-host@6.service arpanet-host@70.service arpanet-host@126.service arpanet-host11.service
+Wants=arpanet-terminal-client.service arpanet-host11.service
 
 [Service]
 Type=simple

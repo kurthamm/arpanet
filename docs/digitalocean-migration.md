@@ -8,7 +8,7 @@ The goal is a reproducible, hardened deployment for the hosted ARPANET platform 
 
 This document covers the DigitalOcean-hosted ARPANET platform:
 
-- Hosted PDP-10 hosts `6`, `70`, and `126`.
+- Hosted PDP-10 hosts `6`, `70`, `126`, and Stanford/SU-AI host `11`.
 - The simulated IMP network under `mini/`.
 - The hosted browser terminal relay.
 - Cloudflare Tunnel and Tailscale access.
@@ -135,11 +135,12 @@ Treat each host as an independent system attached to the IMP network:
 | `6` | `006` | DigitalOcean hosted PDP-10 | Main ARPANET repo tooling |
 | `70` | `106` | DigitalOcean hosted PDP-10 | Main ARPANET repo tooling |
 | `126` | `176` | DigitalOcean hosted PDP-10 | Main ARPANET repo tooling |
+| `11` | `013` | DigitalOcean hosted Stanford/SU-AI WAITS PDP-10 | Dedicated `host11ctl.sh` / `arpanet-host11.service` |
 | `41` | `051` | Physical PiDP-10 replica | PiDP companion repo / Pi-side tooling |
 
 The browser terminal may connect to all four hosts, but it must not restart or mutate any host.
 
-`mini/hostctl.sh` is scoped only to hosted hosts `6`, `70`, and `126`. Do not extend it to manage PiDP-10 host `41`.
+`mini/hostctl.sh` is scoped only to hosted ITS hosts `6`, `70`, and `126`. Stanford/SU-AI host `11` uses `mini/host11ctl.sh`. Do not extend either tool to manage PiDP-10 host `41`.
 
 ## Known Fragility
 
@@ -166,7 +167,7 @@ During initial droplet testing:
 - NCP pings to `6`, `70`, and `126` still failed.
 - A duplicate NCP condition was found: NOC-owned `ncpdov` processes existed alongside manual `screen`-owned `ncpXX` sessions.
 - The PiDP link is loaded from the ignored local override `mini/imp62.local.simh` when present; the tracked `mini/imp62.simh` stays generic.
-- Later validation showed NCP echo could pass while ARPANET TELNET from source host `037` was rejected by some hosted MIT images, so hosted browser sessions are kept separate from ARPANET TELNET validation.
+- Later validation showed NCP echo could pass while ARPANET TELNET sessions were not a repeat-safe browser path for some hosted images. Hosted browser sessions are kept separate from ARPANET TELNET validation.
 
 Before further diagnosis, remove only the manual `ncpXX` screen sessions and leave NOC-owned `ncpdov` processes intact.
 
@@ -210,12 +211,13 @@ Recommended service split:
 - `arpanet-host@6.service`: hosted PDP-10 host `6`.
 - `arpanet-host@70.service`: hosted PDP-10 host `70`.
 - `arpanet-host@126.service`: hosted PDP-10 host `126`.
+- `arpanet-host11.service`: Stanford/SU-AI WAITS host `11`.
 - `arpanet-terminal-client.service`: browser WebSocket relay on localhost.
 - `arpanet-simh-server.service`: session launcher connected to the relay.
 - `arpanet-static.service`: local static HTTP server for the public site.
 - `cloudflared-arpanet.service`: Cloudflare Tunnel ingress.
 
-Each unit should have a single ownership boundary. Restarting one hosted PDP-10 should not restart the other hosted PDP-10s, the PiDP-10, or the entire IMP network unless explicitly required.
+Each unit should have a single ownership boundary. Restarting one hosted PDP-10 should not restart the other hosted PDP-10s, Stanford host `11`, the PiDP-10, or the entire IMP network unless explicitly required.
 
 ## Service Safety Requirements
 
@@ -277,6 +279,7 @@ The migration is not complete until all of these pass on the DigitalOcean drople
 cd /home/deltaprism/arpanet/mini
 ./hostctl.sh verify all
 for host in 6 70 126; do timeout 20 env NCP=ncp31 ./ncp-ping -c1 "$host"; done
+timeout 20 env NCP=ncp16 ./ncp-ping -c1 11
 ```
 
 Browser terminal tests:
@@ -286,6 +289,7 @@ Browser terminal tests:
 - Run `@L 6` and reach the ITS banner/login behavior.
 - Run `@L 70` and reach the ITS banner/login behavior.
 - Run `@L 126` and reach the ITS banner/login behavior.
+- Run `@L 11` and reach the Stanford WAITS DCS line/session behavior.
 - Confirm closing/reopening the browser session does not leave stale relay-owned `ncp-telnet` or `local-host-terminal.py` processes.
 
 Public site tests:

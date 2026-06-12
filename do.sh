@@ -63,6 +63,10 @@ if [[ "$COMMAND" =~ ^[lL]$ ]]; then
             cd ./mini
             exec ./local-host-terminal.py 051 10015 --connect-host 100.105.230.31
             ;;
+        11|013)
+            cd ./mini
+            exec ./local-host-terminal.py 013 2040
+            ;;
     esac
 fi
 

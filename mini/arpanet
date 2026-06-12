@@ -286,6 +286,7 @@ stop_network() {
 
   # Stop hosted PDP-10s first through the lifecycle manager.
   ./hostctl.sh stop all
+  ./host11ctl.sh stop 11 || true
 
   # Stop NCPs first (cleaner disconnect)
 #  stop_ncpds
@@ -325,7 +326,7 @@ case "$1" in
     sleep 0.2
     ./host126.sh
     sleep 0.2
-    ./host11.sh
+    ./host11ctl.sh start 11
 
     ;;
   stop)

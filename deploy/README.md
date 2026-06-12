@@ -6,7 +6,7 @@ droplet.
 The intent is to keep the hosted ARPANET stack reproducible and boring:
 
 - one supervisor for the IMP/NOC layer;
-- one unit per hosted PDP-10 host;
+- one unit per hosted PDP-10 host lane;
 - one browser relay;
 - one terminal launcher;
 - one local static server.
@@ -20,6 +20,7 @@ The unit files live in `deploy/systemd/`:
 
 - `arpanet-noc.service`
 - `arpanet-host@.service`
+- `arpanet-host11.service`
 - `arpanet-terminal-client.service`
 - `arpanet-simh-server.service`
 - `arpanet-static.service`
@@ -41,6 +42,7 @@ sudo systemctl enable --now arpanet-noc.service
 sudo systemctl enable --now arpanet-host@6.service
 sudo systemctl enable --now arpanet-host@70.service
 sudo systemctl enable --now arpanet-host@126.service
+sudo systemctl enable --now arpanet-host11.service
 sudo systemctl enable --now arpanet-terminal-client.service
 sudo systemctl enable --now arpanet-simh-server.service
 sudo systemctl enable --now arpanet-static.service
@@ -50,6 +52,8 @@ sudo systemctl enable --now cloudflared-arpanet.service
 ## Notes
 
 - `arpanet-host@.service` is for the hosted trio only: `6`, `70`, and `126`.
+- `arpanet-host11.service` is for Stanford/SU-AI host `11`, which runs WAITS
+  and uses the dedicated `mini/host11ctl.sh` lifecycle.
 - The browser launcher `do.sh` routes `@L 41` / `@L 051` to the external
   PiDP SIMH MTY terminal over Tailscale. Host `41` ARPANET reachability is
   validated separately through the IMP62/IMP41 link.
