@@ -741,13 +741,12 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 66%;
-            max-width: 900px;
+            width: min(94vw, 1180px);
             background-color: var(--cream);
             border: 2px solid var(--slate);
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
             z-index: 2001;
-            padding: 20px;
+            padding: 28px 44px 40px 28px;
         }
 
         #status-modal-close-btn {
@@ -763,9 +762,9 @@
 
         #ncc-terminal-container {
             margin-top: 15px;
-            min-height: 518px;
+            min-height: 510px;
             background: #000;
-            padding: 5px;
+            padding: 8px;
             overflow: hidden;
         }
     </style>
@@ -2100,9 +2099,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         nccTerm = new Terminal({
             cols: 72,
-            rows: 24,
+            rows: 23,
             fontFamily: '"Courier New", monospace',
-            fontSize: 15,
+            fontSize: 14,
             cursorBlink: true,
             cursorStyle: 'block',
             theme: {
@@ -2119,7 +2118,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Feed the text after initialization
         const textToSend = [
-            '',
             'Cycle: 051 | Active: 4/4 | Msgs: 0000 | Time: 0s',
             '',
             '',
@@ -2137,12 +2135,12 @@ document.addEventListener('DOMContentLoaded', function() {
             '                      HOME',
             '                      41-71',
             '',
-            'HOSTS  006 MIT-AI   106 MIT-DM   176 MIT-ML   051 PiDP-10',
+            'HOSTS 006 MIT-AI  106 MIT-DM  176 MIT-ML  051 PiDP-10',
             '',
             'PATH   CCA31 -> HILTON62 -> HOME41',
-            'LINK   IMP62 UDP 11262 <-> IMP41 UDP 11141 OVER TAILSCALE',
+            'LINK   IMP62:11262 <-> IMP41:11141 OVER TAILSCALE',
             '',
-            'NOTE   MTY browser path; NCP echo is checked separately from CCA31'
+            'NOTE   MTY browser path; NCP echo checked separately'
         ].join('\r\n');
         nccCharQueue = textToSend.split('');
         nccTerm.write('\x1b[2J\x1b[H');
