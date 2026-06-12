@@ -50,8 +50,9 @@ sudo systemctl enable --now cloudflared-arpanet.service
 ## Notes
 
 - `arpanet-host@.service` is for the hosted trio only: `6`, `70`, and `126`.
-- The browser launcher `do.sh` still routes `@L 41` / `@L 051` through
-  source NCP `ncp31`, but host `41` itself is external and site-local.
+- The browser launcher `do.sh` routes `@L 41` / `@L 051` to the external
+  PiDP SIMH MTY terminal over Tailscale. Host `41` ARPANET reachability is
+  validated separately through the IMP62/IMP41 link.
 - Cloudflare Tunnel is kept in its own unit so the public edge can restart
   independently of the hosted IMP/NOC and browser relay services.
 - Tailscale remains a separate operator setup step and is not managed by these

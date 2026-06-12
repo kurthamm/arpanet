@@ -18,7 +18,7 @@ From the hosted terminal page:
 @L 41
 ```
 
-Host `41` / octal `051` is an optional external PiDP-10 path. The launcher maps `@L 41` and `@L 051` through the working source NCP and old TELNET mode automatically.
+Host `41` / octal `051` is an optional external PiDP-10 path. In this DigitalOcean deployment, the browser launcher maps `@L 41` and `@L 051` to the PiDP SIMH MTY terminal over Tailscale. ARPANET reachability for host `41` is validated separately through the IMP62/IMP41 link with `NCP=ncp31 ./ncp-ping -c1 41`.
 
 Hosted hosts `6`, `70`, and `126` are local PDP-10 simulators on the droplet.
 Their browser sessions use localhost-only simulator terminal lines so the public
