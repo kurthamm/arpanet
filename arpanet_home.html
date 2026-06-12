@@ -2099,10 +2099,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         nccTerm = new Terminal({
-            cols: 80,
+            cols: 72,
             rows: 24,
             fontFamily: '"VT52", monospace',
-            fontSize: 18,
+            fontSize: 16,
             cursorBlink: true,
             cursorStyle: 'block',
             theme: {
@@ -2118,9 +2118,31 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('NCC terminal initialized.');
 
         // Feed the text after initialization
-        const textToSend = "Cycle: 76 | Active: 34/35 | Msgs: 2961 | Time: 19:00 UTC\r\n\r\n         SRI                  LBL      UTAH      ILLINO                 MIT\r\n         02-71                34-71    04-70     12-71                  06-71\r\n             XEROX                                                      CCA\r\n             32-71                                           LINCOL     31-71\r\n                                                             10-71 \r\n                                                       RADC\r\n                                                   CASE18-71       BBN2\r\n               FNWC                           GWC  13-5            40-71 \r\n               33-71                          24-70 \r\n                                          DOCB           CARNEG\r\n                                     USC  25-71          14-70    HARVAR\r\nHAWAII   AMES                        23-71                        09-71 \r\n36-71    16-71       UCSB        SDC                          BELVOI    ABERDE\r\n                     03-0        08-71                        27-71     29-71 \r\n         STANFO                                                  SDAC   NBS\r\n         11-71          UCLA                                     26-71  19-71\r\n                    UCSD01-71                                      MITRE\r\n                    35-71                                          17-71 \r\n               RAND                                                  ARPA\r\n               07-71                                                 28-71 \r\n         USC-IS                                        RML              ETAC\r\n         22-71                                         37-71            20-71";
+        const textToSend = [
+            'ARPANET DEPLOYMENT STATUS - KURT HAMM',
+            'Cycle: 051 | Active hosts: 4/4 | Source NCP: CCA-31 | Mode: read-only',
+            '',
+            'CURRENT PUBLIC TERMINAL HOSTS',
+            '',
+            'Host  Octal  IMP   System              Browser path      Network check',
+            '----  -----  ----  ------------------  ----------------  -------------',
+            '6     006    06    MIT-AI ITS          @L 6              NCP echo OK',
+            '70    106    06    MIT-DM ITS          @L 70             NCP echo OK',
+            '126   176    06    MIT-ML ITS          @L 126            NCP echo OK',
+            '41    051    41    PiDP-10 ARPA51      @L 41 / @L 051    NCP echo OK',
+            '',
+            'IMP PATHS IN THIS DEPLOYMENT',
+            '',
+            'Hosted trio:  CCA IMP31 -> MIT IMP06 -> hosts 006, 106, 176',
+            'Home node:    CCA IMP31 -> HILTON IMP62 -> HOME IMP41 -> host 051',
+            'Overlay:      IMP62 UDP 11262 <-> Pi IMP41 UDP 11141 over Tailscale',
+            '',
+            'NOTE',
+            'Browser sessions use simulator terminal lines for reliability.',
+            'ARPANET reachability is verified separately with NCP ping from ncp31.'
+        ].join('\r\n');
         nccCharQueue = textToSend.split('');
-        nccTerm.write('\r\n');
+        nccTerm.write('\x1b[2J\x1b[H');
         startNccPacing();
     }
 
