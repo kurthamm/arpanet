@@ -88,7 +88,7 @@ Clone Kurt's fork and the migration branch:
 
 ```sh
 cd /home/deltaprism
-git clone --recurse-submodules --branch fix-hosted-scenario-terminals https://github.com/kurthamm/arpanet.git arpanet
+git clone --recurse-submodules --branch main https://github.com/kurthamm/arpanet.git arpanet
 cd /home/deltaprism/arpanet
 git submodule update --init --recursive
 ```
