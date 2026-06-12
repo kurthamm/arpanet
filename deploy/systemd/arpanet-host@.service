@@ -1,0 +1,18 @@
+[Unit]
+Description=ARPANET hosted PDP-10 host %i
+After=arpanet-noc.service
+Requires=arpanet-noc.service
+
+[Service]
+Type=oneshot
+User=deltaprism
+Group=deltaprism
+WorkingDirectory=/home/deltaprism/arpanet/mini
+RemainAfterExit=yes
+ExecStart=/usr/bin/flock /tmp/arpanet-hostctl.lock /bin/bash -lc '/home/deltaprism/arpanet/mini/hostctl.sh start %i && /home/deltaprism/arpanet/mini/hostctl.sh verify %i || { rc=$?; /home/deltaprism/arpanet/mini/hostctl.sh stop %i; exit $rc; }'
+ExecStop=/usr/bin/flock /tmp/arpanet-hostctl.lock /home/deltaprism/arpanet/mini/hostctl.sh stop %i
+TimeoutStartSec=360
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

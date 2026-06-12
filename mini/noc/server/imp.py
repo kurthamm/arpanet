@@ -7,6 +7,7 @@ import os
 import re
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, Callable, List, Dict, Any
 from dataclasses import dataclass, field
 from collections import deque
@@ -73,6 +74,13 @@ class IMPController:
         self._attached_client: Optional[str] = None
         self._output_callback: Optional[Callable[[bytes], None]] = None
 
+    def _config_script_path(self) -> str:
+        """Return the SIMH script path, preferring a site-local override."""
+        override = Path(self.process_manager.working_dir) / f"imp{self.config.num_str}.local.simh"
+        if override.exists():
+            return str(override)
+        return f"./imp{self.config.num_str}.simh"
+
     @property
     def state(self) -> ProcessState:
         """Current IMP state."""
@@ -120,7 +128,7 @@ class IMPController:
         self._output_buffer = b""
 
         name = f"imp{self.config.num_str}"
-        args = ["./h316ov", f"./imp{self.config.num_str}.simh"]
+        args = ["./h316ov", self._config_script_path()]
 
         self._process = self.process_manager.spawn(
             name=name,
@@ -146,7 +154,7 @@ class IMPController:
     def send_reset(self):
         """Send reset command (reload SIMH script)."""
         if self._process and self._state == ProcessState.HALTED:
-            cmd = f"do imp{self.config.num_str}.simh\n"
+            cmd = f"do {Path(self._config_script_path()).name}\n"
             self.process_manager.write(self._process, cmd.encode())
             self._set_state(ProcessState.STARTING)
             self._output_buffer = b""

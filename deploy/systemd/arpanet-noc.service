@@ -1,0 +1,18 @@
+[Unit]
+Description=ARPANET NOC, IMP, and NCP supervisor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deltaprism
+Group=deltaprism
+WorkingDirectory=/home/deltaprism/arpanet/mini
+ExecStart=/home/deltaprism/arpanet/mini/noc-server.py
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

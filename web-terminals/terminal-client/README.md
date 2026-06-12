@@ -74,8 +74,8 @@ The startup script automatically detects the environment:
 - Uses Bluehost AutoSSL certificates
 - Certificates auto-discovered from `~/ssl/certs/`
 - Keys auto-discovered from `~/ssl/keys/`
-- Browsers connect via `wss://obsolescence.dev:8080`
-- Simh-server connects via `wss://obsolescence.dev:8081`
+- Browsers connect via `wss://arpanet.hamm.me/ws` when published through Cloudflare Tunnel
+- Simh-server connects via `ws://localhost:8081`
 
 ### Local Mode (Automatic)
 - No SSL certificates needed

@@ -54,16 +54,16 @@ case "$MODE" in
         echo "  Connecting to: $URLS"
         ;;
     vps)
-        URLS="wss://obsolescence.dev:8081"
+        URLS="wss://arpanet.hamm.me/ws"
         echo "Mode: VPS Only"
         echo "  Connecting to: $URLS"
         ;;
     both)
-        URLS="ws://localhost:8081 wss://obsolescence.dev:8081"
+        URLS="ws://localhost:8081 wss://arpanet.hamm.me/ws"
         echo "Mode: Multi-Connection (Local + VPS)"
         echo "  Connecting to:"
         echo "    - ws://localhost:8081 (local)"
-        echo "    - wss://obsolescence.dev:8081 (VPS)"
+        echo "    - wss://arpanet.hamm.me/ws (VPS)"
         ;;
     *)
         echo "Error: Invalid mode"

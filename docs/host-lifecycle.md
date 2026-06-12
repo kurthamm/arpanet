@@ -2,7 +2,7 @@
 
 Use `mini/hostctl.sh` to manage the hosted ITS PDP-10 hosts (`6`, `70`, and `126`).
 
-The older `mini/host06.sh`, `mini/host70.sh`, and `mini/host126.sh` scripts only start screens. They do not prove that old simulator children exited, so they can leave orphan `pdp10-ka-fixed` processes holding terminal and IMP ports. Use `hostctl.sh` for operational work.
+The older `mini/host06.sh`, `mini/host70.sh`, and `mini/host126.sh` entrypoints are now compatibility shims around `hostctl.sh`. Use `hostctl.sh` for operational work.
 
 ## Commands
 
@@ -49,7 +49,7 @@ Before changing runtime state, run the read-only full-system audit:
 mini/arpanet-health.sh
 ```
 
-The audit checks hosted ITS hosts, direct NCP reachability, browser relay sessions, stale `ncp-telnet` processes, IMP62/IMP41 sockets, and the PiDP-side screens when SSH is available. It reports `OK`, `WARN`, and `FAIL` without restarting or killing anything.
+The audit checks hosted ITS hosts, direct NCP reachability, browser relay sessions, stale `ncp-telnet` or local hosted terminal processes, IMP62/IMP41 sockets, and the PiDP-side screens when SSH is available. It reports `OK`, `WARN`, and `FAIL` without restarting or killing anything.
 
 If the Pi cannot be reached from the current shell, skip only that portion with:
 

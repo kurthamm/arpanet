@@ -1,0 +1,18 @@
+[Unit]
+Description=ARPANET localhost static web server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deltaprism
+Group=deltaprism
+WorkingDirectory=/home/deltaprism/arpanet
+Environment=ARPANET_STATIC_PORT=8888
+ExecStart=/usr/bin/python3 /home/deltaprism/arpanet/web-terminals/static-server/serve_arpanet_public.py
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target

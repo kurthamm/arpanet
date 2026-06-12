@@ -12,8 +12,7 @@ fi
 
 source venv/bin/activate
 
-python3 ws_bridge.py 10018 wss://obsolescence.dev:8080 &
+python3 ws_bridge.py 10018 wss://arpanet.hamm.me/ws &
 sleep 1
 ./vt52 -B telnet localhost 10018
-
 

@@ -11,29 +11,11 @@ else
     echo "SESSION_NUMBER not set (argument or environment)" >&2
     exit 1
 fi
-# Define the array of IMP_NUMBER and HOST_NUMBER pairs
-imp_host_pairs=(
-    "12 0"
-    "31 0"
-    "4 0"
-    "10 0"
-    "10 1"
-    "13 0"
-    "14 0"
-    "14 1"
-)
-
-# Bounds check (important!)
-if (( SESSION_NUMBER < 0 || SESSION_NUMBER >= ${#imp_host_pairs[@]} )); then
-    echo "Invalid SESSION_NUMBER: $SESSION_NUMBER" >&2
-    exit 1
-fi
-
-# Get the pair
-pair="${imp_host_pairs[$SESSION_NUMBER]}"
-
-# Split into variables
-read -r IMP_NUMBER HOST_NUMBER <<< "$pair"
+# Use a single known-good source NCP for browser TELNET sessions.  Rotating
+# through historical TIP sources makes hosted-browser behavior depend on source
+# NCPs that are absent or unreliable in the DigitalOcean deployment.
+IMP_NUMBER=31
+HOST_NUMBER=0
 
 #echo "S-$SESSION_NUMBER I-$IMP_NUMBER H-$HOST_NUMBER"
 
@@ -45,24 +27,39 @@ read -r IMP_NUMBER HOST_NUMBER <<< "$pair"
 #
 # ==================================================
 
-while IFS= read -r line; do
-    # Remove possible CR (for safety if CRLF sneaks in)
+line=""
+while IFS= read -r line || [[ -n "$line" ]]; do
     line=${line%$'\r'}
-
-#    if [[ $line =~ ^@L[[:space:]]*([0-9]+) ]]; then
-if [[ $line =~ ^@([lLoO])[[:space:]]*([0-9]+) ]]; then
+    if [[ $line =~ ^@([lLoO])[[:space:]]*([0-9]+) ]]; then
         COMMAND="${BASH_REMATCH[1]}"
         DEST="${BASH_REMATCH[2]}"
-	break
+        break
     fi
 done
+if [[ -z "${DEST-}" ]]; then
+    echo "No @L/@O host command received" >&2
+    exit 1
+fi
 #echo "---> connect $DEST"
 
-# Host 41 is the external PiDP-10 path.  It is reachable for NCP ping from
-# multiple sources, but TELNET is reliable through the CCA source NCP.
-if [[ "$DEST" == "41" || "$DEST" == "051" ]]; then
-    IMP_NUMBER=31
-    HOST_NUMBER=0
+# Hosts 6 and 70 currently reject ARPANET TELNET from the only reliable
+# browser-side source NCP (host 037). Route hosted simulators through their
+# localhost-only MTY lines, and keep the external PiDP lane on ARPANET TELNET.
+if [[ "$COMMAND" =~ ^[lL]$ ]]; then
+    case "$DEST" in
+        6|006)
+            cd ./mini
+            exec ./local-host-terminal.py 006 16015
+            ;;
+        70|106)
+            cd ./mini
+            exec ./local-host-terminal.py 106 17015
+            ;;
+        126|176)
+            cd ./mini
+            exec ./local-host-terminal.py 176 10015
+            ;;
+    esac
 fi
 
 # DEST: either 2nd argument or prompt
@@ -73,4 +70,3 @@ fi
 
 cd ./mini
 exec ./dotelnet.sh "$IMP_NUMBER" "$HOST_NUMBER" "$DEST" "$COMMAND"
-

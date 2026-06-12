@@ -47,7 +47,7 @@ cd ~/Documents/x4/arpa/simh-server
 ./start.sh vps
 
 # On VPS (terminal-client should already be running)
-# Browsers access: https://obsolescence.dev/arpanet_terminal2.html
+# Browsers access: https://arpanet.hamm.me/arpanet_terminal2.html
 ```
 
 ## Usage
@@ -64,7 +64,7 @@ cd ~/Documents/x4/arpa/simh-server
 ## Connection URLs
 
 - **Local mode:** `ws://localhost:8081` (no encryption)
-- **VPS mode:** `wss://obsolescence.dev:8081` (encrypted)
+- **VPS mode:** `wss://arpanet.hamm.me/ws` (encrypted via Cloudflare Tunnel)
 
 ## Session Management
 

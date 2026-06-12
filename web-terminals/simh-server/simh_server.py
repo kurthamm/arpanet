@@ -15,7 +15,7 @@ Usage:
 
 Examples:
   python3 simh_server.py ws://localhost:8081 ./do.sh
-  python3 simh_server.py wss://obsolescence.dev:8081 ./do.sh
+  python3 simh_server.py wss://arpanet.hamm.me/ws ./do.sh
 """
 
 import asyncio
@@ -184,6 +184,8 @@ class SimhSession:
         self.master_fd = None
         self.baud_rate = 9600  # Default, can be changed
         self.running = False
+        self.launcher_pending = True
+        self.launcher_buffer = ""
 
     def spawn(self):
         """Spawn simh in a pty"""
@@ -216,6 +218,22 @@ class SimhSession:
         except Exception as e:
             logger.error(f"Failed to spawn simh for {self.session_id}: {e}")
             return False
+
+    def normalize_input(self, data):
+        """Make browser Return usable for local PTY programs."""
+        normalized = data.replace('\r', '\n')
+        if not self.launcher_pending:
+            return normalized
+
+        for ch in normalized:
+            if ch == '\n':
+                line = self.launcher_buffer.strip()
+                self.launcher_buffer = ""
+                if line.upper().startswith(('@L', '@O')):
+                    self.launcher_pending = False
+            else:
+                self.launcher_buffer += ch
+        return normalized
 
     def cleanup(self):
         """Clean up simh process and PTY"""
@@ -312,7 +330,7 @@ class SimhServer:
         """Generate friendly name for connection based on URL"""
         if 'localhost' in url or '127.0.0.1' in url:
             return "local"
-        elif 'obsolescence.dev' in url:
+        elif 'arpanet.hamm.me' in url:
             return "vps"
         else:
             # Extract hostname from URL
@@ -551,7 +569,7 @@ class SimhServer:
             session = self.sessions[session_id]
             if session.master_fd:
                 try:
-                    os.write(session.master_fd, data.encode('utf-8'))
+                    os.write(session.master_fd, session.normalize_input(data).encode('utf-8'))
                 except Exception as e:
                     logger.error(f"Error writing to PTY ({session_id}): {e}")
 
@@ -745,10 +763,10 @@ Examples:
   python3 simh_server.py ws://localhost:8081
 
   # Multiple connections (local + VPS):
-  python3 simh_server.py ws://localhost:8081 wss://obsolescence.dev:8081
+  python3 simh_server.py ws://localhost:8081 wss://arpanet.hamm.me/ws
 
   # With custom script path:
-  python3 simh_server.py ws://localhost:8081 wss://obsolescence.dev:8081 /path/to/do.sh
+  python3 simh_server.py ws://localhost:8081 wss://arpanet.hamm.me/ws /path/to/do.sh
 
 The simh-server will:
 1. Connect to one or more terminal-clients

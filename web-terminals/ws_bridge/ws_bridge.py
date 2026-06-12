@@ -16,7 +16,7 @@ Usage:
 Examples:
   python3 ws_bridge.py                                    # Listen on 10018, connect to ws://localhost:8080
   python3 ws_bridge.py 10018 ws://localhost:8080          # Explicit local mode
-  python3 ws_bridge.py 10018 wss://obsolescence.dev:8080  # Connect to VPS
+  python3 ws_bridge.py 10018 wss://arpanet.hamm.me/ws     # Connect to VPS
 
 Then run VT-52 simulator:
   ./vt52 -B telnet localhost 10018

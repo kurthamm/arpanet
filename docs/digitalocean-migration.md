@@ -151,6 +151,8 @@ The original runtime relies heavily on `screen` and broad process cleanup. This 
 - Browser terminal sessions can leave stale `ncp-telnet` processes.
 - Startup timing matters: hosts and NCP daemons can start before IMPs are fully converged.
 - Site-specific PiDP/Tailscale changes can leak into upstream-friendly files if not kept separate.
+- The hosted host `tk` listeners must be unique per host; `6`, `70`, and `126` now use `16012`, `17012`, and `10012` respectively.
+- Browser access to hosted hosts `6`, `70`, and `126` uses localhost-only simulator terminal lines; PiDP host `41` remains on the ARPANET NCP TELNET path.
 
 The target deployment should keep vintage software behavior fixed and improve only the modern orchestration around it.
 
@@ -163,6 +165,8 @@ During initial droplet testing:
 - Hosted PDP-10s `6`, `70`, and `126` booted into ITS.
 - NCP pings to `6`, `70`, and `126` still failed.
 - A duplicate NCP condition was found: NOC-owned `ncpdov` processes existed alongside manual `screen`-owned `ncpXX` sessions.
+- The PiDP link is loaded from the ignored local override `mini/imp62.local.simh` when present; the tracked `mini/imp62.simh` stays generic.
+- Later validation showed NCP echo could pass while ARPANET TELNET from source host `037` was rejected by some hosted MIT images, so hosted browser sessions are kept separate from ARPANET TELNET validation.
 
 Before further diagnosis, remove only the manual `ncpXX` screen sessions and leave NOC-owned `ncpdov` processes intact.
 
@@ -226,7 +230,8 @@ Before starting a hosted host service:
 Before starting terminal services:
 
 - Check for stale relay-owned `ncp-telnet` processes.
-- Kill only relay-owned stale sessions, not arbitrary `ncp-telnet` instances.
+- Check for stale relay-owned `ncp-telnet` and `local-host-terminal.py` processes.
+- Kill only relay-owned stale sessions, not arbitrary terminal processes.
 - Ensure the relay binds locally for Cloudflare Tunnel ingress.
 
 Before starting Cloudflare Tunnel:
@@ -245,7 +250,7 @@ Expected checks:
 - NCP ping works for hosted hosts.
 - PiDP host `41` is checked only when its Tailscale/IMP link is intentionally configured.
 - No duplicate `ncpdov` processes own the same NCP path.
-- No stale browser `ncp-telnet` process remains after sessions close.
+- No stale browser `ncp-telnet` or `local-host-terminal.py` process remains after sessions close.
 - Terminal relay and static server are reachable locally.
 - Site-local runtime changes are visible and documented.
 
@@ -281,7 +286,7 @@ Browser terminal tests:
 - Run `@L 6` and reach the ITS banner/login behavior.
 - Run `@L 70` and reach the ITS banner/login behavior.
 - Run `@L 126` and reach the ITS banner/login behavior.
-- Confirm closing/reopening the browser session does not leave stale relay-owned `ncp-telnet` processes.
+- Confirm closing/reopening the browser session does not leave stale relay-owned `ncp-telnet` or `local-host-terminal.py` processes.
 
 Public site tests:
 
@@ -296,7 +301,7 @@ PiDP tests should be separate and run only after hosted hosts are stable:
 - Tailscale path between droplet and Pi is active.
 - IMP62 to IMP41 UDP path is configured as site-local runtime config.
 - NCP ping to `41` works.
-- Browser `@L 41` behavior is tested without restarting hosted hosts.
+- Browser `@L 41` behavior is tested without restarting hosted hosts. If NCP ping works but TELNET stalls at `TELNET to host 051.`, diagnose the Pi-side TELNET/TELSER path in the companion repository.
 
 ## Rollback and Reference
 

@@ -99,6 +99,8 @@ class NCPController:
         self._restart_policy.reset()
         if self._process:
             self.process_manager.kill(self._process)
+        else:
+            self.start()
 
     def get_status(self) -> NCPStatus:
         """Get current status."""

@@ -37,7 +37,7 @@ class NOCServer:
     DEFAULT_CONFIG = "./arpanet"
     DEFAULT_SOCKET = "/tmp/noc.sock"
     LOGFILE = "./logfiles/noc.audit.log"
-    NCP_START_DELAY = 3.0  # Seconds to wait after IMPs before starting NCPs
+    NCP_START_DELAY = 3.0
 
     def __init__(
         self,
@@ -60,7 +60,6 @@ class NOCServer:
         self._imp_configs = []
         self._ncp_configs = []
         self._shutting_down = False
-
         self._setup_logging()
 
     def _setup_logging(self):
@@ -183,7 +182,12 @@ class NOCServer:
         self.logger.info(f"Started {len(self.ncps)} NCP daemons")
 
     def _schedule_ncp_start(self):
-        """Schedule NCP start after IMPs have initialized."""
+        """Schedule NCP start shortly after IMPs begin booting.
+
+        The H316 host interfaces expect their host/NCP UDP peers to appear
+        quickly. Waiting for every IMP to reach RUNNING can leave HI ports
+        peerless long enough to trigger unrecoverable host-interface errors.
+        """
         self.logger.info(f"Waiting {self.NCP_START_DELAY}s for IMPs to initialize...")
         self.loop.call_later(self.NCP_START_DELAY, self._start_ncps)
 

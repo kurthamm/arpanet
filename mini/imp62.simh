@@ -10,8 +10,9 @@ do impcode.simh
 set mi1 enabled
 attach -u mi1 11162::11331
 
-# This is for remote guest IMP 41
-# IMP41 not running; mi2 disabled to prevent I/O errors
+# This is for remote guest IMP 41 over Tailscale.
+# The site-local override file mini/imp62.local.simh can enable the
+# PiDP/Tailscale link without baking that wiring into the generic script.
 set mi2 disabled
 
 

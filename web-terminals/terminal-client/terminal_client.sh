@@ -45,12 +45,12 @@ fi
 source venv/bin/activate
 
 # Auto-detect SSL certificates (VPS vs laptop)
-CERT=$(ls -t ${VPATH}/ssl/certs/obsolescence_dev*.crt 2>/dev/null | grep -v "^_wildcard" | head -1)
+CERT=$(ls -t ${VPATH}/ssl/certs/arpanet_hamm_me*.crt ${VPATH}/ssl/certs/obsolescence_dev*.crt 2>/dev/null | grep -v "^_wildcard" | head -1)
 
 if [ -n "$CERT" ]; then
     # Running on VPS with SSL
     CERT_BASENAME=$(basename "$CERT")
-    CERT_ID=$(echo "$CERT_BASENAME" | sed 's/obsolescence_dev_\([^_]*_[^_]*\).*/\1/')
+    CERT_ID=$(echo "$CERT_BASENAME" | sed -E 's/^(arpanet_hamm_me|obsolescence_dev)_([^_]*_[^_]*).*/\2/')
     KEY=$(ls ${VPATH}/ssl/keys/${CERT_ID}*.key 2>/dev/null | head -1)
 
     if [ -n "$KEY" ]; then

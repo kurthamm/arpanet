@@ -17,13 +17,22 @@ Expected routing:
 
 | Command | Target | Notes |
 | --- | --- | --- |
-| `@L 6` | host `006` | MIT ITS host. |
-| `@L 70` | host `106` | MIT Dynamic Modelling PDP-10; uses old TELNET mode automatically. |
-| `@L 126` | host `176` | ITS host. |
-| `@L 41` | host `051` | External PiDP-10, if the site-local IMP41 link is configured. |
+| `@L 6` | host `006` | Hosted MIT ITS simulator, reached through a localhost-only simulator terminal line. |
+| `@L 70` | host `106` | Hosted MIT Dynamic Modelling PDP-10, reached through a localhost-only simulator terminal line. |
+| `@L 126` | host `176` | Hosted ITS simulator, reached through a localhost-only simulator terminal line. |
+| `@L 41` | host `051` | External PiDP-10, reached through ARPANET NCP TELNET if the site-local IMP41 link is configured. |
 | `@L 051` | host `051` | Accepted spelling for the same PiDP-10 host. |
 
 Some ITS hosts may display `Unknown ITS PDP-10` and `It's a lovely day to be a turist!`. That text is an ITS/TELSER banner and does not by itself indicate wrong routing. Use the `TELNET to host ...` line and NCP tests for routing verification.
+
+## Hosted Browser Routing
+
+The hosted trio and the PiDP lane intentionally use different browser paths:
+
+- `@L 6`, `@L 70`, and `@L 126` run `mini/local-host-terminal.py` and connect to localhost-only SIMH terminal lines (`16015`, `17015`, and `10015`). This does not open public emulator ports; the browser still reaches the relay only through Cloudflare Tunnel.
+- `@L 41` and `@L 051` remain ARPANET NCP TELNET sessions from source `ncp31` using old TELNET mode.
+
+This split keeps the hosted machines usable while preserving NCP reachability checks separately. In the DigitalOcean runtime, `ncp31` is the only reliable application NCP source, and the MIT hosted images may reject ARPANET TELNET from host `037` even while NCP echo works.
 
 ## PiDP-10 Host 41 Routing
 
@@ -39,6 +48,14 @@ The site-local IMP41 link is intentionally not committed as a generic upstream s
 https://github.com/kurthamm/pidp10-arpanet-node
 ```
 
+On the DigitalOcean droplet, the main fork will also honor an ignored local override file:
+
+```text
+mini/imp62.local.simh
+```
+
+That keeps the PiDP/Tailscale wiring out of the tracked `imp62.simh` while still allowing the live deployment to enable host `41` when the local file exists.
+
 ## Direct Validation
 
 From `mini/`, verify the hosted hosts and PiDP host path:
@@ -53,11 +70,14 @@ NCP=ncp31 ./ncp-ping -c1 41
 Check the launcher path without using the browser:
 
 ```sh
+printf '@L 6\r\n' | SESSION_NUMBER=0 ../do.sh
+printf '@L 70\r\n' | SESSION_NUMBER=0 ../do.sh
+printf '@L 126\r\n' | SESSION_NUMBER=0 ../do.sh
 printf '@L 41\r\n' | SESSION_NUMBER=0 ../do.sh
 printf '@L 051\r\n' | SESSION_NUMBER=0 ../do.sh
 ```
 
-Both commands should attempt `TELNET to host 051.`
+The hosted commands should print the matching `TELNET to host ...` line and an ITS banner from the local simulator terminal. The PiDP commands should attempt `TELNET to host 051.`
 
 ## Relay Session Diagnostics
 
@@ -65,10 +85,11 @@ If the hosted browser terminal hangs after an `@L` command, check relay-owned TE
 
 ```sh
 ps -eo pid,ppid,pgid,sid,stat,args | grep '[n]cp-telnet'
+ps -eo pid,ppid,pgid,sid,stat,args | grep '[l]ocal-host-terminal'
 pgrep -af simh_server.py
 ```
 
-A stale `ncp-telnet` whose parent is the running `simh_server.py` belongs to the browser relay. Clean that relay session/process group; do not restart hosted ITS hosts unless direct `ncp-ping` fails.
+A stale `ncp-telnet` or `local-host-terminal.py` whose parent is the running `simh_server.py` belongs to the browser relay. Clean that relay session/process group; do not restart hosted ITS hosts unless direct `ncp-ping` fails.
 
 ## Hosted Host Operations
 

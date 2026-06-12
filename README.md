@@ -20,6 +20,11 @@ From the hosted terminal page:
 
 Host `41` / octal `051` is an optional external PiDP-10 path. The launcher maps `@L 41` and `@L 051` through the working source NCP and old TELNET mode automatically.
 
+Hosted hosts `6`, `70`, and `126` are local PDP-10 simulators on the droplet.
+Their browser sessions use localhost-only simulator terminal lines so the public
+terminal remains usable even when a vintage ITS image does not accept ARPANET
+TELNET from the browser source NCP.
+
 ## Hosted ITS Host Operations
 
 For safe status, restart, and verification of hosted ITS hosts `6`, `70`, and `126`, use:
@@ -73,7 +78,7 @@ Clone, and run demo-run.sh. Inspect it for the things it does: (a) set up a loca
 <br><br>
 Then, you can load the file arpanet_home.html into your browser. Or straight on to arpanet_terminal2.html if you want to skip the intro.
 <br><br>
-You might want to skip all the web stuff. A quick way straight onto your Arpanet is to run './do.sh 1'. That gets a TIP session, type @L 6 [return] and it will connect to host #6 on the Arpanet. That's an MIT ITS system.
+You might want to skip all the web stuff. A quick way straight onto your Arpanet is to run './do.sh 1'. That gets a TIP-like session; type @L 6 [return] and it will connect to host #6. That's an MIT ITS system.
 <br><br>
 The arpanet simulation consists of a network of IMP routers, which you can inspect and manage. The mini subdirectory contains the entire arpanet simulation, irrespective of the web server stuff. In ./mini, start by running ./impctl.py help. It will give you insight in how to play with the IMP farm. The hosts attached to the IMPs are started through ./mini/arpanet, they are started independently from the Arpanet IMP 'farm', but make sure you start ITS systems straight after starting their IMP. ITS is picky on when it wishes to hear from their IMP. Do 'screen -ls' to see the host systems themselves.
 <br><br>

@@ -297,6 +297,43 @@ class ClientHandler:
             imp = self._resolve_imp_target(target)
             return [imp] if imp else []
 
+    def _resolve_ncp_target(self, target: str) -> Optional['NCPController']:
+        """Resolve a target string to an NCP controller."""
+        try:
+            num = int(target)
+            if num in self.ncps:
+                return self.ncps[num]
+        except ValueError:
+            pass
+
+        target_lower = target.lower()
+        for ncp in self.ncps.values():
+            if ncp.config.hostname.lower() == target_lower:
+                return ncp
+
+        return None
+
+    def _resolve_ncp_targets(self, target: str) -> List['NCPController']:
+        """Resolve target specifier to list of NCPs."""
+        if target == "all":
+            return list(self.ncps.values())
+        elif target == "crashed":
+            return [n for n in self.ncps.values() if n.state == ProcessState.CRASHED]
+        elif target == "running":
+            return [n for n in self.ncps.values() if n.state == ProcessState.RUNNING]
+        elif target == "stopped":
+            return [n for n in self.ncps.values() if n.state == ProcessState.STOPPED]
+        elif "," in target:
+            results = []
+            for t in target.split(","):
+                ncp = self._resolve_ncp_target(t.strip())
+                if ncp:
+                    results.append(ncp)
+            return results
+        else:
+            ncp = self._resolve_ncp_target(target)
+            return [ncp] if ncp else []
+
     # Command handlers
 
     def _cmd_status(self, client: ClientConnection, msg: Dict) -> Dict:
@@ -425,15 +462,20 @@ class ClientHandler:
             return error_response("Missing 'target' parameter")
 
         imps = self._resolve_targets(target)
-        if not imps:
-            return error_response(f"No IMPs matched target '{target}'")
+        ncps = self._resolve_ncp_targets(target)
+        if not imps and not ncps:
+            return error_response(f"No IMPs or NCPs matched target '{target}'")
 
         restarted = []
         for imp in imps:
             imp.force_restart()
             restarted.append(imp.config.number)
+        restarted_ncps = []
+        for ncp in ncps:
+            ncp.force_restart()
+            restarted_ncps.append(ncp.config.full_host)
 
-        return ok_response({"restarted": restarted})
+        return ok_response({"restarted": restarted, "restarted_ncps": restarted_ncps})
 
     def _cmd_stop(self, client: ClientConnection, msg: Dict) -> Dict:
         """Handle stop command."""

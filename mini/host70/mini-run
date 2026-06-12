@@ -24,7 +24,7 @@ set dk disabled
 set stk enabled
 set tk enabled
 at -u tk 17000 speed=300
-at -u tk line=2,10012
+at -u tk line=2,17012
 set dpk enabled
 at -u dpk 17002 speed=4800
 at -u dpk line=11,17019 speed=4800

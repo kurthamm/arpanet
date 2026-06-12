@@ -261,6 +261,9 @@ class CLI:
         restarted = response.get("data", {}).get("restarted", [])
         if restarted:
             print(f"Restarted: {', '.join(str(i) for i in restarted)}")
+        restarted_ncps = response.get("data", {}).get("restarted_ncps", [])
+        if restarted_ncps:
+            print(f"Restarted NCPs: {', '.join(str(i) for i in restarted_ncps)}")
         return 0
 
     def _cmd_stop(self, args: List[str]) -> int:

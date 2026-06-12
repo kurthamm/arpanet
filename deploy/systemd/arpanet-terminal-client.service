@@ -1,0 +1,18 @@
+[Unit]
+Description=ARPANET browser terminal WebSocket relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deltaprism
+Group=deltaprism
+WorkingDirectory=/home/deltaprism/arpanet/web-terminals/terminal-client
+Environment=ARPANET_TERMINAL_BIND=127.0.0.1
+ExecStart=/home/deltaprism/arpanet/web-terminals/terminal-client/venv/bin/python /home/deltaprism/arpanet/web-terminals/terminal-client/terminal_client.py
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target

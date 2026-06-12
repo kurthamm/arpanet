@@ -1,8 +1,5 @@
-cd host126
-echo $PWD
-cp ./126/rp* .
-cp ./126/ds* .
-screen -dmS host126 ../pdp10-ka-fixed ./mini-run
-#screen -dmS host126 ./pdp10-kaov ./mini-run
-cd ..
+#!/usr/bin/env bash
+set -euo pipefail
 
+cd "$(dirname "$0")"
+exec ./hostctl.sh start 126

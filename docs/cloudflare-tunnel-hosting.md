@@ -20,7 +20,7 @@ The terminal page is:
 https://arpanet.hamm.me/arpanet_terminal2.html
 ```
 
-## Services on Civitae
+## Services on the hosted droplet
 
 The hosted page uses two local services:
 
@@ -28,6 +28,10 @@ The hosted page uses two local services:
 arpanet-static.service       http://127.0.0.1:8888
 cloudflared-arpanet.service  Cloudflare Tunnel connector
 ```
+
+As of the DigitalOcean migration, the active `arpanet.hamm.me` connector should
+run on the `ARPANet` droplet. The old Civitae `cloudflared-arpanet.service`
+connector should remain disabled so traffic does not split between deployments.
 
 The existing main Cloudflare service remains separate:
 

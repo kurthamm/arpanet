@@ -3,7 +3,7 @@ set -u -o pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$ROOT/.." && pwd)"
-PI_HOST="${ARPANET_PI_HOST:-pi@192.168.50.197}"
+PI_HOST="${ARPANET_PI_HOST:-pi@100.105.230.31}"
 PI_TIMEOUT="${ARPANET_PI_TIMEOUT:-8}"
 CHECK_PI="${ARPANET_CHECK_PI:-1}"
 FAILURES=0
@@ -29,13 +29,16 @@ print_matching_processes() {
 
 check_repo_state() {
     section "Repository Runtime State"
-    local status
-    status="$(cd "$REPO_ROOT" && git status --short mini/imp62.simh 2>/dev/null || true)"
-    if [[ -n "$status" ]]; then
-        warn "site-local runtime config is modified:"
-        printf '%s\n' "$status"
+    if [[ -f "$ROOT/imp62.local.simh" ]]; then
+        ok "site-local imp62.local.simh override present"
     else
-        ok "no site-local imp62.simh modification detected"
+        warn "site-local imp62.local.simh override missing"
+    fi
+
+    if cd "$REPO_ROOT" && git diff --quiet -- mini/imp62.simh; then
+        ok "tracked imp62.simh remains generic"
+    else
+        warn "tracked imp62.simh has local modifications"
     fi
 }
 
@@ -77,7 +80,7 @@ check_ncp_pings() {
 
 check_relay() {
     section "Browser Terminal Relay"
-    local relay_count telnet_count
+    local relay_count telnet_count local_terminal_count
     relay_count="$(process_count 'simh_server.py')"
     if [[ "$relay_count" == "1" ]]; then
         ok "one simh_server.py relay running"
@@ -93,24 +96,37 @@ check_relay() {
         warn "$telnet_count ncp-telnet process(es) active; this is OK only during an intentional browser/direct terminal session"
         ps -eo pid,ppid,pgid,sid,stat,args | grep '[n]cp-telnet' || true
     fi
+
+    local_terminal_count="$(pgrep -fc 'local-host-terminal.py' 2>/dev/null || true)"
+    if [[ "$local_terminal_count" == "0" ]]; then
+        ok "no active local hosted terminal sessions"
+    else
+        warn "$local_terminal_count local hosted terminal process(es) active; this is OK only during an intentional browser/direct terminal session"
+        ps -eo pid,ppid,pgid,sid,stat,args | grep '[l]ocal-host-terminal.py' || true
+    fi
 }
 
 check_imp_links() {
     section "IMP Links And Sockets"
     local imp62_count imp06_count link_line
     imp06_count="$(process_count 'h316ov ./imp06.simh')"
-    imp62_count="$(process_count 'h316ov ./imp62.simh')"
+    imp62_count="$(
+        {
+            process_count 'h316ov ./imp62.simh'
+            process_count 'h316ov .*imp62.local.simh'
+        } | awk '{sum += $1} END {print sum + 0}'
+    )"
 
     [[ "$imp06_count" == "1" ]] && ok "one IMP06 process" || fail "expected one IMP06 process, found $imp06_count"
     [[ "$imp62_count" == "1" ]] && ok "one IMP62 process" || fail "expected one IMP62 process, found $imp62_count"
-    print_matching_processes 'h316ov ./imp(06|31|62).simh'
+    print_matching_processes 'h316ov .*imp(06|31|62)(\.local)?\.simh'
 
-    link_line="$(ss -H -u -a -p | grep '100.105.230.31:11141' | grep ':11262' || true)"
+    link_line="$(ss -H -u -a -p | grep '11141' | grep '11262' || true)"
     if [[ -n "$link_line" ]]; then
         ok "IMP62 remote link to Pi IMP41 socket present"
         printf '%s\n' "$link_line"
     else
-        fail "IMP62 remote link socket 11262 <-> 100.105.230.31:11141 not found"
+        fail "IMP62 remote link socket 11262 <-> 11141 not found"
     fi
 }
 
@@ -135,7 +151,7 @@ screen -ls || true
 printf "-- processes --\n"
 ps -eo pid,ppid,pgid,sid,stat,pcpu,args | grep -E "pdp10-ka-ncp-pidp|h316-arpa|cbridge|tv11" | grep -v grep || true
 printf "-- sockets --\n"
-ss -H -u -a -p | grep -E "11141|11262|100.120.170.123" || true
+ss -H -u -a -p | grep -E "11141|11262" || true
 '
     output="$(timeout "$PI_TIMEOUT" ssh -o BatchMode=yes -o ConnectTimeout=5 "$PI_HOST" "bash -s" 2>&1 <<<"$remote_script")"
     rc=$?
@@ -152,10 +168,10 @@ ss -H -u -a -p | grep -E "11141|11262|100.120.170.123" || true
             fail "Pi screen $name missing"
         fi
     done
-    if grep -q '100.105.230.31:11141.*100.120.170.123:11262' <<<"$output"; then
-        ok "Pi IMP41 UDP link to Civitae present"
+    if grep -q '11141' <<<"$output" && grep -q '11262' <<<"$output"; then
+        ok "Pi IMP41 UDP link to droplet present"
     else
-        fail "Pi IMP41 UDP link to Civitae missing"
+        fail "Pi IMP41 UDP link to droplet missing"
     fi
 }
 

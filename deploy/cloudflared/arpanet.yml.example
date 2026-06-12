@@ -1,0 +1,10 @@
+tunnel: arpanet-page-REPLACE-WITH-UUID
+credentials-file: /etc/cloudflared/arpanet-page-REPLACE-WITH-UUID.json
+
+ingress:
+  - hostname: arpanet.hamm.me
+    path: /ws*
+    service: http://127.0.0.1:8080
+  - hostname: arpanet.hamm.me
+    service: http://127.0.0.1:8888
+  - service: http_status:404

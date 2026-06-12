@@ -1,0 +1,17 @@
+[Unit]
+Description=ARPANET Cloudflare Tunnel
+After=network-online.target arpanet-static.service arpanet-terminal-client.service
+Wants=network-online.target arpanet-static.service arpanet-terminal-client.service
+
+[Service]
+Type=simple
+User=deltaprism
+Group=deltaprism
+ExecStart=/usr/bin/cloudflared --no-autoupdate --config /etc/cloudflared/arpanet.yml tunnel run
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

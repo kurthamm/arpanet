@@ -20,6 +20,7 @@ import asyncio
 import json
 import logging
 import ssl
+import os
 import sys
 from datetime import datetime
 
@@ -39,9 +40,10 @@ logger = logging.getLogger(__name__)
 
 
 class TerminalClient:
-    def __init__(self, browser_port=8080, simh_port=8081, certfile=None, keyfile=None):
+    def __init__(self, browser_port=8080, simh_port=8081, bind_host="127.0.0.1", certfile=None, keyfile=None):
         self.browser_port = browser_port
         self.simh_port = simh_port
+        self.bind_host = bind_host
         self.certfile = certfile
         self.keyfile = keyfile
         self.ssl_context = None
@@ -56,8 +58,8 @@ class TerminalClient:
             self.setup_ssl(certfile, keyfile)
 
         logger.info(f"TerminalClient initialized")
-        logger.info(f"  Browsers will connect on port {browser_port}")
-        logger.info(f"  Simh-server will connect on port {simh_port}")
+        logger.info(f"  Browsers will connect on {bind_host}:{browser_port}")
+        logger.info(f"  Simh-server will connect on {bind_host}:{simh_port}")
         if self.ssl_context:
             logger.info(f"  SSL/TLS enabled (WSS)")
         else:
@@ -208,25 +210,25 @@ class TerminalClient:
         # Very relaxed keepalive: 60s ping, 120s timeout for maximum stability
         browser_server = await websockets.serve(
             self.handle_browser,
-            "0.0.0.0",
+            self.bind_host,
             self.browser_port,
             ssl=self.ssl_context,
             ping_interval=60,
             ping_timeout=120
         )
-        logger.info(f"Browser server listening on {protocol}://0.0.0.0:{self.browser_port}")
+        logger.info(f"Browser server listening on {protocol}://{self.bind_host}:{self.browser_port}")
 
         # Simh-server connection on port 8081
         # Very relaxed keepalive: 60s ping, 120s timeout for maximum stability
         simh_server = await websockets.serve(
             self.handle_simh_server,
-            "0.0.0.0",
+            self.bind_host,
             self.simh_port,
             ssl=self.ssl_context,
             ping_interval=60,
             ping_timeout=120
         )
-        logger.info(f"Simh-server listening on {protocol}://0.0.0.0:{self.simh_port}")
+        logger.info(f"Simh-server listening on {protocol}://{self.bind_host}:{self.simh_port}")
 
         logger.info("Terminal-client started. Waiting for connections...")
 
@@ -244,7 +246,16 @@ async def main():
     if len(sys.argv) > 2:
         keyfile = sys.argv[2]
 
-    server = TerminalClient(browser_port=8080, simh_port=8081, certfile=certfile, keyfile=keyfile)
+    bind_host = os.environ.get("ARPANET_TERMINAL_BIND", "127.0.0.1")
+    browser_port = int(os.environ.get("ARPANET_TERMINAL_BROWSER_PORT", "8080"))
+    simh_port = int(os.environ.get("ARPANET_TERMINAL_SIMH_PORT", "8081"))
+    server = TerminalClient(
+        browser_port=browser_port,
+        simh_port=simh_port,
+        bind_host=bind_host,
+        certfile=certfile,
+        keyfile=keyfile,
+    )
     await server.start()
 
 

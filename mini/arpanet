@@ -176,6 +176,11 @@ start_network() {
   screen -dmS noc ./noc-server.py 
   sleep 3
 
+  # Start hosted PDP-10s through the lifecycle manager.
+  ./hostctl.sh start 6
+  ./hostctl.sh start 70
+  ./hostctl.sh start 126
+
   # old style screen setup, now disabled
 
   # Start IMPs first
@@ -278,6 +283,9 @@ stop_hosts() {
 stop_network() {
   echo "Stopping ARPANET network..."
   echo ""
+
+  # Stop hosted PDP-10s first through the lifecycle manager.
+  ./hostctl.sh stop all
 
   # Stop NCPs first (cleaner disconnect)
 #  stop_ncpds

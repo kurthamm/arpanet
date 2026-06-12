@@ -1,0 +1,17 @@
+[Unit]
+Description=ARPANET terminal session launcher
+After=arpanet-terminal-client.service arpanet-host@6.service arpanet-host@70.service arpanet-host@126.service
+Wants=arpanet-terminal-client.service
+
+[Service]
+Type=simple
+User=deltaprism
+Group=deltaprism
+WorkingDirectory=/home/deltaprism/arpanet/web-terminals/simh-server
+ExecStart=/home/deltaprism/arpanet/web-terminals/simh-server/venv/bin/python /home/deltaprism/arpanet/web-terminals/simh-server/simh_server.py ws://127.0.0.1:8081 /home/deltaprism/arpanet/do.sh
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target
