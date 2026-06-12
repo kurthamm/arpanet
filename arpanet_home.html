@@ -1060,16 +1060,6 @@
 					</div>
 				</div>
 
-				<div class="setting-group">
-					<div class="setting-label">Arpanet Nodes History</div>
-
-					<div>
-						<select id="node-history-selector" class="button full-width" style="text-align: left; cursor: pointer;">
-							<option value="">Select a node...</option>
-						</select>
-					</div>
-				</div>
-
 			</div>
 
             <div class="top-content">
@@ -2084,46 +2074,6 @@ terminalDefinitions.forEach(term => {
 
 // Initialize terminal states display
 updateTerminalStates();
-</script>
-
-<script>
-// Populate Node History Dropdown from arpanetNodes data
-document.addEventListener('DOMContentLoaded', function() {
-    const selector = document.getElementById('node-history-selector');
-    if (!selector || typeof arpanetNodes === 'undefined') return;
-
-    // Get unique nodes with IMP numbers (entries that have 'node' property)
-    const nodeMap = new Map();
-    arpanetNodes.forEach(item => {
-        if (item.node && item.name1) {
-            // Use node number as key to avoid duplicates
-            if (!nodeMap.has(item.node)) {
-                nodeMap.set(item.node, {
-                    number: item.node,
-                    name: item.name1
-                });
-            }
-        }
-    });
-
-    // Convert to array and sort by node number
-    const nodes = Array.from(nodeMap.values()).sort((a, b) => a.number - b.number);
-
-    // Populate the dropdown
-    nodes.forEach(node => {
-        const option = document.createElement('option');
-        option.value = `arpa/arpanet-node-${node.number}-${node.name}.html`;
-        option.textContent = `${node.number} - ${node.name}`;
-        selector.appendChild(option);
-    });
-
-    // Handle selection - navigate to the page
-    selector.addEventListener('change', function() {
-        if (this.value) {
-            window.location.href = this.value;
-        }
-    });
-});
 </script>
 
 <script>
