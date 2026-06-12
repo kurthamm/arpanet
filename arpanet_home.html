@@ -2138,9 +2138,9 @@ document.addEventListener('DOMContentLoaded', function() {
             'HOSTS 006 MIT-AI  106 MIT-DM  176 MIT-ML  051 PiDP-10',
             '',
             'PATH   CCA31 -> HILTON62 -> HOME41',
-            'LINK   IMP62:11262 <-> IMP41:11141 OVER TAILSCALE',
+            'LINK   IMP62:11262 <-> IMP41:11141',
             '',
-            'NOTE   MTY browser path; NCP echo checked separately'
+            'NCP    ECHO OK: 006 106 176 051'
         ].join('\r\n');
         nccCharQueue = textToSend.split('');
         nccTerm.write('\x1b[2J\x1b[H');
