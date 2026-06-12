@@ -1063,7 +1063,7 @@
 					<div class="setting-label">Arpanet Status</div>
 
 					<div>
-						<a href="#" id="open-status-panel-btn" class="button full-width" >Check IMP network status</a>
+						<a href="#" id="open-status-panel-btn" class="button full-width" >View NCC-style status</a>
 					</div>
 				</div>
 
@@ -2128,29 +2128,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Feed the text after initialization
         const textToSend = [
-            'Cycle: 051 | Active: 4/4 | Msgs: 0000 | Time: 0s',
+            'BBN NCC  IMP CHECK-IN REPORT',
             '',
+            'SITE  EQUIP      LOCATION             CONNECTED HOSTS',
+            '----  ---------  -------------------  ----------------------',
+            '06    IMP        CAMBRIDGE, MASS.     006 MIT-AI',
+            '                                      106 MIT-DM',
+            '                                      176 MIT-ML',
             '',
+            '31    TIP/IMP    CAMBRIDGE, MASS.     CCA TENEX HOST 037',
+            '62    TIP        WASHINGTON, D.C.     ICCC TERMINALS',
+            '41    IMP        HOME REPLICA SITE    051 PIDP-10',
             '',
+            'HOST CHECK',
+            '006  MIT-AI     UP',
+            '106  MIT-DM     UP',
+            '176  MIT-ML     UP',
+            '051  PIDP-10    UP',
             '',
-            '                                                             MIT',
-            '                                                             06-71',
-            '',
-            '                                                        CCA',
-            '                                                        31-71',
-            '',
-            '                                          HILTON',
-            '                                          62-71',
-            '',
-            '                      HOME',
-            '                      41-71',
-            '',
-            'HOSTS 006 MIT-AI  106 MIT-DM  176 MIT-ML  051 PiDP-10',
-            '',
-            'PATH   CCA31 -> HILTON62 -> HOME41',
-            'LINK   IMP62:11262 <-> IMP41:11141',
-            '',
-            'NCP    ECHO OK: 006 106 176 051'
+            'NOTES',
+            'MIT IMP 06 CARRIES THE THREE HOSTED PDP-10 SYSTEMS.',
+            'CCA 31 IS A SEPARATE CAMBRIDGE TIP/IMP, NOT MIT IMP 06.',
+            'HILTON 62 IS A TERMINAL TIP FOR THE 1972 ICCC DEMO.',
+            'HOME 41 IS THIS IMPLEMENTATION\'S PIDP-10 REPLICA SITE.'
         ].join('\r\n');
         nccCharQueue = textToSend.split('');
         nccTerm.write('\x1b[2J\x1b[H');
