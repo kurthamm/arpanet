@@ -853,6 +853,174 @@
         #map-animation-wrapper #next-btn {
             right: 10px; /* Flush with the right edge */
         }
+
+        .growth-panel {
+            grid-column: 1 / -1;
+        }
+
+        .growth-panel .growth-intro {
+            margin-top: 10px;
+            margin-bottom: 18px;
+        }
+
+        .growth-stage-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .growth-stage-button {
+            border: 2px solid var(--slate);
+            background: transparent;
+            color: var(--slate);
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 700;
+            padding: 7px 10px;
+            text-transform: uppercase;
+        }
+
+        .growth-stage-button.active {
+            background: var(--slate);
+            color: var(--cream);
+        }
+
+        .growth-visual {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(260px, 0.9fr);
+            gap: 18px;
+            align-items: stretch;
+        }
+
+        .growth-map {
+            position: relative;
+            min-height: 360px;
+            border: 2px solid var(--slate);
+            background:
+                linear-gradient(90deg, rgba(91, 109, 122, 0.08) 1px, transparent 1px),
+                linear-gradient(rgba(91, 109, 122, 0.08) 1px, transparent 1px),
+                #f4eedb;
+            background-size: 48px 48px;
+            overflow: hidden;
+        }
+
+        .growth-map::before {
+            content: "Schematic U.S. rollout";
+            position: absolute;
+            top: 12px;
+            left: 14px;
+            color: rgba(41, 50, 56, 0.58);
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .growth-path {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .growth-path path {
+            fill: none;
+            stroke: rgba(91, 109, 122, 0.45);
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 3;
+            transition: opacity 0.25s ease;
+        }
+
+        .growth-site {
+            position: absolute;
+            left: var(--x);
+            top: var(--y);
+            display: none;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            z-index: 2;
+        }
+
+        .growth-site.visible {
+            display: block;
+        }
+
+        .growth-site .dot {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #293238;
+            border-radius: 50%;
+            background: #8ecf78;
+            box-shadow: 0 0 0 4px rgba(142, 207, 120, 0.28);
+            vertical-align: middle;
+        }
+
+        .growth-site.first .dot {
+            background: #f0df6d;
+            box-shadow: 0 0 0 5px rgba(240, 223, 109, 0.35);
+        }
+
+        .growth-site .label {
+            display: inline-block;
+            margin-left: 6px;
+            padding: 2px 5px;
+            background: rgba(244, 238, 219, 0.88);
+            color: var(--dark-text);
+            font-size: 13px;
+            font-weight: 700;
+            vertical-align: middle;
+        }
+
+        .growth-copy {
+            border: 2px solid var(--slate);
+            padding: 14px;
+            min-height: 360px;
+        }
+
+        .growth-copy h3 {
+            color: var(--slate);
+            font-size: 22px;
+            line-height: 1.1;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .growth-copy p {
+            margin-bottom: 12px;
+        }
+
+        .growth-final-map {
+            display: none;
+            margin-top: 16px;
+            border: 2px solid var(--slate);
+            padding: 10px;
+        }
+
+        .growth-final-map.visible {
+            display: block;
+        }
+
+        .growth-final-map img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        @media (max-width: 900px) {
+            .growth-visual {
+                grid-template-columns: 1fr;
+            }
+
+            .growth-map,
+            .growth-copy {
+                min-height: 320px;
+            }
+        }
     </style>
 
 </head>
@@ -950,6 +1118,59 @@
 
                     <br><br>Green nodes: accessible in the reconstruction; <br>yellow nodes: expected online soon;<br>red ones: will take longer to reconstruct.
                     <br><br>
+                </div>
+            </div>
+
+            <div class="panel growth-panel">
+                <div class="title">How the ARPANET spread</div>
+                <div class="growth-intro">
+                    This is a schematic rollout view, not a physical wiring diagram. It starts with the first ARPANET site at UCLA, adds the original four-node 1969 network, then grows toward the May 1973 logical map shown above.
+                </div>
+                <div class="growth-stage-buttons" aria-label="ARPANET growth timeline">
+                    <button class="growth-stage-button active" type="button" data-growth-stage="0">UCLA</button>
+                    <button class="growth-stage-button" type="button" data-growth-stage="1">Oct 1969</button>
+                    <button class="growth-stage-button" type="button" data-growth-stage="2">Dec 1969</button>
+                    <button class="growth-stage-button" type="button" data-growth-stage="3">1971</button>
+                    <button class="growth-stage-button" type="button" data-growth-stage="4">Oct 1972</button>
+                    <button class="growth-stage-button" type="button" data-growth-stage="5">May 1973</button>
+                </div>
+                <div class="growth-visual">
+                    <div class="growth-map" id="growth-map">
+                        <svg class="growth-path" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                            <path data-growth-line="1" d="M15 62 L24 48" />
+                            <path data-growth-line="2" d="M15 62 L18 70 M15 62 L33 49" />
+                            <path data-growth-line="3" d="M24 48 L76 36 M76 36 L84 34 M76 36 L81 38 M18 70 L12 77 M18 70 L23 73" />
+                            <path data-growth-line="4" d="M76 36 L69 45 M69 45 L62 52 M62 52 L52 58 M52 58 L43 66 M43 66 L31 72" />
+                            <path data-growth-line="5" d="M69 45 L70 63 M70 63 L83 68 M83 68 L85 80 M52 58 L28 37 M24 48 L9 50" />
+                        </svg>
+                        <div class="growth-site first" data-growth-site="0" style="--x:15%; --y:62%;"><span class="dot"></span><span class="label">UCLA</span></div>
+                        <div class="growth-site" data-growth-site="1" style="--x:24%; --y:48%;"><span class="dot"></span><span class="label">SRI</span></div>
+                        <div class="growth-site" data-growth-site="2" style="--x:18%; --y:70%;"><span class="dot"></span><span class="label">UCSB</span></div>
+                        <div class="growth-site" data-growth-site="2" style="--x:33%; --y:49%;"><span class="dot"></span><span class="label">Utah</span></div>
+                        <div class="growth-site" data-growth-site="3" style="--x:76%; --y:36%;"><span class="dot"></span><span class="label">BBN</span></div>
+                        <div class="growth-site" data-growth-site="3" style="--x:84%; --y:34%;"><span class="dot"></span><span class="label">MIT</span></div>
+                        <div class="growth-site" data-growth-site="3" style="--x:81%; --y:38%;"><span class="dot"></span><span class="label">Harvard</span></div>
+                        <div class="growth-site" data-growth-site="3" style="--x:12%; --y:77%;"><span class="dot"></span><span class="label">RAND</span></div>
+                        <div class="growth-site" data-growth-site="3" style="--x:23%; --y:73%;"><span class="dot"></span><span class="label">UCSD</span></div>
+                        <div class="growth-site" data-growth-site="4" style="--x:69%; --y:45%;"><span class="dot"></span><span class="label">Lincoln</span></div>
+                        <div class="growth-site" data-growth-site="4" style="--x:62%; --y:52%;"><span class="dot"></span><span class="label">CASE</span></div>
+                        <div class="growth-site" data-growth-site="4" style="--x:52%; --y:58%;"><span class="dot"></span><span class="label">Carnegie</span></div>
+                        <div class="growth-site" data-growth-site="4" style="--x:43%; --y:66%;"><span class="dot"></span><span class="label">SDC</span></div>
+                        <div class="growth-site" data-growth-site="4" style="--x:31%; --y:72%;"><span class="dot"></span><span class="label">USC-ISI</span></div>
+                        <div class="growth-site" data-growth-site="5" style="--x:70%; --y:63%;"><span class="dot"></span><span class="label">Belvoir</span></div>
+                        <div class="growth-site" data-growth-site="5" style="--x:83%; --y:68%;"><span class="dot"></span><span class="label">NBS</span></div>
+                        <div class="growth-site" data-growth-site="5" style="--x:85%; --y:80%;"><span class="dot"></span><span class="label">ETAC</span></div>
+                        <div class="growth-site" data-growth-site="5" style="--x:28%; --y:37%;"><span class="dot"></span><span class="label">LBL</span></div>
+                        <div class="growth-site" data-growth-site="5" style="--x:9%; --y:50%;"><span class="dot"></span><span class="label">Ames</span></div>
+                    </div>
+                    <div class="growth-copy">
+                        <h3 id="growth-title">UCLA, 1969</h3>
+                        <p id="growth-text">The story starts at UCLA's Network Measurement Center. The first IMP arrived there in 1969, making UCLA the first ARPANET site.</p>
+                        <p id="growth-note">Use the timeline buttons to step through the rollout.</p>
+                    </div>
+                </div>
+                <div class="growth-final-map" id="growth-final-map">
+                    <img src="arpa/images/arpa/arpanet1973.jpg" alt="ARPANET logical map, May 1973">
                 </div>
             </div>
 
@@ -1704,6 +1925,81 @@ connectWS();
 <script src="arpa/assets/js/arpanet-nodes.js"></script>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+  const buttons = Array.from(document.querySelectorAll('.growth-stage-button'));
+  const sites = Array.from(document.querySelectorAll('.growth-site'));
+  const lines = Array.from(document.querySelectorAll('[data-growth-line]'));
+  const title = document.getElementById('growth-title');
+  const text = document.getElementById('growth-text');
+  const note = document.getElementById('growth-note');
+  const finalMap = document.getElementById('growth-final-map');
+
+  if (!buttons.length || !title || !text || !note || !finalMap) return;
+
+  const stages = [
+    {
+      title: 'UCLA, 1969',
+      text: "The story starts at UCLA's Network Measurement Center. The first IMP arrived there in 1969, making UCLA the first ARPANET site.",
+      note: 'Use the timeline buttons to step through the rollout.'
+    },
+    {
+      title: 'UCLA to SRI',
+      text: 'The first host-to-host ARPANET message was sent from UCLA to SRI on October 29, 1969. The first attempt famously got as far as "LO" before the remote system crashed.',
+      note: 'This is the first visible link in the schematic.'
+    },
+    {
+      title: 'The first four nodes',
+      text: 'By the end of 1969, the initial testbed linked UCLA, SRI, UC Santa Barbara, and the University of Utah.',
+      note: 'Those four sites were the seed of the network.'
+    },
+    {
+      title: 'Research network takes shape',
+      text: 'In 1970 and 1971 the network grew beyond the first western testbed, adding more research sites and major computing centers.',
+      note: 'The exact topology is simplified here; the historical map below keeps the documentary detail.'
+    },
+    {
+      title: 'The ARPANET Ball era',
+      text: 'By the 1972 ICCC demonstration, ARPANET was public enough to be shown through scripted scenarios, terminals, and remote logins.',
+      note: 'This is the moment the idea became legible to a wider technical audience.'
+    },
+    {
+      title: 'May 1973 logical map',
+      text: 'By May 1973, the network was large enough that a logical topology map made more sense than a simple geographic story.',
+      note: 'The original 1973 logical map is shown below as the final frame.'
+    }
+  ];
+
+  function showGrowthStage(stageIndex) {
+    const index = Math.max(0, Math.min(stageIndex, stages.length - 1));
+    const stage = stages[index];
+
+    buttons.forEach((button) => {
+      button.classList.toggle('active', Number(button.dataset.growthStage) === index);
+    });
+
+    sites.forEach((site) => {
+      site.classList.toggle('visible', Number(site.dataset.growthSite) <= index);
+    });
+
+    lines.forEach((line) => {
+      line.style.opacity = Number(line.dataset.growthLine) <= index ? '1' : '0';
+    });
+
+    title.textContent = stage.title;
+    text.textContent = stage.text;
+    note.textContent = stage.note;
+    finalMap.classList.toggle('visible', index === stages.length - 1);
+  }
+
+  buttons.forEach((button) => {
+    button.addEventListener('click', () => {
+      showGrowthStage(Number(button.dataset.growthStage));
+    });
+  });
+
+  showGrowthStage(0);
+});
+
 // Terminal definitions
 const terminalDefinitions = [
   { id: 0, type: 'vt05', baud: 1200 },
