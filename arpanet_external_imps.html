@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Connect IMP and PiDP Replicas</title>
-    <meta name="description" content="How external IMP and PiDP replicas can connect to the ARPANET Reconstruction Project">
+    <meta name="description" content="How external IMP and PiDP replicas can connect to Kurt Hamm's ARPANET reconstruction deployment">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=swap');
         :root { --cream:#e5dac3; --slate:#5b6d7a; --dark-slate:#445561; --dark-text:#293238; --light-text:#f2ebd5; }
@@ -36,14 +36,14 @@
 <div class="container">
     <div class="header">
         <a href="./arpanet_home.html" class="back-button">? Back to Main Page</a>
-        <div class="breadcrumb"><a href="./arpanet_home.html">Arpanet Reconstruction Project</a> <span>?</span> External IMPs and Replicas</div>
+        <div class="breadcrumb"><a href="./arpanet_home.html">Kurt Hamm's ARPANET Reconstruction</a> <span>?</span> External IMPs and Replicas</div>
         <h1 class="page-title">Connect Your IMP &amp; PiDP Replicas</h1>
-        <div class="subtitle">A practical path for attaching external replica hardware to the reconstructed ARPANET.</div>
+        <div class="subtitle">A practical path for attaching external replica hardware to this hosted ARPANET implementation.</div>
     </div>
 
     <div class="section">
         <h2 class="section-title">What Works Today</h2>
-        <p>The project can accept an external simulated IMP over a stable network link. That external IMP can then attach to a local host simulator, including a PiDP-10 running ITS with NCP enabled.</p>
+        <p>This hosted implementation can accept an external simulated IMP over a stable network link. That external IMP can then attach to a local host simulator, including a PiDP-10 running ITS with NCP enabled.</p>
         <p>A tested example is a physical PiDP-10 replica attached as ARPANET host <code>41</code>, shown by NCP as octal host <code>051</code>. From the hosted terminal, <code>@L 41</code> reaches that external PiDP-10 host.</p>
         <div class="callout">This is not a promise that every replica machine is plug-and-play. It is a working pattern that can be reproduced and adapted.</div>
     </div>
@@ -84,7 +84,7 @@
 
     <div class="section">
         <h2 class="section-title">Reproduce the PiDP-10 Example</h2>
-        <p>The detailed, reproducible PiDP-10 integration is maintained in a companion repository. It includes the ARPA51 profile, IMP41 bridge, Tailscale notes, validation steps, troubleshooting, and front-panel-capable simulator build notes.</p>
+        <p>The detailed, reproducible PiDP-10 integration for this deployment is maintained in a companion repository. It includes the ARPA51 profile, IMP41 bridge, Tailscale notes, validation steps, troubleshooting, and front-panel-capable simulator build notes.</p>
         <div class="button-row">
             <a class="button" href="https://github.com/kurthamm/pidp10-arpanet-node" target="_blank" rel="noopener">PiDP-10 ARPANET Node Docs</a>
             <a class="button" href="https://github.com/kurthamm/arpanet/tree/fix-hosted-scenario-terminals" target="_blank" rel="noopener">Tested ARPANET Fork</a>
