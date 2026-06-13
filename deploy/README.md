@@ -54,6 +54,9 @@ sudo systemctl enable --now cloudflared-arpanet.service
 - `arpanet-host@.service` is for the hosted trio only: `6`, `70`, and `126`.
 - `arpanet-host11.service` is for Stanford/SU-AI host `11`, which runs WAITS
   and uses the dedicated `mini/host11ctl.sh` lifecycle.
+- Host services are adopt-safe: if a host is already running and passes NCP
+  verification, starting the service records the unit active without stopping
+  the working runtime.
 - The browser launcher `do.sh` routes `@L 41` / `@L 051` to the external
   PiDP SIMH MTY terminal over Tailscale. Host `41` ARPANET reachability is
   validated separately through the IMP62/IMP41 link.

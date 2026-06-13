@@ -9,7 +9,7 @@ User=deltaprism
 Group=deltaprism
 WorkingDirectory=/home/deltaprism/arpanet/mini
 RemainAfterExit=yes
-ExecStart=/usr/bin/flock /tmp/arpanet-host11.lock /bin/bash -lc '/home/deltaprism/arpanet/mini/host11ctl.sh start 11 && /home/deltaprism/arpanet/mini/host11ctl.sh verify 11 || { rc=$?; /home/deltaprism/arpanet/mini/host11ctl.sh stop 11; exit $rc; }'
+ExecStart=/usr/bin/flock /tmp/arpanet-host11.lock /bin/bash -lc '/home/deltaprism/arpanet/mini/host11ctl.sh verify 11 || { /home/deltaprism/arpanet/mini/host11ctl.sh stop 11 || true; /home/deltaprism/arpanet/mini/host11ctl.sh start 11 && /home/deltaprism/arpanet/mini/host11ctl.sh verify 11; }'
 ExecStop=/usr/bin/flock /tmp/arpanet-host11.lock /home/deltaprism/arpanet/mini/host11ctl.sh stop 11
 TimeoutStartSec=360
 TimeoutStopSec=60
