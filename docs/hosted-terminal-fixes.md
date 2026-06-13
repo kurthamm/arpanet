@@ -7,6 +7,7 @@ This fork supports the hosted browser terminal for the ARPANET simulation, Stanf
 Use the hosted terminal page and type one of these commands at the TIP prompt:
 
 ```text
+@L 1
 @L 6
 @L 70
 @L 126
@@ -18,10 +19,12 @@ Expected routing:
 
 | Command | Target | Notes |
 | --- | --- | --- |
+| `@L 1` | host `001` | UCLA-NMC historical address, reached through the SIMH Sigma 7 CP-V mux on localhost port `4003`. |
+| `@L 001` | host `001` | Accepted octal spelling for the same UCLA-NMC Sigma host. |
 | `@L 6` | host `006` | Hosted MIT ITS simulator, reached through a localhost-only simulator terminal line. |
 | `@L 70` | host `106` | Hosted MIT Dynamic Modelling PDP-10, reached through a localhost-only simulator terminal line. |
 | `@L 126` | host `176` | Hosted ITS simulator, reached through a localhost-only simulator terminal line. |
-| `@L 11` | host `013` | Hosted Stanford/SU-AI WAITS PDP-10, reached through a localhost-only WAITS DCS terminal line. |
+| `@L 11` | host `013` | Hosted Stanford/SU-AI WAITS PDP-10, reached through the `waitsconnect` ARPANET TELNET bridge from `ncp16`. |
 | `@L 013` | host `013` | Accepted octal spelling for the same Stanford host. |
 | `@L 41` | host `051` | External PiDP-10, reached through its Pi-side SIMH terminal line over Tailscale. |
 | `@L 051` | host `051` | Accepted spelling for the same PiDP-10 host. |
@@ -32,8 +35,9 @@ Some ITS hosts may display `Unknown ITS PDP-10` and `It's a lovely day to be a t
 
 The browser terminal path is intentionally separate from the ARPANET health path:
 
+- `@L 1` and `@L 001` run `mini/local-host-terminal.py` and connect to the SIMH Sigma 7 CP-V mux on localhost port `4003`.
 - `@L 6`, `@L 70`, and `@L 126` run `mini/local-host-terminal.py` and connect to localhost-only SIMH terminal lines (`16015`, `17015`, and `10015`).
-- `@L 11` and `@L 013` run `mini/local-host-terminal.py` against the Stanford WAITS DCS line on `2040`.
+- `@L 11` and `@L 013` use `mini/waitsconnect` through `NCP=ncp16 ./ncp-telnet -c 11`. The older DCS port `2040` accepts a SIMH connection banner but does not provide the visitor-facing WAITS login path.
 - `@L 41` and `@L 051` use the same helper to connect to the PiDP-10 MTY line at the Pi's Tailscale address.
 - This does not open public emulator ports; the browser still reaches the relay only through Cloudflare Tunnel.
 - ARPANET connectivity for the MIT hosts and PiDP host is validated with `NCP=ncp31 ./ncp-ping`. Stanford/SU-AI is validated with `NCP=ncp16 ./ncp-ping`.
@@ -74,9 +78,19 @@ NCP=ncp31 ./ncp-ping -c1 41
 NCP=ncp16 ./ncp-ping -c1 11
 ```
 
+Host `1` is currently verified through the Sigma mux route rather than NCP ping:
+
+```sh
+mini/host01-sigma/host01-sigmactl.sh verify
+printf '@L 1\r\n' | SESSION_NUMBER=0 ../do.sh
+printf '@L 001\r\n' | SESSION_NUMBER=0 ../do.sh
+```
+
 Check the launcher path without using the browser for the localhost and PiDP terminal-line routes:
 
 ```sh
+printf '@L 1\r\n' | SESSION_NUMBER=0 ../do.sh
+printf '@L 001\r\n' | SESSION_NUMBER=0 ../do.sh
 printf '@L 6\r\n' | SESSION_NUMBER=0 ../do.sh
 printf '@L 70\r\n' | SESSION_NUMBER=0 ../do.sh
 printf '@L 126\r\n' | SESSION_NUMBER=0 ../do.sh
@@ -86,7 +100,7 @@ printf '@L 051\r\n' | SESSION_NUMBER=0 ../do.sh
 
 Those commands should print the matching `TELNET to host ...` line and a banner from the target simulator terminal.
 
-For Stanford, keep the test process open long enough for WAITS to print the DCS line prompt. A simple pipe closes stdin immediately and can make a healthy session appear to drop:
+For Stanford, keep the test process open long enough for `waitsconnect` to finish the ARPANET TELNET handshake and reach `CON-TELLOGIN`. A simple pipe closes stdin immediately and can make a healthy session appear to drop:
 
 ```sh
 printf '@L 11\r\n' | SESSION_NUMBER=0 ../do.sh
@@ -122,4 +136,11 @@ Use `mini/host11ctl.sh` for Stanford/SU-AI host `11`:
 mini/host11ctl.sh status 11
 mini/host11ctl.sh verify 11
 mini/host11ctl.sh restart 11
+```
+
+If PARRY stops working with `CAN'T FIND FILE - INPUT` or missing-file behavior,
+restore the tested PARRY-capable WAITS packs:
+
+```sh
+mini/host11-restore-parry.sh --restart
 ```

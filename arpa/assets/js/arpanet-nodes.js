@@ -48,10 +48,10 @@ const arpanetNodes = [
   { node: 62, modem1: 31, name: 'HILTON - IMP', name1: 'HILTON', name2: 'IMP', x: 10, y: 10, rx: 25, ry: 12, 		host: 62 },
   { name: 'HILTON-KA1', name1: 'HILTON', name2: 'KA', x: 10, y: 10, rx: 33, ry: 18, 	host: 126, hostname: 'HILTON-KA1', computer: 'PDP-10', system: 'ITS', status: 'Server' },
   { name: 'HILTON-KA0', name1: 'HILTON', name2: 'KA', x: 10, y: 10, rx: 33, ry: 18, 	host: 62, hostname: 'HILTON-KA0', computer: 'PDP-10', system: 'ITS', status: 'Server' },
-  
-  
-  
-  
+
+
+
+
 
   { node: 5, modem1: 31, modem2:9, modem3: 30, name: 'BBN - IMP', name1: 'BBN', name2: 'IMP', x: 1016, y: 340, rx: 18, ry: 13,			host: 5, lat: 42.3908323, lon: -71.1469589 },
   { name: 'BBN - H316', name1: 'BBN', name2: 'H316', 						x: 1095, y: 374, rx: 28, ry: 15, 							host: 5, hostname: 'BBN-NCC', computer: 'H-316', system: 'H-316', status: 'User' },
@@ -123,13 +123,30 @@ const arpanetNodes = [
   { name: 'UCSB - 360/75', name1: 'UCSB', name2: '360/75', x: 425, y: 570, rx: 33, ry: 13, 	host: 3, hostname: 'UCSB-MOD75', computer: 'IBM 360/75', system: 'OLS', status: 'Server' },
   { node: 3, modem1: 1, modem2: 33, name: 'UCSB - IMP', name1: 'UCSB', name2: 'IMP', x: 342, y: 570, rx: 22, ry: 12,		host: 3, lat: 34.4146025, lon: -119.84581 },
 
-  { name: 'STANFORD - PDP-10', name1: 'STANFORD', name2: 'PDP-10', x: 103, y: 618, rx: 33, ry: 15, host: 11, hostname: 'SU-AI', computer: 'PDP-10', system: 'SAIL', status: 'Server', scenario: 'SAIL AP Hotline === HOST #11', scenstat: 0 },
+  { name: 'STANFORD - PDP-10', name1: 'STANFORD', name2: 'PDP-10', x: 103, y: 618, rx: 33, ry: 15, host: 11, hostname: 'SU-AI', computer: 'PDP-10', system: 'WAITS', status: 'Server', scenario: 'SAIL PARRY === HOST #11', scenstat: 0 },
   { node: 11, modem1: 22, modem2: 16, name: 'STANFORD - IMP', name1: 'STANFORD', name2: 'IMP', x: 181, y: 621, rx: 18, ry: 13,	host: 11, lat: 37.4351796, lon: -122.1746129 },
 
   { node: 17, modem1: 26, modem2:28, name: 'MITRE - TIP', name1: 'MITRE', name2: 'TIP', x: 949, y: 692, rx: 22, ry: 12, host: 145, hostname: 'MITRE-TIP', computer: 'TIP', status: 'TIP', lat: 42.5052939, lon: -71.2370477 },
 
   { node: 37, modem1: 20, modem2: 22, name: 'RML - TIP', name1: 'RML', name2: 'TIP', x: 787, y: 825, rx: 22, ry: 12, host: 165, hostname: 'RML-TIP', computer: 'TIP', status: 'TIP' },
 ];
+
+const nodeDetailPageOverrides = {
+  ABERDEEN: 'arpa/arpanet-node-35-ABERDEEN.html',
+  BELVOIR: 'arpa/arpanet-node-34-BELVOIR.html',
+  BBN2: 'arpa/arpanet-node-30-BBN.html',
+  HILTON: null,
+  'HILTON-KA0': null,
+  'HILTON-KA1': null,
+  LBL: 'arpa/arpanet-node-36-LBL.html'
+};
+
+function getNodeDetailPage(nodeToDisplay, impNumber) {
+  const firstWord = nodeToDisplay.name.split(' ')[0];
+  return Object.prototype.hasOwnProperty.call(nodeDetailPageOverrides, firstWord)
+    ? nodeDetailPageOverrides[firstWord]
+    : `arpa/arpanet-node-${impNumber}-${firstWord}.html`;
+}
 
 // Initialize the interactive map
 function initArpanetMap() {
@@ -310,8 +327,10 @@ function initArpanetMap() {
 
       // Add button to node details page if IMP_Number exists
       if (impNumber !== null) {
-        const firstWord = nodeToDisplay.name.split(' ')[0];
-        displayHTML += `<button onclick="window.location.href='arpa/arpanet-node-${impNumber}-${firstWord}.html'">View Node Details</button>`;
+        const detailPage = getNodeDetailPage(nodeToDisplay, impNumber);
+        if (detailPage) {
+          displayHTML += `<button onclick="window.location.href='${detailPage}'">View Node Details</button>`;
+        }
       }
 
       // Update hover box content

@@ -41,7 +41,13 @@
 	This is a Terminal IMP, type <code>@L [host number]</code> to go out and connect over the Arpanet.
 	<br>
 	<br>
-	Online are <b>MIT-AI</b> (host #6), <b>MIT-DM</b> (#70), <b>MIT-ML</b> (#126), and <b>Stanford/SU-AI</b> (#11). So, <code>@L 6 [Return]</code> connects you to MIT's AI Lab PDP-10 in Cambridge, MA, and <code>@L 11 [Return]</code> connects you to Stanford's WAITS system.
+	Online are <b>UCLA-NMC</b> (host #1 / octal #001), <b>MIT-AI</b> (#6), <b>MIT-DM</b> (#70), <b>MIT-ML</b> (#126), <b>Stanford/SU-AI</b> (#11), and the home-location <b>PiDP-10</b> (#41 / octal #051). So, <code>@L 1 [Return]</code> connects you to the Sigma 7 CP-V host, <code>@L 6 [Return]</code> connects you to MIT's AI Lab PDP-10 in Cambridge, MA, <code>@L 11 [Return]</code> connects you to Stanford's WAITS system, and <code>@L 41 [Return]</code> connects you to the PiDP-10 path.
+	<br>
+	<br>
+	Login note: UCLA-NMC CP-V expects <code>:SYS,LBE</code> at <code>LOGON PLEASE:</code>. MIT ITS hosts use <code>:login iccc</code>. Stanford/SU-AI is WAITS; on the current web bridge, <code>@L 11</code> reaches <code>CON-TELLOGIN</code>, where the login program expects <code>1,REG</code>.
+	<br>
+	<br>
+	Numbering note: scenarios that directly correspond to the 1972 booklet keep the original booklet number. A suffix such as <code>18A</code> means a 2026 working adaptation of a 1972 scenario. Supplemental live demonstrations that are not original booklet scenarios use <code>0</code> or <code>0A</code>.
 	<br>
 	<br>
 	<b>[SP]</b>: type Space; <b>[CR]</b>: type Return; <b>[LF]</b>: type Line Feed (Ctrl-J, or Return); <b>[^K]: Ctrl-K</b>
@@ -93,10 +99,140 @@
 	<br>
 	<br>
 </section>
-<section data-title="SCENARIO 1: MIT-AI DOCTOR === HOST #6">
+
+<section data-title="SCENARIO 0: UCLA-NMC SIGMA 7 STAR TREK === HOST #1">
 	<hr>
 	<br>
-    <h3>SCENARIO 1: MIT-AI DOCTOR === HOST #6</h3>
+    <h3>SCENARIO 0: UCLA-NMC SIGMA 7 STAR TREK === HOST #1</h3>
+
+
+	<br>	UCLA-NMC is host #1 / octal #001 at IMP #1. This live host is an XDS Sigma 7 running the CP-V F00 timesharing system from the SIMH Sigma CP-V kit. The Star Trek program used here is the CP-V BASIC <code>BA:TREK</code> program loaded from the kit's <code>Star_Trek_(BASIC)</code> material.
+	<br>
+    <br>	1. To connect to UCLA-NMC:
+	<br>
+    <br>	<u>@L</u>  [SP] <u>1</u> [LF]
+	<br>
+	<br>
+
+	<br>	2. To login to CP-V:
+	<br>
+	<br>	When CP-V prints:
+	<br>	<code>LOGON PLEASE:</code>
+	<br>	type:
+	<br>	<u>:SYS,LBE</u> [CR]
+	<br>
+	<br>	CP-V should respond with a <code>!</code> command prompt.
+	<br>
+	<br>
+
+	<br>	3. To load the Star Trek BASIC program:
+	<br>
+	<br>	<u>BASIC BA:TREK</u> [CR]
+	<br>	VER. D03
+	<br>	&gt;
+	<br>
+	<br>
+
+	<br>	4. To run the game:
+	<br>
+	<br>	<u>RUN</u> [CR]
+	<br>	STAR TREK
+	<br>	DO YOU WANT INSTRUCTIONS (THEY'RE LONG!) ?
+	<br>
+	<br>	Type <u>NO</u> [CR] for the short path, or <u>YES</u> [CR] to read the full in-program instructions.
+	<br>
+	<br>	The game begins with a short-range scan and a <code>COMMAND:</code> prompt.
+	<br>
+	<br>
+
+	<br>	5. Commands printed by the real program:
+	<br>
+	<br>	<code>0</code> - set course
+	<br>	<code>1</code> - short range sensor scan
+	<br>	<code>2</code> - long range sensor scan
+	<br>	<code>3</code> - fire phasers
+	<br>	<code>4</code> - fire photon torpedoes
+	<br>	<code>5</code> - shield control
+	<br>	<code>6</code> - damage control report
+	<br>	<code>7</code> - call on library computer
+	<br>
+	<br>
+
+	<br>	6. When finished:
+	<br>
+	<br>	The BASIC game does not provide a normal quit command. If you are stuck in the game, use the terminal disconnect control and reconnect when needed. At the CP-V <code>!</code> prompt, log off with:
+	<br>
+	<br>	<u>OFF</u> [CR]
+	<br>
+	<br>
+</section>
+
+<section data-title="SCENARIO 0A: UCLA-NMC SIGMA 7 ADVENTURE === HOST #1">
+	<hr>
+	<br>
+    <h3>SCENARIO 0A: UCLA-NMC SIGMA 7 ADVENTURE === HOST #1</h3>
+
+
+	<br>	UCLA-NMC is host #1 / octal #001 at IMP #1. This scenario uses the real CP-V Adventure load module now installed on the live Sigma 7 CP-V host. The game is the CP-V Adventure from the Sigma CP-V kit material, built on the running CP-V system and invoked as <code>ADV</code>.
+	<br>
+    <br>	1. To connect to UCLA-NMC:
+	<br>
+    <br>	<u>@L</u>  [SP] <u>1</u> [LF]
+	<br>
+	<br>
+
+	<br>	2. To login to CP-V:
+	<br>
+	<br>	When CP-V prints:
+	<br>	<code>LOGON PLEASE:</code>
+	<br>	type:
+	<br>	<u>:SYS,LBE</u> [CR]
+	<br>
+	<br>	CP-V should respond with a <code>!</code> command prompt.
+	<br>
+	<br>
+
+	<br>	3. To start Adventure:
+	<br>
+	<br>	<u>ADV</u> [CR]
+	<br>
+	<br>	The program should print:
+	<br>	<code>Welcome to the *new* CP-V Adventure!</code>
+	<br>
+	<br>
+
+	<br>	4. To read the in-program update note:
+	<br>
+	<br>	<u>NEWS</u> [CR]
+	<br>
+	<br>
+
+	<br>	5. To begin exploring:
+	<br>
+	<br>	<u>LOOK</u> [CR]
+	<br>	<u>IN</u> [CR]
+	<br>	<u>GET LAMP</u> [CR]
+	<br>	<u>OUT</u> [CR]
+	<br>
+	<br>	Adventure accepts plain English commands, usually one or two words. Try directions such as <code>NORTH</code>, <code>SOUTH</code>, <code>EAST</code>, <code>WEST</code>, <code>UP</code>, and <code>DOWN</code>, or object commands such as <code>TAKE</code>, <code>DROP</code>, <code>OPEN</code>, and <code>INVENTORY</code>.
+	<br>
+	<br>
+
+	<br>	6. When finished:
+	<br>
+	<br>	<u>QUIT</u> [CR]
+	<br>
+	<br>	If the game asks for confirmation, answer the prompt it prints. When you return to the CP-V <code>!</code> prompt, log off with:
+	<br>
+	<br>	<u>OFF</u> [CR]
+	<br>
+	<br>
+</section>
+
+<section data-title="SCENARIO 18A: MIT-AI DOCTOR === HOST #6">
+	<hr>
+	<br>
+    <h3>SCENARIO 18A: MIT-AI DOCTOR === HOST #6</h3>
 
 
 		DOCTOR is a LISP program written by Joseph Weizenbaum and described in "<b>ELIZA</b> - A Computer
@@ -108,6 +244,8 @@
 		(repeatable back to the previous space or comma), and number sign ("#") deletes the
 		entire line typed in. Each input statement is terminated by a period or question mark <i>and a double [CR]</i>. The
 		session is terminated by typing Ctrl-Z.
+	<br>
+	<br>	In the 1972 booklet, this is Scenario 18: <b>BBN DOCTOR</b> on BBN-TENEX host #69. The 2026 implementation is a working adaptation on <b>MIT-AI host #6</b>, using the recovered MIT ITS DOCTOR/ELIZA program available on the live MIT-AI disk image. It preserves the DOCTOR experience, but it is not running on the original 1972 BBN host.
 	<br>
     <br>	1. To connect to MIT-AI:
 	<br>
@@ -149,7 +287,7 @@
 	<br>
 </section>
 
-<section data-title="SCENARIO 8: MIT-DM PDP-10 GAMES === HOST #70">
+<section data-title="SCENARIO 8: MIT-DM PDP-10: JOTTO AND CHESS GAMES === HOST #70">
 	<hr>
 	<br>
     <h3>SCENARIO 8: MIT-DM PDP-10: JOTTO AND CHESS GAMES === HOST #70</h3>
@@ -365,7 +503,7 @@
 	<br>
 </section>
 	
-<section data-title="MIT-DMCG MUDDLE === HOST #70">
+<section data-title="SCENARIO 16: MIT-DMCG MUDDLE === HOST #70">
 	<hr>
 	<br>
     <h3>SCENARIO 16: MIT-DMCG MUDDLE === HOST #70</h3>
@@ -526,10 +664,91 @@
 	<br>
 </section>
 
-<section data-title="MIT-DMCG ITS PDP-10 — HOST #70">
+<section data-title="SCENARIO 19: SAIL PARRY === HOST #11">
+	<hr>
+	<br>
+    <h3>SCENARIO 19: SAIL PARRY === HOST #11</h3>
+
+
+	<br>	PARRY is a program which simulates a paranoid patient in a mental hospital. It was written by Professor Kenneth Colby of Stanford. The user plays psychiatrist and attempts to discover the patient's problems without antagonizing the patient or scaring him so much that he runs away.
+	<br>
+	<br>	This scenario follows the 1972 booklet's SAIL PARRY scenario on Stanford/SU-AI, host #11. The live WAITS image has been restored with the missing PARRY support files from Lars Brinkhoff's 2026 WAITS/PARRY restoration so that the original <code>PARRY.DMP</code> image can run.
+	<br>
+	<br>	SAIL/WAITS uses period (<code>.</code>) as the executive prompt. Control-C returns to the executive from programs. DEL or RUBOUT deletes the previous character while typing.
+	<br>
+    <br>	1. To connect to Stanford/SU-AI:
+	<br>
+    <br>	<u>@L</u>  [SP] <u>11</u> [LF]
+	<br>
+	<br>
+
+	<br>	2. To login to WAITS:
+	<br>
+	<br>	When WAITS prints:
+	<br>	<code>#</code>
+	<br>	type:
+	<br>	<u>1,REG</u> [CR]
+	<br>
+	<br>	WAITS should respond with the date and a <code>.</code> executive prompt.
+	<br>
+	<br>
+
+	<br>	3. To start PARRY:
+	<br>
+	<br>	<u>R PARRY</u> [CR]
+	<br>
+	<br>	PARRY should print:
+	<br>	<code>END INPUT PARAMETERS WITH CARRIAGE RETURN OR ALTMODE</code>
+	<br>	<code>PRINT NON VERBAL FEATURE? [Y,N]</code>
+	<br>
+	<br>
+
+	<br>	4. Set PARRY's behavior parameters:
+	<br>
+	<br>	<u>N</u> [CR]
+	<br>	<code>VERSION [WEAK, MILD, STRONG]</code>
+	<br>	<u>MILD</u> [CR]
+	<br>	<code>TRACE EMOTION VARIABLES? [Y,N]</code>
+	<br>	<u>N</u> [CR]
+	<br>	<code>DO YOU WANT THE CORE DUMPED? [Y,N]</code>
+	<br>	<u>N</u> [CR]
+	<br>
+	<br>
+
+	<br>	5. Talk to PARRY:
+	<br>
+	<br>	PARRY will print <code>READY:</code> and a <code>*</code> prompt. End each input with a period or question mark, followed by Return. To indicate silence, type a period by itself. When finished, type <code>BYE.</code>
+	<br>
+	<br>	<u>HELLO.</u> [CR]
+	<br>	HELLO
+	<br>
+	<br>	<u>WHAT IS YOUR NAME?</u> [CR]
+	<br>	PAT SMITH
+	<br>
+	<br>	Then continue the interview:
+	<br>
+	<br>	<u>HOW ARE YOU FEELING TODAY?</u> [CR]
+	<br>	<u>TELL ME YOUR PROBLEMS.</u> [CR]
+	<br>	<u>WHY DO PEOPLE GET ON YOUR NERVES?</u> [CR]
+	<br>
+	<br>
+
+	<br>	6. When finished:
+	<br>
+	<br>	<u>BYE.</u> [CR]
+	<br>
+	<br>	PARRY may print its emotion variables and then report <code>P.DMP NOT FOUND</code>. The conversation is already finished at that point; type Ctrl-C if needed to return to the WAITS executive prompt.
+	<br>
+	<br>	[^C]
+	<br>	<u>KJOB</u> [CR]
+	<br>
+	<br>
+</section>
+
+<section data-title="SCENARIO 1: MIT-DMCG ITS PDP-10 — HOST #70">
 	<hr>
 	<br>	
-    <h3>SCENARIO XX: MIT-DMCG ITS PDP-10 — HOST #70</h3>
+    <h3>SCENARIO 1: MIT-DMCG ITS PDP-10 — HOST #70</h3>
 	<br>	
 	<br>	
 	<br>	The MIT Project MAC Dynamic Modelling and Computer Graphics (DMCG) PDP-10 runs the ITS

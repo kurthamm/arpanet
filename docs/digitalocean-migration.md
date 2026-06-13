@@ -132,15 +132,20 @@ Treat each host as an independent system attached to the IMP network:
 
 | Host | Octal | Location | Lifecycle owner |
 | --- | --- | --- | --- |
+| `1` | `001` | DigitalOcean hosted UCLA-NMC Sigma 7 CP-V path | Dedicated `host01-sigma/host01-sigmactl.sh` |
 | `6` | `006` | DigitalOcean hosted PDP-10 | Main ARPANET repo tooling |
 | `70` | `106` | DigitalOcean hosted PDP-10 | Main ARPANET repo tooling |
 | `126` | `176` | DigitalOcean hosted PDP-10 | Main ARPANET repo tooling |
 | `11` | `013` | DigitalOcean hosted Stanford/SU-AI WAITS PDP-10 | Dedicated `host11ctl.sh` / `arpanet-host11.service` |
 | `41` | `051` | Physical PiDP-10 replica | PiDP companion repo / Pi-side tooling |
 
-The browser terminal may connect to all four hosts, but it must not restart or mutate any host.
+The browser terminal may connect to these hosts, but it must not restart or
+mutate any host.
 
-`mini/hostctl.sh` is scoped only to hosted ITS hosts `6`, `70`, and `126`. Stanford/SU-AI host `11` uses `mini/host11ctl.sh`. Do not extend either tool to manage PiDP-10 host `41`.
+`mini/hostctl.sh` is scoped only to hosted ITS hosts `6`, `70`, and `126`.
+Stanford/SU-AI host `11` uses `mini/host11ctl.sh`. UCLA-NMC host `1` uses
+`mini/host01-sigma/host01-sigmactl.sh`. Do not extend either PDP-10 tool to
+manage PiDP-10 host `41`.
 
 ## Known Fragility
 
@@ -154,6 +159,12 @@ The original runtime relies heavily on `screen` and broad process cleanup. This 
 - Site-specific PiDP/Tailscale changes can leak into upstream-friendly files if not kept separate.
 - The hosted host `tk` listeners must be unique per host; `6`, `70`, and `126` now use `16012`, `17012`, and `10012` respectively.
 - Browser access to hosted hosts `6`, `70`, `126`, and PiDP host `41` uses simulator terminal lines. ARPANET reachability is validated separately with NCP ping and the IMP62/IMP41 link.
+- Browser access to UCLA-NMC host `1` uses the SIMH Sigma 7 CP-V mux on
+  localhost TCP `4003`. It is not yet a working recovered UCLA-NMC SEX/NCP
+  attachment.
+- Stanford/SU-AI PARRY depends on restored WAITS packs from Lars Brinkhoff's
+  `sailing-on-arpanet` restoration. Use `mini/host11-restore-parry.sh --restart`
+  if a fresh WAITS archive loses the PARRY support files.
 
 The target deployment should keep vintage software behavior fixed and improve only the modern orchestration around it.
 
@@ -208,6 +219,7 @@ The final deployment should replace ad-hoc production `screen` starts with expli
 Recommended service split:
 
 - `arpanet-noc.service`: starts and supervises the NOC/IMP network.
+- `arpanet-host01-sigma.service`: UCLA-NMC host `1` Sigma 7 CP-V path.
 - `arpanet-host@6.service`: hosted PDP-10 host `6`.
 - `arpanet-host@70.service`: hosted PDP-10 host `70`.
 - `arpanet-host@126.service`: hosted PDP-10 host `126`.
@@ -278,6 +290,7 @@ The migration is not complete until all of these pass on the DigitalOcean drople
 ```sh
 cd /home/deltaprism/arpanet/mini
 ./hostctl.sh verify all
+./host01-sigma/host01-sigmactl.sh verify
 for host in 6 70 126; do timeout 20 env NCP=ncp31 ./ncp-ping -c1 "$host"; done
 timeout 20 env NCP=ncp16 ./ncp-ping -c1 11
 ```
@@ -286,10 +299,13 @@ Browser terminal tests:
 
 - Open the hosted terminal page through the Cloudflare hostname.
 - Start a terminal session.
+- Run `@L 1` and reach the Sigma CP-V login salutation.
 - Run `@L 6` and reach the ITS banner/login behavior.
 - Run `@L 70` and reach the ITS banner/login behavior.
 - Run `@L 126` and reach the ITS banner/login behavior.
-- Run `@L 11` and reach the Stanford WAITS DCS line/session behavior.
+- Run `@L 11` and reach Stanford WAITS through the `waitsconnect` ARPANET TELNET bridge, landing at `CON-TELLOGIN`.
+- From `@L 11`, log in with `1,REG`, run `R PARRY`, answer the setup prompts,
+  and reach PARRY's `READY:` conversation prompt.
 - Confirm closing/reopening the browser session does not leave stale relay-owned `ncp-telnet` or `local-host-terminal.py` processes.
 
 Public site tests:

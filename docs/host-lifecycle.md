@@ -3,6 +3,8 @@
 Use `mini/hostctl.sh` to manage the hosted ITS PDP-10 hosts (`6`, `70`, and `126`).
 Use `mini/host11ctl.sh` to manage Stanford/SU-AI host `11`, which is a separate
 WAITS/SAIL lane and is not part of the MIT ITS trio.
+Use `mini/host01-sigma/host01-sigmactl.sh` to manage UCLA-NMC host `1`, which is
+a SIMH Sigma 7 CP-V system exposed through the browser terminal path.
 
 The older `mini/host06.sh`, `mini/host70.sh`, and `mini/host126.sh` entrypoints are now compatibility shims around `hostctl.sh`. Use `hostctl.sh` for operational work.
 
@@ -19,10 +21,15 @@ mini/hostctl.sh start 70
 mini/host11ctl.sh status 11
 mini/host11ctl.sh verify 11
 mini/host11ctl.sh restart 11
+mini/host01-sigma/host01-sigmactl.sh status
+mini/host01-sigma/host01-sigmactl.sh verify
+mini/host01-sigma/host01-sigmactl.sh restart
 ```
 
 Valid host targets are `6`, `70`, `126`, or `all`.
 For `host11ctl.sh`, the only valid host target is `11`.
+The Sigma host controller does not take a host number because it owns only host
+`1`.
 
 ## What The Tool Guarantees
 
@@ -46,6 +53,27 @@ For Stanford/SU-AI, `host11ctl.sh`:
 - Verifies host `11` with `NCP=ncp16 ./ncp-ping`, because the live Stanford
   NCP echo path answers from AMES NCP16 and does not answer from CCA NCP31.
 
+Stanford/SU-AI PARRY is intentionally reproducible. If the WAITS packs need to
+be restored to the tested PARRY-capable image, use:
+
+```sh
+mini/host11-restore-parry.sh --restart
+```
+
+That script pins Lars Brinkhoff's `sailing-on-arpanet` restoration to commit
+`c5e29a27a4dd8db03a8b2dbc79082f2612ae30ee`, backs up the current packs, restores
+`SYS000.ckd`, `SYS001.ckd`, and `SYS002.ckd`, then restarts host `11`.
+
+For UCLA-NMC host `1`, `host01-sigmactl.sh`:
+
+- Builds SIMH Sigma from `src/linux-ncp/test/simh` if needed.
+- Fetches public CP-V F00 RAD media from `kenrector/sigma-cpv-kit`.
+- Starts a SIMH Sigma 7 using `mini/host01-sigma/f00rad.simh`.
+- Exposes the CP-V mux on localhost TCP `4003` for the browser terminal route.
+- Enables the first eight CP-V user lines during the automated boot sequence.
+- Does not claim recovered UCLA-NMC SEX media and does not yet provide a working
+  UCLA-NMC NCP/IMP attachment.
+
 ## Host Port Map
 
 | Host | Screen | Directory | Clean packs | IMP host port |
@@ -54,6 +82,7 @@ For Stanford/SU-AI, `host11ctl.sh`:
 | `70` | `host70` | `mini/host70` | `mini/host70/106` | UDP `21062` |
 | `126` | `host126` | `mini/host126` | `mini/host126/126` | UDP `21622` |
 | `11` | `host11` + `waitsconnect` | `mini/host11` | WAITS `SYS*.ckd` | UDP `20112` |
+| `1` | `sigma01-cpv` | `mini/host01-sigma` | CP-V F00 RAD runtime | browser mux TCP `4003` |
 
 ## Safety Rule
 

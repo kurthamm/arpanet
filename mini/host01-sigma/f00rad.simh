@@ -1,0 +1,32 @@
+; SDS/XDS Sigma 7 running CP-V F00 RAD system from sigma-cpv-kit.
+; This is a real SIMH Sigma configuration and real CP-V media, not a UCLA SEX
+; recreation and not an ARPANET NCP host attachment.
+
+set cpu history=6000
+set cpu sigma7
+set cpu 128k
+set cpu FP
+set cpu DECIMAL
+set cpu laslms
+
+set pt dva=7
+set mux chan=a,dva=6,lines=64
+set muxl0 7p
+set muxl1 7p
+set muxl2 7p
+set muxl3 7p
+set muxl4 7p
+set muxl5 7p
+set muxl6 7p
+set muxl7 7p
+
+set dpb chan=b,dva=f
+set rad chan=c,dva=f
+
+attach mux 4003
+attach lp runtime/f00rad/cpf0lp
+attach rad runtime/f00rad/rad
+attach dpb1 runtime/f00rad/sys1
+attach dpb2 runtime/f00rad/sys2
+
+boot rad

@@ -47,6 +47,10 @@ fi
 # SIMH terminal lines while NCP ping remains the ARPANET health check.
 if [[ "$COMMAND" =~ ^[lL]$ ]]; then
     case "$DEST" in
+        1|001)
+            cd ./mini
+            exec ./local-host-terminal.py 001 4003 --no-init --send-break --max-simh-line 7
+            ;;
         6|006)
             cd ./mini
             exec ./local-host-terminal.py 006 16015
@@ -65,7 +69,7 @@ if [[ "$COMMAND" =~ ^[lL]$ ]]; then
             ;;
         11|013)
             cd ./mini
-            exec ./local-host-terminal.py 013 2040
+            exec env NCP=ncp16 ./ncp-telnet -c 11
             ;;
     esac
 fi

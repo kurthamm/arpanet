@@ -4,6 +4,7 @@ This branch documents and supports two related but separate work streams:
 
 - Hosted ARPANET terminal operation: see [docs/hosted-terminal-fixes.md](docs/hosted-terminal-fixes.md).
 - Safe hosted ITS host lifecycle commands: see [docs/host-lifecycle.md](docs/host-lifecycle.md).
+- Stanford/SU-AI PARRY restoration: see [docs/host11-parry-restoration.md](docs/host11-parry-restoration.md).
 - DigitalOcean migration and runtime hardening: see [docs/digitalocean-migration.md](docs/digitalocean-migration.md).
 - Physical PiDP-10 external host integration: see [kurthamm/pidp10-arpanet-node](https://github.com/kurthamm/pidp10-arpanet-node).
 
@@ -15,8 +16,17 @@ From the hosted terminal page:
 @L 6
 @L 70
 @L 126
+@L 11
 @L 41
 ```
+
+Host `1` / octal `001` is UCLA-NMC's historically correct address at IMP #1.
+The live implementation is a real SIMH Sigma 7 running CP-V F00 media from the
+public Sigma CP-V kit. It is not the recovered UCLA SEX system; original
+UCLA-NMC/SEX storage is still not present in this repository.
+
+Host `11` / octal `013` is Stanford/SU-AI WAITS. The live packs include the
+restored PARRY support files required for the 1972 scenario 19 experience.
 
 Host `41` / octal `051` is an optional external PiDP-10 path. In this DigitalOcean deployment, the browser launcher maps `@L 41` and `@L 051` to the PiDP SIMH MTY terminal over Tailscale. ARPANET reachability for host `41` is validated separately through the IMP62/IMP41 link with `NCP=ncp31 ./ncp-ping -c1 41`.
 
@@ -90,7 +100,7 @@ At the moment, do not expect much. We're building this up over the coming months
 
 # Structure
 
-There is a fully formed but so far small Arpanet in ./mini. It consists of a network of (simh) simulated IMPs connecting to each other, and a number of (simh) PDP-10s and other machines. Many of the ones planned will run the reconstructed system software and applications from the period. Currently, there's just PDP-10s at MIT, typically hosts 70, 134 and 198and host 11, the Stanford SAIL system running WAITS. Host 11, alas, is not connected to the IMP through its own NCP software but through a Linuxbridge. UCLA's SDS Sigma 7 is planned soon. Longer term, the hope is for Multics, PDP-11s, and perhaps even IBM 360s. It is early days yet. But the IMPs run reliably, connecting to make their network over simulated leased lines; and we're happy with progress :-)
+There is a fully formed but so far small Arpanet in ./mini. It consists of a network of (simh) simulated IMPs connecting to each other, and a number of (simh) PDP-10s and other machines. Many of the ones planned will run the reconstructed system software and applications from the period. The active public host set currently includes UCLA-NMC host 1 as a SIMH Sigma 7 CP-V system, MIT ITS hosts 6, 70, and 126, Stanford/SU-AI host 11 running WAITS with restored PARRY support files, and the optional physical PiDP-10 path at host 41. Dormant local ITS disk sets remain available for additional MIT hosts, but they are not exposed by default. Host 11 is reached through a Linux bridge rather than through its own recovered WAITS NCP. The UCLA host 1 path is a browser terminal route to a real Sigma emulator and CP-V media, not recovered UCLA-NMC SEX media. Longer term, the hope is for Multics, PDP-11s, and perhaps even IBM 360s. It is early days yet. But the IMPs run reliably, connecting to make their network over simulated leased lines; and we're happy with progress :-)
 <br><br>
 A more or less stand-alone web project runs the project page as well as the terminal page. All it does is get a terminal from the ./mini directory projected on to your browser page. A python simh-server script brings you into the ./mini Arpanet wolrd, and a python terminal_client handles the data flow with the ./arpanet_terminal.html file. The HTML file with the terminal_client script can run the web site remotely from the server on which the ./mini Arpanet is running.
 <br><br>

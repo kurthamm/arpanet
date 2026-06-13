@@ -435,6 +435,93 @@
             align-items: center;
         }
 
+        .active-hosts-panel {
+            background-color: rgba(229, 218, 195, 0.96);
+            border-top: 1px solid rgba(91, 109, 122, 0.22);
+            border-bottom: 1px solid rgba(91, 109, 122, 0.45);
+            padding: 8px 12px 10px;
+        }
+
+        .active-hosts-title {
+            color: var(--slate);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            line-height: 1;
+            margin-bottom: 7px;
+            text-transform: uppercase;
+        }
+
+        .active-hosts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px;
+        }
+
+        .active-host-card {
+            border: 2px solid var(--slate);
+            background-color: rgba(255, 255, 240, 0.42);
+            color: var(--dark-text);
+            min-height: 92px;
+            padding: 7px 8px;
+            overflow: hidden;
+        }
+
+        .active-host-card.current {
+            background-color: var(--slate);
+            color: var(--cream);
+        }
+
+        .active-host-topline {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+
+        .active-host-name {
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.1;
+            overflow-wrap: anywhere;
+        }
+
+        .active-host-number {
+            font-family: 'VT52', monospace;
+            font-size: 16px;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        .active-host-meta,
+        .active-host-command,
+        .active-host-login {
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+        }
+
+        .active-host-command {
+            margin-top: 3px;
+            color: var(--slate);
+            opacity: 0.92;
+        }
+
+        .active-host-login {
+            margin-top: 4px;
+            color: var(--dark-text);
+        }
+
+        .active-host-card.current .active-host-command {
+            color: var(--cream);
+        }
+
+        .active-host-card.current .active-host-login {
+            color: var(--cream);
+        }
+
         .header-controls {
             display: flex;
             gap: 8px;
@@ -483,6 +570,34 @@
             padding: 8px 12px !important;
             min-height: 44px;
             background: rgba(44, 62, 80, 0.94);
+            color: var(--cream);
+        }
+
+        body.terminal-focus-mode #terminal-panel .active-hosts-panel {
+            background: rgba(20, 28, 32, 0.96);
+            border-color: rgba(229, 218, 195, 0.45);
+        }
+
+        body.terminal-focus-mode #terminal-panel .active-hosts-title {
+            color: var(--cream);
+        }
+
+        body.terminal-focus-mode #terminal-panel .active-host-card {
+            border-color: rgba(229, 218, 195, 0.75);
+            background: rgba(229, 218, 195, 0.08);
+            color: var(--cream);
+        }
+
+        body.terminal-focus-mode #terminal-panel .active-host-card.current {
+            background: rgba(0, 255, 0, 0.16);
+            border-color: #00ff00;
+        }
+
+        body.terminal-focus-mode #terminal-panel .active-host-command {
+            color: #00ff00;
+        }
+
+        body.terminal-focus-mode #terminal-panel .active-host-login {
             color: var(--cream);
         }
 
@@ -716,6 +831,14 @@
         @media (max-width: 999px) {
             .mobile-terminal-controls {
                 display: flex !important;
+            }
+
+            .active-hosts-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .active-host-card {
+                min-height: 86px;
             }
         }
 
@@ -969,6 +1092,10 @@
                         <button class="button" id="ctrl-z-button">^Z</button>
                         <button class="button" id="ctrl-c-button">^C</button>
                     </div>
+                </div>
+                <div class="active-hosts-panel" aria-label="Active ARPANET hosts">
+                    <div class="active-hosts-title">Active Hosts</div>
+                    <div class="active-hosts-grid" id="active-hosts-grid"></div>
                 </div>
                 <div id="terminal-container" style="flex: 1; background: #E8DCC8; border: none; margin: 0; overflow: visible; display: flex; align-items: center; justify-content: center; position: relative;">
                     <div id="terminal-placeholder" style="text-align: center; position: absolute;">
@@ -1406,6 +1533,120 @@
           }
         };
 
+        const activeHosts = [
+          {
+            host: '1',
+            aliases: ['001'],
+            displayHost: '1 / 001',
+            name: 'UCLA-NMC',
+            site: 'UCLA Network Measurement Center',
+            computer: 'Sigma 7',
+            system: 'CP-V',
+            role: 'Sigma timesharing at IMP #1',
+            login: 'LOGON PLEASE: :SYS,LBE'
+          },
+          {
+            host: '6',
+            name: 'MIT-AI',
+            site: 'MIT AI Lab',
+            computer: 'PDP-10',
+            system: 'ITS',
+            role: 'AI, Lisp, games, hacker culture',
+            login: 'ITS: :login iccc'
+          },
+          {
+            host: '70',
+            name: 'MIT-DM',
+            site: 'MIT Dynamic Modeling Group',
+            computer: 'PDP-10',
+            system: 'ITS',
+            role: 'DMS, MUDDLE, interactive computing',
+            login: 'ITS: :login iccc'
+          },
+          {
+            host: '126',
+            name: 'MIT-ML',
+            site: 'MIT Machine Learning group',
+            computer: 'PDP-10',
+            system: 'ITS',
+            role: 'MACLISP, math, AI research',
+            login: 'ITS: :login iccc'
+          },
+          {
+            host: '41',
+            aliases: ['051'],
+            displayHost: '41 / 051',
+            name: 'PiDP-10',
+            site: 'Home lab external node',
+            computer: 'PiDP-10 replica',
+            system: 'SIMH path',
+            role: 'Physical home-location PDP-10 path',
+            login: 'See PiDP banner'
+          },
+          {
+            host: '11',
+            name: 'SU-AI',
+            site: 'Stanford AI Lab',
+            computer: 'PDP-10',
+            system: 'WAITS',
+            role: 'SAIL, robotics, AI research',
+            login: '# prompt: 1,REG'
+          }
+        ];
+
+        let activeHostNumber = null;
+        let terminalCommandBuffer = '';
+
+        function renderActiveHosts() {
+          const hostGrid = document.getElementById('active-hosts-grid');
+          if (!hostGrid) return;
+
+          hostGrid.innerHTML = activeHosts.map((host) => {
+            const isCurrent = host.host === activeHostNumber;
+            return `
+              <div class="active-host-card${isCurrent ? ' current' : ''}" data-host="${host.host}">
+                <div class="active-host-topline">
+                  <div class="active-host-name">${host.name}</div>
+                  <div class="active-host-number">#${host.displayHost || host.host}</div>
+                </div>
+                <div class="active-host-meta">${host.site} · ${host.computer} · ${host.system}</div>
+                <div class="active-host-command">@L ${host.host} — ${host.role}</div>
+                <div class="active-host-login">Login: ${host.login}</div>
+              </div>
+            `;
+          }).join('');
+        }
+
+        function setActiveHost(hostNumber) {
+          const normalizedHost = String(hostNumber || '').trim();
+          const matchedHost = activeHosts.find((host) => {
+            return host.host === normalizedHost || (host.aliases || []).includes(normalizedHost);
+          });
+          activeHostNumber = matchedHost ? matchedHost.host : null;
+          renderActiveHosts();
+        }
+
+        function trackTerminalInput(data) {
+          for (let i = 0; i < data.length; i++) {
+            const char = data[i];
+            const charCode = char.charCodeAt(0);
+
+            if (char === '\r' || char === '\n') {
+              const match = terminalCommandBuffer.match(/@L\s+(\d+)/i);
+              if (match) {
+                setActiveHost(match[1]);
+              }
+              terminalCommandBuffer = '';
+            } else if (charCode === 8 || charCode === 127) {
+              terminalCommandBuffer = terminalCommandBuffer.slice(0, -1);
+            } else if (charCode >= 32 && charCode <= 126) {
+              terminalCommandBuffer = (terminalCommandBuffer + char).slice(-80);
+            }
+          }
+        }
+
+        renderActiveHosts();
+
         function calculateTerminalLayout() {
           const terminalEl = document.getElementById('terminal');
           const config = terminalConfigs[selectedTerminalType];
@@ -1694,7 +1935,7 @@
             updateStatus('server', true);
 
             // Display startup message (monochrome like real VT05)
-            term.write('\r\nPress Return to wake up the TIP. \"@L 70\" connects to host 70, MIT-DM\r\n');
+            term.write('\r\nPress Return to wake up the TIP. \"@L 1\" connects to UCLA-NMC. \"@L 70\" connects to MIT-DM.\r\n');
 
             // Set baud rate based on terminal type
             if (selectedTerminalType === 'teletype33') {
@@ -1779,6 +2020,7 @@
 
           // Send user input to server
           term.onData((data) => {
+            trackTerminalInput(data);
             if (ws && ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify({ type: 'input', data: data }));
             }
@@ -1833,6 +2075,8 @@
 
           // Reset connection state
           isConnected = false;
+          terminalCommandBuffer = '';
+          setActiveHost(null);
         }
 
         // Handle terminal type switch
