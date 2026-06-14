@@ -8,7 +8,7 @@ The goal is a reproducible, hardened deployment for the hosted ARPANET platform 
 
 This document covers the DigitalOcean-hosted ARPANET platform:
 
-- Hosted PDP-10 hosts `6`, `70`, `126`, and Stanford/SU-AI host `11`.
+- Hosted MIT-MULTICS host `6`, hosted ITS PDP-10 hosts `70`, `126`, `134`, `198`, and Stanford/SU-AI host `11`.
 - The simulated IMP network under `mini/`.
 - The hosted browser terminal relay.
 - Cloudflare Tunnel and Tailscale access.
@@ -133,19 +133,22 @@ Treat each host as an independent system attached to the IMP network:
 | Host | Octal | Location | Lifecycle owner |
 | --- | --- | --- | --- |
 | `1` | `001` | DigitalOcean hosted UCLA-NMC Sigma 7 CP-V path | Dedicated `host01-sigma/host01-sigmactl.sh` |
-| `6` | `006` | DigitalOcean hosted PDP-10 | Main ARPANET repo tooling |
-| `70` | `106` | DigitalOcean hosted PDP-10 | Main ARPANET repo tooling |
-| `126` | `176` | DigitalOcean hosted PDP-10 | Main ARPANET repo tooling |
+| `6` | `006` | DigitalOcean hosted MIT-MULTICS DPS8M/MR12.8 path | Dedicated `host06-multicsctl.sh` |
+| `70` | `106` | DigitalOcean hosted MIT-DM PDP-10 | Main ARPANET repo tooling |
+| `126` | `176` | DigitalOcean hosted HILTON-KA1 conference-site PDP-10 | Main ARPANET repo tooling |
+| `134` | `206` | DigitalOcean hosted MIT-AI PDP-10 | Main ARPANET repo tooling |
+| `198` | `306` | DigitalOcean hosted MIT-ML PDP-10 | Main ARPANET repo tooling |
 | `11` | `013` | DigitalOcean hosted Stanford/SU-AI WAITS PDP-10 | Dedicated `host11ctl.sh` / `arpanet-host11.service` |
 | `41` | `051` | Physical PiDP-10 replica | PiDP companion repo / Pi-side tooling |
 
 The browser terminal may connect to these hosts, but it must not restart or
 mutate any host.
 
-`mini/hostctl.sh` is scoped only to hosted ITS hosts `6`, `70`, and `126`.
+`mini/hostctl.sh` is scoped only to hosted ITS hosts `70`, `126`, `134`, and `198`.
 Stanford/SU-AI host `11` uses `mini/host11ctl.sh`. UCLA-NMC host `1` uses
-`mini/host01-sigma/host01-sigmactl.sh`. Do not extend either PDP-10 tool to
-manage PiDP-10 host `41`.
+`mini/host01-sigma/host01-sigmactl.sh`. MIT-MULTICS host `6` uses
+`mini/host06-multicsctl.sh`. Do not extend the PDP-10 tool to manage PiDP-10
+host `41`.
 
 ## Known Fragility
 
@@ -157,8 +160,8 @@ The original runtime relies heavily on `screen` and broad process cleanup. This 
 - Browser terminal sessions can leave stale `ncp-telnet` processes.
 - Startup timing matters: hosts and NCP daemons can start before IMPs are fully converged.
 - Site-specific PiDP/Tailscale changes can leak into upstream-friendly files if not kept separate.
-- The hosted host `tk` listeners must be unique per host; `6`, `70`, and `126` now use `16012`, `17012`, and `10012` respectively.
-- Browser access to hosted hosts `6`, `70`, `126`, and PiDP host `41` uses simulator terminal lines. ARPANET reachability is validated separately with NCP ping and the IMP62/IMP41 link.
+- The hosted host `tk` listeners must be unique per host; `134`, `70`, `126`, and `198` now use `18012`, `17012`, `10012`, and `19012` respectively.
+- Browser access to hosted hosts `6`, `70`, `126`, `134`, `198`, and PiDP host `41` uses simulator terminal lines. ARPANET reachability is validated separately with NCP ping and the IMP62/IMP41 link.
 - Browser access to UCLA-NMC host `1` uses the SIMH Sigma 7 CP-V mux on
   localhost TCP `4003`. It is not yet a working recovered UCLA-NMC SEX/NCP
   attachment.
@@ -174,8 +177,8 @@ During initial droplet testing:
 
 - `h316ov` initially crashed because `libpcre3` was missing.
 - After installing `libpcre3`, IMP processes reached `RUNNING` in the NOC.
-- Hosted PDP-10s `6`, `70`, and `126` booted into ITS.
-- NCP pings to `6`, `70`, and `126` still failed.
+- Hosted PDP-10s `70`, `126`, `134`, and `198` booted into ITS.
+- NCP pings to hosted ITS hosts require separate validation after startup.
 - A duplicate NCP condition was found: NOC-owned `ncpdov` processes existed alongside manual `screen`-owned `ncpXX` sessions.
 - The PiDP link is loaded from the ignored local override `mini/imp62.local.simh` when present; the tracked `mini/imp62.simh` stays generic.
 - Later validation showed NCP echo could pass while ARPANET TELNET sessions were not a repeat-safe browser path for some hosted images. Hosted browser sessions are kept separate from ARPANET TELNET validation.
@@ -204,7 +207,7 @@ Then verify that only one `ncpdov` instance owns each NCP socket and retest:
 
 ```sh
 cd /home/deltaprism/arpanet/mini
-for host in 31 6 70 126; do
+for host in 31 6 70 126 134 198; do
   echo "=== $host ==="
   timeout 20 env NCP=ncp31 ./ncp-ping -c1 "$host" || echo "FAIL-$host"
 done
@@ -220,9 +223,11 @@ Recommended service split:
 
 - `arpanet-noc.service`: starts and supervises the NOC/IMP network.
 - `arpanet-host01-sigma.service`: UCLA-NMC host `1` Sigma 7 CP-V path.
-- `arpanet-host@6.service`: hosted PDP-10 host `6`.
 - `arpanet-host@70.service`: hosted PDP-10 host `70`.
 - `arpanet-host@126.service`: hosted PDP-10 host `126`.
+- `arpanet-host@134.service`: hosted PDP-10 host `134`.
+- `arpanet-host@198.service`: hosted PDP-10 host `198`.
+- `arpanet-host06-multics.service`: MIT-MULTICS host `6`.
 - `arpanet-host11.service`: Stanford/SU-AI WAITS host `11`.
 - `arpanet-terminal-client.service`: browser WebSocket relay on localhost.
 - `arpanet-simh-server.service`: session launcher connected to the relay.
@@ -260,7 +265,7 @@ Use `mini/arpanet-health.sh` as the operator-level health check. It should remai
 
 Expected checks:
 
-- Hosted hosts `6`, `70`, and `126` have exactly one simulator owner each.
+- Hosted hosts `70`, `126`, `134`, and `198` have exactly one simulator owner each.
 - NCP ping works for hosted hosts.
 - PiDP host `41` is checked only when its Tailscale/IMP link is intentionally configured.
 - No duplicate `ncpdov` processes own the same NCP path.
@@ -291,7 +296,7 @@ The migration is not complete until all of these pass on the DigitalOcean drople
 cd /home/deltaprism/arpanet/mini
 ./hostctl.sh verify all
 ./host01-sigma/host01-sigmactl.sh verify
-for host in 6 70 126; do timeout 20 env NCP=ncp31 ./ncp-ping -c1 "$host"; done
+for host in 70 126 134 198; do timeout 20 env NCP=ncp31 ./ncp-ping -c1 "$host"; done
 timeout 20 env NCP=ncp16 ./ncp-ping -c1 11
 ```
 
@@ -300,9 +305,10 @@ Browser terminal tests:
 - Open the hosted terminal page through the Cloudflare hostname.
 - Start a terminal session.
 - Run `@L 1` and reach the Sigma CP-V login salutation.
-- Run `@L 6` and reach the ITS banner/login behavior.
+- Run `@L 134` and reach the MIT-AI ITS banner/login behavior.
 - Run `@L 70` and reach the ITS banner/login behavior.
-- Run `@L 126` and reach the ITS banner/login behavior.
+- Run `@L 126` and reach the HILTON-KA1 ITS banner/login behavior.
+- Run `@L 198` and reach the MIT-ML ITS banner/login behavior.
 - Run `@L 11` and reach Stanford WAITS through the `waitsconnect` ARPANET TELNET bridge, landing at `CON-TELLOGIN`.
 - From `@L 11`, log in with `1,REG`, run `R PARRY`, answer the setup prompts,
   and reach PARRY's `READY:` conversation prompt.

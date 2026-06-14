@@ -1,7 +1,5 @@
-cd host134
-echo $PWD
-cp ./134/rp* .
-cp ./134/ds* .
-echo screen -dmS host134 ./pdp10-ka ./mini-run
-screen -dmS host134 ./pdp10-ka ./mini-run
-cd ..
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")"
+exec ./hostctl.sh start 134

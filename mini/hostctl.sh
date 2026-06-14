@@ -7,7 +7,7 @@ HOST="${2:-}"
 
 usage() {
     cat <<USAGE
-Usage: $(basename "$0") <status|stop|start|restart|verify> <6|70|126|all>
+Usage: $(basename "$0") <status|stop|start|restart|verify> <70|126|134|198|all>
 
 Safely manages the hosted ITS PDP-10 screens. It refuses to start a host
 when that host's simulator ports are still owned by an old process.
@@ -21,48 +21,53 @@ fail() {
 
 host_dir() {
     case "$1" in
-        6) echo "host06" ;;
         70) echo "host70" ;;
         126) echo "host126" ;;
+        134) echo "host134" ;;
+        198) echo "host198" ;;
         *) fail "unknown host: $1" ;;
     esac
 }
 
 clean_dir() {
     case "$1" in
-        6) echo "006" ;;
         70) echo "106" ;;
         126) echo "126" ;;
+        134) echo "134" ;;
+        198) echo "306" ;;
     esac
 }
 
 screen_name() {
     case "$1" in
-        6) echo "host06" ;;
         70) echo "host70" ;;
         126) echo "host126" ;;
+        134) echo "host134" ;;
+        198) echo "host198" ;;
     esac
 }
 
 tcp_ports() {
     case "$1" in
-        6) echo "16000 16002 16003 16015 16016 16017 16018 16019 16020" ;;
         70) echo "17000 17002 17003 17015 17016 17017 17018 17019 17020" ;;
         126) echo "10000 10002 10003 10015 10016 10017 10018 10019 10020" ;;
+        134) echo "18000 18002 18003 18015 18016 18017 18018 18019 18020" ;;
+        198) echo "19000 19002 19003 19015 19016 19017 19018 19019 19020" ;;
     esac
 }
 
 udp_ports() {
     case "$1" in
-        6) echo "20062" ;;
         70) echo "21062" ;;
         126) echo "21622" ;;
+        134) echo "22062" ;;
+        198) echo "23062" ;;
     esac
 }
 
 hosts_for() {
     if [[ "$1" == "all" ]]; then
-        echo "6 70 126"
+        echo "70 126 134 198"
     else
         echo "$1"
     fi
@@ -74,7 +79,7 @@ screen_exists() {
 
 is_host_sim_pid() {
     local pid="$1"
-    tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null | grep -q 'pdp10-ka-fixed ./mini-run'
+    tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null | grep -Eq '(pdp10-ka-fixed|[./]*pdp10-ka) ./mini-run'
 }
 
 port_pids() {
@@ -179,23 +184,26 @@ stop_host() {
 }
 
 start_host() {
-    local host="$1" dir
+    local host="$1" dir sim
     dir="$(host_dir "$host")"
+    sim="../pdp10-ka-fixed"
+    [[ "$host" == "198" ]] && sim="./pdp10-ka"
     [[ -z "$(port_pids "$host")" ]] || fail "host $host ports already owned; run stop first"
     if screen_exists "$host"; then
         fail "screen $(screen_name "$host") already exists; run stop first"
     fi
     restore_clean_packs "$host"
     echo "host $host: starting screen $(screen_name "$host")"
-    (cd "$ROOT/$dir" && screen -dmS "$(screen_name "$host")" ../pdp10-ka-fixed ./mini-run)
+    (cd "$ROOT/$dir" && screen -dmS "$(screen_name "$host")" "$sim" ./mini-run)
 }
 
 verify_host() {
     local host="$1" dest deadline=$((SECONDS + 120))
     case "$host" in
-        6) dest=6 ;;
         70) dest=70 ;;
         126) dest=126 ;;
+        134) dest=134 ;;
+        198) dest=198 ;;
     esac
     while (( SECONDS < deadline )); do
         if (cd "$ROOT" && timeout 10 env NCP=ncp31 ./ncp-ping -c1 "$dest" >/tmp/hostctl-ncp.$host 2>&1); then
@@ -222,12 +230,14 @@ case "$ACTION" in
     *) usage; exit 2 ;;
 esac
 
+rc=0
 for host in $(hosts_for "$HOST"); do
     case "$ACTION" in
         status) status_host "$host" ;;
         stop) stop_host "$host" ;;
         start) start_host "$host" ;;
         restart) restart_host "$host" ;;
-        verify) verify_host "$host" ;;
+        verify) verify_host "$host" || rc=1 ;;
     esac
 done
+exit "$rc"

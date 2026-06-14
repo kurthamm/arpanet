@@ -54,13 +54,50 @@ check_hosted_hosts() {
     local verify_output
     verify_output="$($ROOT/hostctl.sh verify all 2>&1)"
     printf '%s\n' "$verify_output"
-    for host in 6 70 126; do
+    for host in 70 126 134 198; do
         if grep -q "host $host: NCP verified" <<<"$verify_output"; then
             ok "host $host NCP verified"
         else
             fail "host $host NCP verification missing or failed"
         fi
     done
+}
+
+check_runtime_layers() {
+    section "Ordered Runtime Recovery Check"
+    if [[ ! -x "$ROOT/arpanet-recover.sh" ]]; then
+        fail "mini/arpanet-recover.sh is missing or not executable"
+        return
+    fi
+
+    local output rc
+    output="$("$ROOT/arpanet-recover.sh" verify 2>&1)"
+    rc=$?
+    printf '%s\n' "$output"
+    if [[ $rc -eq 0 ]]; then
+        ok "ordered runtime verification clean"
+    else
+        fail "ordered runtime verification failed rc=$rc"
+    fi
+}
+
+check_multics_host() {
+    section "MIT-MULTICS Host"
+    if [[ ! -x "$ROOT/host06-multicsctl.sh" ]]; then
+        fail "mini/host06-multicsctl.sh is missing or not executable"
+        return
+    fi
+
+    "$ROOT/host06-multicsctl.sh" status
+
+    local verify_output
+    verify_output="$($ROOT/host06-multicsctl.sh verify 2>&1)"
+    printf '%s\n' "$verify_output"
+    if grep -q "host06-multics: Multics salutation verified" <<<"$verify_output"; then
+        ok "host 6 Multics salutation verified"
+    else
+        fail "host 6 Multics verification missing or failed"
+    fi
 }
 
 check_stanford_host() {
@@ -85,7 +122,7 @@ check_stanford_host() {
 check_ncp_pings() {
     section "NCP Reachability"
     local host output rc
-    for host in 6 70 126 41; do
+    for host in 70 126 134 198 41; do
         output="$(cd "$ROOT" && timeout 10 env NCP=ncp31 ./ncp-ping -c1 "$host" 2>&1)"
         rc=$?
         printf '%s\n' "$output"
@@ -220,11 +257,8 @@ main() {
     info "read-only audit; no processes are changed"
     date
     check_repo_state
-    check_hosted_hosts
-    check_stanford_host
-    check_ncp_pings
+    check_runtime_layers
     check_relay
-    check_imp_links
     check_pi
     check_terminal_page
     section "Summary"

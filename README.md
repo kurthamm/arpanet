@@ -14,8 +14,10 @@ From the hosted terminal page:
 
 ```text
 @L 6
+@L 134
 @L 70
 @L 126
+@L 198
 @L 11
 @L 41
 ```
@@ -30,14 +32,21 @@ restored PARRY support files required for the 1972 scenario 19 experience.
 
 Host `41` / octal `051` is an optional external PiDP-10 path. In this DigitalOcean deployment, the browser launcher maps `@L 41` and `@L 051` to the PiDP SIMH MTY terminal over Tailscale. ARPANET reachability for host `41` is validated separately through the IMP62/IMP41 link with `NCP=ncp31 ./ncp-ping -c1 41`.
 
-Hosted hosts `6`, `70`, and `126` are local PDP-10 simulators on the droplet.
+Host `6` / octal `006` is MIT-MULTICS at IMP #6 host index 0. The live
+implementation uses DPS8M with public MR12.8 media and a visitor account; it is
+not recovered 1972 MIT H645 `Multics 17.6b` storage.
+
+Hosted ITS hosts `70`, `126`, `134`, and `198` are local PDP-10 simulators on the droplet.
+Host `126` / octal `176` is HILTON-KA1, the Washington Hilton conference-site
+KA host at IMP #62 host index 1. It is separate from MIT-ML, which is host
+`198` / octal `306` at IMP #6 host index 3.
 Their browser sessions use localhost-only simulator terminal lines so the public
 terminal remains usable even when a vintage ITS image does not accept ARPANET
 TELNET from the browser source NCP.
 
 ## Hosted ITS Host Operations
 
-For safe status, restart, and verification of hosted ITS hosts `6`, `70`, and `126`, use:
+For safe status, restart, and verification of hosted ITS hosts `70`, `126`, `134`, and `198`, use:
 
 ```sh
 mini/hostctl.sh status all
@@ -60,7 +69,7 @@ The PiDP-10 work is intentionally kept in a separate companion repository becaus
 ---
 # arpanet
 
-WORK IN PROGRESS - Probably too early unless you are involved.
+WORK IN PROGRESS - Very early unless you are involved.
 
 See the project in action (if we have the server up...) at https://obsolescence.dev/arpanet_home.html or run the setup on your own computer.
 
@@ -88,7 +97,7 @@ Clone, and run demo-run.sh. Inspect it for the things it does: (a) set up a loca
 <br><br>
 Then, you can load the file arpanet_home.html into your browser. Or straight on to arpanet_terminal2.html if you want to skip the intro.
 <br><br>
-You might want to skip all the web stuff. A quick way straight onto your Arpanet is to run './do.sh 1'. That gets a TIP-like session; type @L 6 [return] and it will connect to host #6. That's an MIT ITS system.
+You might want to skip all the web stuff. A quick way straight onto your Arpanet is to run './do.sh 1'. That gets a TIP-like session; type @L 6 [return] and it will connect to MIT-MULTICS, type @L 126 [return] and it will connect to the Hilton conference-site KA host, type @L 134 [return] and it will connect to MIT-AI, or type @L 198 [return] and it will connect to MIT-ML.
 <br><br>
 The arpanet simulation consists of a network of IMP routers, which you can inspect and manage. The mini subdirectory contains the entire arpanet simulation, irrespective of the web server stuff. In ./mini, start by running ./impctl.py help. It will give you insight in how to play with the IMP farm. The hosts attached to the IMPs are started through ./mini/arpanet, they are started independently from the Arpanet IMP 'farm', but make sure you start ITS systems straight after starting their IMP. ITS is picky on when it wishes to hear from their IMP. Do 'screen -ls' to see the host systems themselves.
 <br><br>
@@ -100,7 +109,7 @@ At the moment, do not expect much. We're building this up over the coming months
 
 # Structure
 
-There is a fully formed but so far small Arpanet in ./mini. It consists of a network of (simh) simulated IMPs connecting to each other, and a number of (simh) PDP-10s and other machines. Many of the ones planned will run the reconstructed system software and applications from the period. The active public host set currently includes UCLA-NMC host 1 as a SIMH Sigma 7 CP-V system, MIT ITS hosts 6, 70, and 126, Stanford/SU-AI host 11 running WAITS with restored PARRY support files, and the optional physical PiDP-10 path at host 41. Dormant local ITS disk sets remain available for additional MIT hosts, but they are not exposed by default. Host 11 is reached through a Linux bridge rather than through its own recovered WAITS NCP. The UCLA host 1 path is a browser terminal route to a real Sigma emulator and CP-V media, not recovered UCLA-NMC SEX media. Longer term, the hope is for Multics, PDP-11s, and perhaps even IBM 360s. It is early days yet. But the IMPs run reliably, connecting to make their network over simulated leased lines; and we're happy with progress :-)
+There is a fully formed but so far small Arpanet in ./mini. It consists of a network of (simh) simulated IMPs connecting to each other, and a number of (simh) PDP-10s and other machines. Many of the ones planned will run the reconstructed system software and applications from the period. The active public host set currently includes UCLA-NMC host 1 as a SIMH Sigma 7 CP-V system, MIT-MULTICS host 6 as a DPS8M/MR12.8 Multics system, MIT ITS hosts 70, 126, 134, and 198, Stanford/SU-AI host 11 running WAITS with restored PARRY support files, and the optional physical PiDP-10 path at host 41. Dormant local ITS disk sets remain available for additional MIT hosts, but they are not exposed by default. Host 11 is reached through a Linux bridge rather than through its own recovered WAITS NCP. The UCLA host 1 path is a browser terminal route to a real Sigma emulator and CP-V media, not recovered UCLA-NMC SEX media. Longer term, the hope is for deeper Multics NCP integration, PDP-11s, and perhaps even IBM 360s. It is early days yet. But the IMPs run reliably, connecting to make their network over simulated leased lines; and we're happy with progress :-)
 <br><br>
 A more or less stand-alone web project runs the project page as well as the terminal page. All it does is get a terminal from the ./mini directory projected on to your browser page. A python simh-server script brings you into the ./mini Arpanet wolrd, and a python terminal_client handles the data flow with the ./arpanet_terminal.html file. The HTML file with the terminal_client script can run the web site remotely from the server on which the ./mini Arpanet is running.
 <br><br>

@@ -1547,30 +1547,23 @@
           },
           {
             host: '6',
-            name: 'MIT-AI',
-            site: 'MIT AI Lab',
-            computer: 'PDP-10',
-            system: 'ITS',
-            role: 'AI, Lisp, games, hacker culture',
-            login: 'ITS: :login iccc'
+            aliases: ['006'],
+            displayHost: '6 / 006',
+            name: 'MIT-MULTICS',
+            site: 'MIT Project MAC',
+            computer: 'DPS8M / H6180',
+            system: 'Multics MR12.8',
+            role: 'PL/I, directories, timesharing',
+            login: 'login: l Iccc'
           },
           {
-            host: '70',
-            name: 'MIT-DM',
-            site: 'MIT Dynamic Modeling Group',
+            host: '11',
+            name: 'SU-AI',
+            site: 'Stanford AI Lab',
             computer: 'PDP-10',
-            system: 'ITS',
-            role: 'DMS, MUDDLE, interactive computing',
-            login: 'ITS: :login iccc'
-          },
-          {
-            host: '126',
-            name: 'MIT-ML',
-            site: 'MIT Machine Learning group',
-            computer: 'PDP-10',
-            system: 'ITS',
-            role: 'MACLISP, math, AI research',
-            login: 'ITS: :login iccc'
+            system: 'WAITS',
+            role: 'SAIL, robotics, AI research',
+            login: '# prompt: 1,REG'
           },
           {
             host: '41',
@@ -1584,13 +1577,46 @@
             login: 'See PiDP banner'
           },
           {
-            host: '11',
-            name: 'SU-AI',
-            site: 'Stanford AI Lab',
+            host: '70',
+            name: 'MIT-DM',
+            site: 'MIT Dynamic Modeling Group',
             computer: 'PDP-10',
-            system: 'WAITS',
-            role: 'SAIL, robotics, AI research',
-            login: '# prompt: 1,REG'
+            system: 'ITS',
+            role: 'DMS, MUDDLE, interactive computing',
+            login: 'ITS: :login iccc'
+          },
+          {
+            host: '126',
+            aliases: ['176'],
+            displayHost: '126 / 176',
+            name: 'HILTON-KA1',
+            site: 'Washington Hilton ICCC site',
+            computer: 'PDP-10',
+            system: 'ITS',
+            role: 'Conference-site KA host',
+            login: 'ITS: :login iccc'
+          },
+          {
+            host: '134',
+            aliases: ['206'],
+            displayHost: '134 / 206',
+            name: 'MIT-AI',
+            site: 'MIT AI Lab',
+            computer: 'PDP-10',
+            system: 'ITS',
+            role: 'AI, Lisp, games, hacker culture',
+            login: 'ITS: :login iccc'
+          },
+          {
+            host: '198',
+            aliases: ['306'],
+            displayHost: '198 / 306',
+            name: 'MIT-ML',
+            site: 'MIT Machine Learning group',
+            computer: 'PDP-10',
+            system: 'ITS',
+            role: 'MACSYMA, symbolic math, AI research',
+            login: 'MACSYMA: :LOGIN WMP'
           }
         ];
 
@@ -1935,7 +1961,7 @@
             updateStatus('server', true);
 
             // Display startup message (monochrome like real VT05)
-            term.write('\r\nPress Return to wake up the TIP. \"@L 1\" connects to UCLA-NMC. \"@L 70\" connects to MIT-DM.\r\n');
+            term.write('\r\nPress Return to wake up the TIP. \"@L 126\" connects to HILTON-KA1. \"@L 134\" connects to MIT-AI. \"@L 198\" connects to MIT-ML.\r\n');
 
             // Set baud rate based on terminal type
             if (selectedTerminalType === 'teletype33') {
@@ -2415,7 +2441,7 @@
             { elementSelector: '[data-tab="scenarios"]', text: 'This tab shows the original 1972 Scenarios booklet.<br><br>(these scenarios are WIP currently)', position: 'bottom' },
             { elementId: 'switch-terminal-button', text: 'Gives you a different terminal type, noisy Teletype or fast(ish) VT-05', position: 'top' },
             { elementId: 'scenarioSelector', text: 'Lets you jump to a selection of Scenarios to try out', position: 'top' },
-            { text: 'That is all. You are free to roam, or follow one of the scenarios.<br><br>If you get lost, just reload the page.<br><br>If you decide to roam freely, you might want to read up on the PDP-10 ITS operating system to get some hacker skills<br><br>To start, the TIP terminal expects a connect command. For instance, "@L 70" connects to MIT-DM', position: 'center' } // Final dialog, no target
+            { text: 'That is all. You are free to roam, or follow one of the scenarios.<br><br>If you get lost, just reload the page.<br><br>If you decide to roam freely, you might want to read up on the PDP-10 ITS operating system to get some hacker skills<br><br>To start, the TIP terminal expects a connect command. For instance, "@L 126" connects to the Hilton conference-site KA host, "@L 134" connects to MIT-AI, and "@L 198" connects to MIT-ML', position: 'center' } // Final dialog, no target
         ];
 
         let currentTourStep = 0;

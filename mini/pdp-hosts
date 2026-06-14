@@ -13,7 +13,6 @@
 
 # IMP 62, HI2 - HILTON-KA1 (PDP-10/ITS)
  imp 62, host 1
- imp 6, host 0
  imp 6, host 1
  imp 6, host 2
  imp 6, host 3

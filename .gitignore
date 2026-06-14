@@ -9,6 +9,11 @@ mini/error-logs/
 mini/host06/rp03.?
 mini/host70/rp03.?
 mini/host126/rp03.?
+mini/host134/rp03.?
+mini/host198/rp03.?
+mini/host06-multics/sim-cache/
+mini/host06-multics/kit-cache/
+mini/host06-multics/runtime/
 mini/host11/*.ckd
 mini/host11/*.octal
 mini/host11/SYSTEM.DMP.*

@@ -76,9 +76,12 @@ def drain_initial_output(sock, duration=1.2):
 
 def simh_line_number(data):
     match = re.search(rb"Connected to [^\r\n]* line ([0-9]+)", data)
-    if not match:
-        return None
-    return int(match.group(1))
+    if match:
+        return int(match.group(1))
+    match = re.search(rb"Attached to line [a-z]\.h([0-9]+)", data)
+    if match:
+        return int(match.group(1))
+    return None
 
 
 def line_exceeds_limit(data, max_simh_line):
@@ -108,6 +111,11 @@ def main():
         "--send-break",
         action="store_true",
         help="send a TELNET BREAK after connect",
+    )
+    parser.add_argument(
+        "--select-first-line",
+        action="store_true",
+        help="send Return after connect to select the first available terminal line",
     )
     parser.add_argument(
         "--max-simh-line",
@@ -151,6 +159,15 @@ def main():
         if b"LOGON PLEASE" not in initial_output and b"\n!" not in initial_output:
             sock.sendall(b"\r")
             initial_output += drain_initial_output(sock, duration=2.0)
+    if args.select_first_line:
+        time.sleep(0.2)
+        sock.sendall(b"\r")
+        initial_output += drain_initial_output(sock, duration=2.0)
+        if args.max_simh_line is not None:
+            if line_exceeds_limit(initial_output, args.max_simh_line):
+                print_busy(args.host_label)
+                sock.close()
+                return
 
     while running:
         readable, _, _ = select.select([0, sock], [], [], 0.5)

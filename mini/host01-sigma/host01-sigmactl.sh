@@ -131,17 +131,22 @@ start() {
 stop() {
     echo "host01-sigma: stopping"
     if screen_exists; then
-        screen -S sigma01-cpv -X stuff $'\020' 2>/dev/null || true
-        sleep 1
-        screen -S sigma01-cpv -X stuff $'ZAP\r' 2>/dev/null || true
-        sleep 75
-        screen -S sigma01-cpv -X stuff $'\005quit\r' 2>/dev/null || true
-        sleep 5
+        if [[ "${ARPANET_FAST_STOP:-0}" == "1" ]]; then
+            screen -S sigma01-cpv -X quit 2>/dev/null || true
+        else
+            screen -S sigma01-cpv -X stuff $'\020' 2>/dev/null || true
+            sleep 1
+            screen -S sigma01-cpv -X stuff $'ZAP\r' 2>/dev/null || true
+            sleep 75
+            screen -S sigma01-cpv -X stuff $'\005quit\r' 2>/dev/null || true
+            sleep 5
+        fi
     fi
     screen -S sigma01-cpv -X quit 2>/dev/null || true
     if ps -eo args | grep -q "[B]IN/sigma f00rad[.]simh"; then
         pkill -TERM -f "$SIGMA f00rad[.]simh" 2>/dev/null || true
         sleep 2
+        pkill -KILL -f "$SIGMA f00rad[.]simh" 2>/dev/null || true
     fi
     echo "host01-sigma: stopped"
 }

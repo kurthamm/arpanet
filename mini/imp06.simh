@@ -25,7 +25,6 @@ set hi1 enabled
 set hi1 nodebug
 attach -u hi1 20061:127.0.0.1:20062
 # Host 0: MIT-MULTICS
-set hi1 convert
 
 set hi2 enabled
 set hi2 nodebug

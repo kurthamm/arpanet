@@ -1,12 +1,14 @@
 # Hosted Host Lifecycle
 
-Use `mini/hostctl.sh` to manage the hosted ITS PDP-10 hosts (`6`, `70`, and `126`).
+Use `mini/hostctl.sh` to manage the active hosted ITS PDP-10 hosts (`70`, `126`, `134`, and `198`).
 Use `mini/host11ctl.sh` to manage Stanford/SU-AI host `11`, which is a separate
 WAITS/SAIL lane and is not part of the MIT ITS trio.
 Use `mini/host01-sigma/host01-sigmactl.sh` to manage UCLA-NMC host `1`, which is
 a SIMH Sigma 7 CP-V system exposed through the browser terminal path.
+Use `mini/host06-multicsctl.sh` to manage MIT-MULTICS host `6`, which is a
+DPS8M/MR12.8 Multics system exposed through the browser terminal path.
 
-The older `mini/host06.sh`, `mini/host70.sh`, and `mini/host126.sh` entrypoints are now compatibility shims around `hostctl.sh`. Use `hostctl.sh` for operational work.
+The older `mini/host70.sh`, `mini/host126.sh`, `mini/host134.sh`, and `mini/host198.sh` entrypoints are compatibility shims around `hostctl.sh`. `mini/host06.sh` intentionally refuses to start MIT-AI because host `6` is MIT-MULTICS. Use the host-specific controllers for operational work.
 
 ## Commands
 
@@ -24,9 +26,12 @@ mini/host11ctl.sh restart 11
 mini/host01-sigma/host01-sigmactl.sh status
 mini/host01-sigma/host01-sigmactl.sh verify
 mini/host01-sigma/host01-sigmactl.sh restart
+mini/host06-multicsctl.sh status
+mini/host06-multicsctl.sh verify
+mini/host06-multicsctl.sh restart
 ```
 
-Valid host targets are `6`, `70`, `126`, or `all`.
+Valid active ITS host targets are `70`, `126`, `134`, `198`, or `all`. Host `126` is HILTON-KA1 at IMP `62`, host index `1`, octal `176`. MIT-MULTICS host `6` is managed separately by `host06-multicsctl.sh`.
 For `host11ctl.sh`, the only valid host target is `11`.
 The Sigma host controller does not take a host number because it owns only host
 `1`.
@@ -40,7 +45,9 @@ The Sigma host controller does not take a host number because it owns only host
 - Refuses to start if ports are still owned.
 - Restores clean `rp03.*` packs from the tracked host subdirectory before start.
 - Backs up previous mutable packs under `$HOME/arpanet-runtime-backups`.
-- Verifies the host with `NCP=ncp31 ./ncp-ping` after restart.
+- Attempts direct `NCP=ncp31 ./ncp-ping` verification after restart. Browser
+  terminal usability is validated separately through `do.sh` and the
+  localhost-only simulator terminal lines.
 
 For Stanford/SU-AI, `host11ctl.sh`:
 
@@ -74,15 +81,33 @@ For UCLA-NMC host `1`, `host01-sigmactl.sh`:
 - Does not claim recovered UCLA-NMC SEX media and does not yet provide a working
   UCLA-NMC NCP/IMP attachment.
 
+For MIT-MULTICS host `6`, `host06-multicsctl.sh`:
+
+- Builds DPS8M from the pinned `R3.1.0` source if needed.
+- Fetches public MR12.8 QuickStart media.
+- Performs a one-time site setup creating the public `Iccc` account if the
+  configured runtime disk is missing.
+- Starts DPS8M with MR12.8 and exposes the HSLA terminal service on TCP `6180`.
+- Does not claim recovered 1972 MIT H645 `Multics 17.6b` media.
+
 ## Host Port Map
 
 | Host | Screen | Directory | Clean packs | IMP host port |
 | --- | --- | --- | --- | --- |
-| `6` | `host06` | `mini/host06` | `mini/host06/006` | UDP `20062` |
 | `70` | `host70` | `mini/host70` | `mini/host70/106` | UDP `21062` |
 | `126` | `host126` | `mini/host126` | `mini/host126/126` | UDP `21622` |
+| `134` | `host134` | `mini/host134` | `mini/host134/134` | UDP `22062` |
+| `198` | `host198` | `mini/host198` | `mini/host198/306` | UDP `23062` |
 | `11` | `host11` + `waitsconnect` | `mini/host11` | WAITS `SYS*.ckd` | UDP `20112` |
 | `1` | `sigma01-cpv` | `mini/host01-sigma` | CP-V F00 RAD runtime | browser mux TCP `4003` |
+| `6` | `host06-multics` | `mini/host06-multics` | MR12.8 `root.dsk` runtime | browser HSLA TCP `6180` |
+
+Host `126` is HILTON-KA1 at the Washington Hilton conference-site IMP, not
+MIT-ML. Its browser route uses terminal line `10015`.
+
+Host `198` is MIT-ML at IMP `06`, host index `3`, octal `306`. It uses the
+local `mini/host198/pdp10-ka` simulator binary with terminal line `19015` for
+the browser route.
 
 ## Safety Rule
 

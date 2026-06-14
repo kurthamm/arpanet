@@ -37,7 +37,10 @@ class NOCServer:
     DEFAULT_CONFIG = "./arpanet"
     DEFAULT_SOCKET = "/tmp/noc.sock"
     LOGFILE = "./logfiles/noc.audit.log"
-    NCP_START_DELAY = 3.0
+    # Some IMPs take about 30 seconds to reach RUNNING after a cold NOC
+    # restart. Starting NCP daemons too early leaves source NCP sockets alive
+    # but unable to pass traffic, so wait for the routers to settle.
+    NCP_START_DELAY = 35.0
 
     def __init__(
         self,

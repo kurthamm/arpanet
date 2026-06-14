@@ -53,7 +53,7 @@ if [[ "$COMMAND" =~ ^[lL]$ ]]; then
             ;;
         6|006)
             cd ./mini
-            exec ./local-host-terminal.py 006 16015
+            exec ./local-host-terminal.py 006 6180 --no-init --select-first-line --max-simh-line 7
             ;;
         70|106)
             cd ./mini
@@ -62,6 +62,14 @@ if [[ "$COMMAND" =~ ^[lL]$ ]]; then
         126|176)
             cd ./mini
             exec ./local-host-terminal.py 176 10015
+            ;;
+        198|306)
+            cd ./mini
+            exec ./local-host-terminal.py 306 19015
+            ;;
+        134|206)
+            cd ./mini
+            exec ./local-host-terminal.py 206 18015
             ;;
         41|051)
             cd ./mini

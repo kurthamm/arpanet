@@ -23,18 +23,18 @@ set dpy disabled
 set dk disabled
 set stk enabled
 set tk enabled
-at -u tk 16000 speed=300
-at -u tk line=2,10012
+at -u tk 18000 speed=300
+at -u tk line=2,18012
 set dpk enabled
-at -u dpk 16002 speed=4800
-at -u dpk line=11,16019 speed=4800
-at -u dpk line=15,16020 speed=4800
+at -u dpk 18002 speed=4800
+at -u dpk line=11,18019 speed=4800
+at -u dpk line=15,18020 speed=4800
 set mty enabled
-at -u mty 16003 speed=50000
-at -u mty line=9,16018 speed=9600
-at -u mty line=8,16017 speed=9600
-at -u mty line=7,16016;notelnet speed=50000
-at -u mty line=6,16015 speed=9600
+at -u mty 18003 speed=50000
+at -u mty line=9,18018 speed=9600
+at -u mty line=8,18017 speed=9600
+at -u mty line=7,18016;notelnet speed=50000
+at -u mty line=6,18015 speed=9600
 
 set imp enabled
 set imp ncp

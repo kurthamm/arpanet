@@ -8,9 +8,10 @@ Use the hosted terminal page and type one of these commands at the TIP prompt:
 
 ```text
 @L 1
-@L 6
+@L 134
 @L 70
 @L 126
+@L 198
 @L 11
 @L 41
 ```
@@ -21,9 +22,15 @@ Expected routing:
 | --- | --- | --- |
 | `@L 1` | host `001` | UCLA-NMC historical address, reached through the SIMH Sigma 7 CP-V mux on localhost port `4003`. |
 | `@L 001` | host `001` | Accepted octal spelling for the same UCLA-NMC Sigma host. |
-| `@L 6` | host `006` | Hosted MIT ITS simulator, reached through a localhost-only simulator terminal line. |
+| `@L 6` | host `006` | MIT-MULTICS, reached through the DPS8M/MR12.8 HSLA terminal service on localhost port `6180`. |
+| `@L 006` | host `006` | Accepted octal spelling for the same MIT-MULTICS host. |
 | `@L 70` | host `106` | Hosted MIT Dynamic Modelling PDP-10, reached through a localhost-only simulator terminal line. |
-| `@L 126` | host `176` | Hosted ITS simulator, reached through a localhost-only simulator terminal line. |
+| `@L 126` | host `176` | Hosted Washington Hilton conference-site KA1 PDP-10, reached through a localhost-only simulator terminal line. |
+| `@L 176` | host `176` | Accepted octal spelling for the same HILTON-KA1 host. |
+| `@L 134` | host `206` | Hosted MIT-AI PDP-10, reached through a localhost-only simulator terminal line. |
+| `@L 206` | host `206` | Accepted octal spelling for the same MIT-AI host. |
+| `@L 198` | host `306` | Hosted MIT-ML PDP-10, reached through a localhost-only simulator terminal line. |
+| `@L 306` | host `306` | Accepted octal spelling for the same MIT-ML host. |
 | `@L 11` | host `013` | Hosted Stanford/SU-AI WAITS PDP-10, reached through the `waitsconnect` ARPANET TELNET bridge from `ncp16`. |
 | `@L 013` | host `013` | Accepted octal spelling for the same Stanford host. |
 | `@L 41` | host `051` | External PiDP-10, reached through its Pi-side SIMH terminal line over Tailscale. |
@@ -36,7 +43,7 @@ Some ITS hosts may display `Unknown ITS PDP-10` and `It's a lovely day to be a t
 The browser terminal path is intentionally separate from the ARPANET health path:
 
 - `@L 1` and `@L 001` run `mini/local-host-terminal.py` and connect to the SIMH Sigma 7 CP-V mux on localhost port `4003`.
-- `@L 6`, `@L 70`, and `@L 126` run `mini/local-host-terminal.py` and connect to localhost-only SIMH terminal lines (`16015`, `17015`, and `10015`).
+- `@L 6`, `@L 134`, `@L 70`, `@L 126`, and `@L 198` run `mini/local-host-terminal.py` and connect to localhost-only terminal lines (`6180`, `18015`, `17015`, `10015`, and `19015`).
 - `@L 11` and `@L 013` use `mini/waitsconnect` through `NCP=ncp16 ./ncp-telnet -c 11`. The older DCS port `2040` accepts a SIMH connection banner but does not provide the visitor-facing WAITS login path.
 - `@L 41` and `@L 051` use the same helper to connect to the PiDP-10 MTY line at the Pi's Tailscale address.
 - This does not open public emulator ports; the browser still reaches the relay only through Cloudflare Tunnel.
@@ -71,9 +78,10 @@ That keeps the PiDP/Tailscale wiring out of the tracked `imp62.simh` while still
 From `mini/`, verify the hosted hosts and PiDP host path:
 
 ```sh
-NCP=ncp31 ./ncp-ping -c1 6
+NCP=ncp31 ./ncp-ping -c1 134
 NCP=ncp31 ./ncp-ping -c1 70
 NCP=ncp31 ./ncp-ping -c1 126
+NCP=ncp31 ./ncp-ping -c1 198
 NCP=ncp31 ./ncp-ping -c1 41
 NCP=ncp16 ./ncp-ping -c1 11
 ```
@@ -91,9 +99,13 @@ Check the launcher path without using the browser for the localhost and PiDP ter
 ```sh
 printf '@L 1\r\n' | SESSION_NUMBER=0 ../do.sh
 printf '@L 001\r\n' | SESSION_NUMBER=0 ../do.sh
-printf '@L 6\r\n' | SESSION_NUMBER=0 ../do.sh
+printf '@L 134\r\n' | SESSION_NUMBER=0 ../do.sh
+printf '@L 206\r\n' | SESSION_NUMBER=0 ../do.sh
 printf '@L 70\r\n' | SESSION_NUMBER=0 ../do.sh
 printf '@L 126\r\n' | SESSION_NUMBER=0 ../do.sh
+printf '@L 176\r\n' | SESSION_NUMBER=0 ../do.sh
+printf '@L 198\r\n' | SESSION_NUMBER=0 ../do.sh
+printf '@L 306\r\n' | SESSION_NUMBER=0 ../do.sh
 printf '@L 41\r\n' | SESSION_NUMBER=0 ../do.sh
 printf '@L 051\r\n' | SESSION_NUMBER=0 ../do.sh
 ```
@@ -120,7 +132,7 @@ A stale `ncp-telnet` or `local-host-terminal.py` whose parent is the running `si
 
 ## Hosted Host Operations
 
-Use `mini/hostctl.sh` for hosted ITS hosts `6`, `70`, and `126`:
+Use `mini/hostctl.sh` for hosted ITS hosts `70`, `126`, `134`, and `198`:
 
 ```sh
 mini/hostctl.sh status all
