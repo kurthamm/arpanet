@@ -7,6 +7,8 @@ Use `mini/host01-sigma/host01-sigmactl.sh` to manage UCLA-NMC host `1`, which is
 a SIMH Sigma 7 CP-V system exposed through the browser terminal path.
 Use `mini/host06-multicsctl.sh` to manage MIT-MULTICS host `6`, which is a
 DPS8M/MR12.8 Multics system exposed through the browser terminal path.
+Use `mini/host65-ucla-ccnctl.sh` to manage UCLA-CCN host `65`, which is an
+OS/360 MVT/TCAM/TSO system with real FORTRAN IV G under Hercules.
 
 The older `mini/host70.sh`, `mini/host126.sh`, `mini/host134.sh`, and `mini/host198.sh` entrypoints are compatibility shims around `hostctl.sh`. `mini/host06.sh` intentionally refuses to start MIT-AI because host `6` is MIT-MULTICS. Use the host-specific controllers for operational work.
 
@@ -29,9 +31,12 @@ mini/host01-sigma/host01-sigmactl.sh restart
 mini/host06-multicsctl.sh status
 mini/host06-multicsctl.sh verify
 mini/host06-multicsctl.sh restart
+mini/host65-ucla-ccnctl.sh status
+mini/host65-ucla-ccnctl.sh verify-tso-fortran
+mini/host65-ucla-ccnctl.sh restart
 ```
 
-Valid active ITS host targets are `70`, `126`, `134`, `198`, or `all`. Host `126` is HILTON-KA1 at IMP `62`, host index `1`, octal `176`. MIT-MULTICS host `6` is managed separately by `host06-multicsctl.sh`.
+Valid active ITS host targets are `70`, `126`, `134`, `198`, or `all`. Host `126` is HILTON-KA1 at IMP `62`, host index `1`, octal `176`. MIT-MULTICS host `6` is managed separately by `host06-multicsctl.sh`; UCLA-CCN host `65` is managed separately by `host65-ucla-ccnctl.sh`.
 For `host11ctl.sh`, the only valid host target is `11`.
 The Sigma host controller does not take a host number because it owns only host
 `1`.
@@ -90,6 +95,18 @@ For MIT-MULTICS host `6`, `host06-multicsctl.sh`:
 - Starts DPS8M with MR12.8 and exposes the HSLA terminal service on TCP `6180`.
 - Does not claim recovered 1972 MIT H645 `Multics 17.6b` media.
 
+For UCLA-CCN host `65`, `host65-ucla-ccnctl.sh`:
+
+- Fetches the public OS/360 MVT turnkey archive into an ignored cache.
+- Boots real OS/360 MVT under Hercules and starts TCAM/TSO.
+- Exposes a CCN front door on localhost TCP `16515` for the browser terminal
+  route.
+- Uses an internal `s3270` control session to bridge line-mode visitor input to
+  real TSO output.
+- Validates real FORTRAN IV G compile/load/run with `verify-tso-fortran`.
+- Does not claim recovered UCLA 360/91 storage, recovered SPEAKEASY, or
+  recovered UCLA `FORTG`/`GOFORT` command processors.
+
 ## Host Port Map
 
 | Host | Screen | Directory | Clean packs | IMP host port |
@@ -101,6 +118,7 @@ For MIT-MULTICS host `6`, `host06-multicsctl.sh`:
 | `11` | `host11` + `waitsconnect` | `mini/host11` | WAITS `SYS*.ckd` | UDP `20112` |
 | `1` | `sigma01-cpv` | `mini/host01-sigma` | CP-V F00 RAD runtime | browser mux TCP `4003` |
 | `6` | `host06-multics` | `mini/host06-multics` | MR12.8 `root.dsk` runtime | browser HSLA TCP `6180` |
+| `65` | `host65-ucla-ccn` | `mini/host65-ucla-ccn` | OS/360 MVT runtime | browser front door TCP `16515` |
 
 Host `126` is HILTON-KA1 at the Washington Hilton conference-site IMP, not
 MIT-ML. Its browser route uses terminal line `10015`.

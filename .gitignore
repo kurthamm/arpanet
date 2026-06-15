@@ -14,6 +14,10 @@ mini/host198/rp03.?
 mini/host06-multics/sim-cache/
 mini/host06-multics/kit-cache/
 mini/host06-multics/runtime/
+mini/host65-ucla-ccn/kit-cache/
+mini/host65-ucla-ccn/runtime/
+mini/host65-ucla-ccn/logs/
+mini/host65-ucla-ccn/transcripts/
 mini/host11/*.ckd
 mini/host11/*.octal
 mini/host11/SYSTEM.DMP.*

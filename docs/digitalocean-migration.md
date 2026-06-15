@@ -161,10 +161,13 @@ The original runtime relies heavily on `screen` and broad process cleanup. This 
 - Startup timing matters: hosts and NCP daemons can start before IMPs are fully converged.
 - Site-specific PiDP/Tailscale changes can leak into upstream-friendly files if not kept separate.
 - The hosted host `tk` listeners must be unique per host; `134`, `70`, `126`, and `198` now use `18012`, `17012`, `10012`, and `19012` respectively.
-- Browser access to hosted hosts `6`, `70`, `126`, `134`, `198`, and PiDP host `41` uses simulator terminal lines. ARPANET reachability is validated separately with NCP ping and the IMP62/IMP41 link.
+- Browser access to hosted hosts `6`, `65`, `70`, `126`, `134`, `198`, and PiDP host `41` uses simulator terminal lines or host-specific front doors. ARPANET reachability is validated separately with NCP ping and the IMP62/IMP41 link.
 - Browser access to UCLA-NMC host `1` uses the SIMH Sigma 7 CP-V mux on
   localhost TCP `4003`. It is not yet a working recovered UCLA-NMC SEX/NCP
   attachment.
+- Browser access to UCLA-CCN host `65` uses the CCN front door on localhost TCP
+  `16515` and an internal `s3270` bridge to real OS/360 MVT/TCAM/TSO. It is not
+  recovered UCLA 360/91 storage and does not expose SPEAKEASY as runnable.
 - Stanford/SU-AI PARRY depends on restored WAITS packs from Lars Brinkhoff's
   `sailing-on-arpanet` restoration. Use `mini/host11-restore-parry.sh --restart`
   if a fresh WAITS archive loses the PARRY support files.

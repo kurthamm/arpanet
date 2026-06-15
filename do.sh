@@ -75,6 +75,10 @@ if [[ "$COMMAND" =~ ^[lL]$ ]]; then
             cd ./mini
             exec ./local-host-terminal.py 051 10015 --connect-host 100.105.230.31
             ;;
+        65|101)
+            cd ./mini
+            exec ./local-host-terminal.py 101 16515 --no-init
+            ;;
         11|013)
             cd ./mini
             exec env NCP=ncp16 ./ncp-telnet -c 11

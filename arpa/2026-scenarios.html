@@ -41,10 +41,10 @@
 	This is a Terminal IMP, type <code>@L [host number]</code> to go out and connect over the Arpanet.
 	<br>
 	<br>
-	Online are <b>UCLA-NMC</b> (host #1 / octal #001), <b>MIT-MULTICS</b> (#6 / octal #006), <b>MIT-DM</b> (#70), <b>HILTON-KA1</b> (#126 / octal #176), <b>MIT-AI</b> (#134 / octal #206), <b>MIT-ML</b> (#198 / octal #306), <b>Stanford/SU-AI</b> (#11), and the home-location <b>PiDP-10</b> (#41 / octal #051). So, <code>@L 6 [Return]</code> connects you to MIT-MULTICS, <code>@L 1 [Return]</code> connects you to the Sigma 7 CP-V host, <code>@L 126 [Return]</code> connects you to the Washington Hilton conference-site KA host, <code>@L 134 [Return]</code> connects you to MIT's AI Lab PDP-10 in Cambridge, MA, <code>@L 198 [Return]</code> connects you to MIT-ML, <code>@L 11 [Return]</code> connects you to Stanford's WAITS system, and <code>@L 41 [Return]</code> connects you to the PiDP-10 path.
+	Online are <b>UCLA-NMC</b> (host #1 / octal #001), <b>MIT-MULTICS</b> (#6 / octal #006), <b>UCLA-CCN</b> (#65 / octal #101), <b>MIT-DM</b> (#70), <b>HILTON-KA1</b> (#126 / octal #176), <b>MIT-AI</b> (#134 / octal #206), <b>MIT-ML</b> (#198 / octal #306), <b>Stanford/SU-AI</b> (#11), and the home-location <b>PiDP-10</b> (#41 / octal #051). So, <code>@L 6 [Return]</code> connects you to MIT-MULTICS, <code>@L 1 [Return]</code> connects you to the Sigma 7 CP-V host, <code>@L 65 [Return]</code> connects you to UCLA-CCN's OS/360 MVT/TSO path, <code>@L 126 [Return]</code> connects you to the Washington Hilton conference-site KA host, <code>@L 134 [Return]</code> connects you to MIT's AI Lab PDP-10 in Cambridge, MA, <code>@L 198 [Return]</code> connects you to MIT-ML, <code>@L 11 [Return]</code> connects you to Stanford's WAITS system, and <code>@L 41 [Return]</code> connects you to the PiDP-10 path.
 	<br>
 	<br>
-	Login note: MIT-MULTICS expects <code>l Iccc</code>, then password <code>iccc2026</code>. UCLA-NMC CP-V expects <code>:SYS,LBE</code> at <code>LOGON PLEASE:</code>. The MIT-DM, HILTON-KA1, and MIT-AI ITS paths use <code>:login iccc</code>; MIT-ML MACSYMA uses the historically documented Mathlab login <code>:LOGIN WMP</code>. Stanford/SU-AI is WAITS; on the current web bridge, <code>@L 11</code> reaches <code>CON-TELLOGIN</code>, where the login program expects <code>1,REG</code>.
+	Login note: MIT-MULTICS expects <code>l Iccc</code>, then password <code>iccc2026</code>. UCLA-NMC CP-V expects <code>:SYS,LBE</code> at <code>LOGON PLEASE:</code>. UCLA-CCN starts at a CCN front door; type <code>TSO</code>, then <code>LOGON IBMUSER</code>. The MIT-DM, HILTON-KA1, and MIT-AI ITS paths use <code>:login iccc</code>; MIT-ML MACSYMA uses the historically documented Mathlab login <code>:LOGIN WMP</code>. Stanford/SU-AI is WAITS; on the current web bridge, <code>@L 11</code> reaches <code>CON-TELLOGIN</code>, where the login program expects <code>1,REG</code>.
 	<br>
 	<br>
 	Numbering note: scenarios that directly correspond to the 1972 booklet keep the original booklet number. A suffix such as <code>18A</code> means a 2026 working adaptation of a 1972 scenario. Supplemental live demonstrations that are not original booklet scenarios use <code>0</code> or <code>0A</code>.
@@ -753,6 +753,86 @@ Start your therapy, two returns after your replies!
 	<br>	7. To disconnect:
 	<br>
 	<br>	(Click the DISCONNECT button) <blockquote><i>(original: @C [CR])</i></blockquote>
+	<br>
+</section>
+
+<section data-title="SCENARIO 14A: UCLA-CCN 360/91 TSO FORTRAN === HOST #65">
+	<hr>
+	<br>
+    <h3>SCENARIO 14A: UCLA-CCN 360/91 TSO FORTRAN === HOST #65</h3>
+
+	<br>	UCLA-CCN is host #65 / octal #101 at UCLA IMP #1, host index 1. This live host
+	<br>	uses a real OS/360 MVT, TCAM, TSO, and FORTRAN IV G system under Hercules. It is
+	<br>	not recovered UCLA 360/91 storage. The exact UCLA <code>FORTG</code> and <code>GOFORT</code>
+	<br>	TSO command processors have not been recovered in this image, so this 2026 path uses
+	<br>	the real installed compiler and loader: TSO <code>EDIT</code>, <code>ALLOC</code>,
+	<br>	<code>CALL 'SYS1.LINKLIB(IEYFORT)'</code>, and <code>LOADGO</code>.
+	<br>
+    <br>	1. To connect to UCLA-CCN:
+	<br>
+    <br>	<u>@L</u>  [SP] <u>65</u> [LF]
+	<br>
+	<br>
+	<br>	2. At the CCN front door, enter TSO:
+	<br>
+	<br>	<u>TSO</u> [CR]
+	<br>
+	<br>
+	<br>	3. To login to TSO:
+	<br>
+	<br>	<u>LOGON</u> [SP] <u>IBMUSER</u> [CR]
+	<br>
+	<br>	NO BROADCAST MESSAGES
+	<br>	READY
+	<br>
+	<br>
+	<br>	4. Create a small FORTRAN IV source program:
+	<br>
+	<br>	<u>EDIT</u> [SP] <u>H</u> [SP] <u>NEW</u> [SP] <u>FORTG</u> [CR]
+	<br>	<u>      WRITE(6,10)</u> [CR]
+	<br>	<u>   10 FORMAT(1X,10HHELLO FORT)</u> [CR]
+	<br>	<u>      END</u> [CR]
+	<br>	[CR]
+	<br>	<u>SAVE</u> [CR]
+	<br>	<u>END</u> [CR]
+	<br>
+	<br>
+	<br>	5. Allocate the real compiler and runtime files:
+	<br>
+	<br>	<u>ALLOC FILE(SYSIN) DATASET(H.FORT) SHR</u> [CR]
+	<br>	[CR]
+	<br>	<u>ALLOC FILE(SYSLIN) DATASET(H.OBJ) NEW BLOCK(80) SPACE(10,5)</u> [CR]
+	<br>	[CR]
+	<br>	<u>ALLOC FILE(SYSPRINT) DATASET(*)</u> [CR]
+	<br>	[CR]
+	<br>
+	<br>
+	<br>	6. Compile with the real FORTRAN IV G compiler:
+	<br>
+	<br>	<u>CALL 'SYS1.LINKLIB(IEYFORT)'</u> [CR]
+	<br>
+	<br>	FORTRAN IV G LEVEL 21
+	<br>	NO DIAGNOSTICS GENERATED
+	<br>
+	<br>
+	<br>	7. Allocate FORTRAN unit 6 to the terminal and run the object program:
+	<br>
+	<br>	<u>ALLOC FILE(FT06F001) DATASET(*)</u> [CR]
+	<br>	[CR]
+	<br>	<u>LOADGO H FORTLIB PRINT(*)</u> [CR]
+	<br>
+	<br>	OS/360 LOADER
+	<br>	HELLO FORT
+	<br>	READY
+	<br>
+	<br>
+	<br>	8. List your TSO data sets and logout:
+	<br>
+	<br>	<u>LISTCAT</u> [CR]
+	<br>	H.FORT
+	<br>	H.OBJ
+	<br>
+	<br>	<u>LOGOFF</u> [CR]
 	<br>
 </section>
 
