@@ -158,7 +158,7 @@ function getLiveStatus(node) {
 
 function getAvailabilityLabel(node) {
   const status = getLiveStatus(node);
-  if (status === 'live' && node.origin === 'kurt') return 'Live now - Kurt-added';
+  if (status === 'live' && node.origin === 'kurt') return 'Live now - 2026 extension';
   if (status === 'live') return 'Live now - original project';
   if (status === 'planned') return 'Planned / expected online soon';
   if (status === 'longterm') return 'Long-term reconstruction';
@@ -166,7 +166,7 @@ function getAvailabilityLabel(node) {
 }
 
 function getOriginLabel(node) {
-  if (node.origin === 'kurt') return 'Kurt-added 2026 extension';
+  if (node.origin === 'kurt') return '2026 extension beyond original project';
   if (node.origin === 'original') return 'Original reconstruction tracking';
   return 'Historical map data';
 }
@@ -345,7 +345,7 @@ function initArpanetMap() {
       const isKurtAddedLive = nodeToDisplay.origin === 'kurt' && getLiveStatus(nodeToDisplay) === 'live' && !nodeToDisplay.mapHidden;
       let displayHTML = '';
       if (isKurtAddedLive) {
-        displayHTML += '<div class="map-origin-badge">Kurt-added live host</div>';
+        displayHTML += '<div class="map-origin-badge">2026 live extension</div>';
       }
       displayHTML += `<div style="font-weight: bold; margin-bottom: 6px;">${nodeToDisplay.name}</div>`;
 
@@ -369,7 +369,7 @@ function initArpanetMap() {
       details.push(`Origin: ${getOriginLabel(nodeToDisplay)}`);
       if (nodeToDisplay.scenario) details.push(`Scenario: ${nodeToDisplay.scenario}`);
       if (!nodeToDisplay.scenario && getLiveStatus(nodeToDisplay) === 'live') details.push('Scenario: No guided scenario yet');
-      if (nodeToDisplay.origin === 'kurt') details.push('Map color: Garnet marks Kurt-added hosts');
+      if (nodeToDisplay.origin === 'kurt') details.push('Map color: Garnet marks live 2026 extensions');
 
       if (details.length > 0) {
         displayHTML += `<div style="font-size: 0.85em; line-height: 1.4; color: #333;">${details.join('<br>')}</div>`;
@@ -379,7 +379,7 @@ function initArpanetMap() {
       if (impNumber !== null) {
         const detailPage = getNodeDetailPage(nodeToDisplay, impNumber);
         if (detailPage) {
-          const buttonText = isKurtAddedLive ? 'View Kurt-Added Node Details' : 'View Node Details';
+          const buttonText = isKurtAddedLive ? 'View Extension Details' : 'View Node Details';
           displayHTML += `<button onclick="window.location.href='${detailPage}'">${buttonText}</button>`;
         }
       }

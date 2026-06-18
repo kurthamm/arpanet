@@ -25,7 +25,7 @@ Stanford/SU-AI `#11` was not one of the first four 1969 ARPANET hosts, but it
 was present on the May 1973 map and was already green in the original
 reconstruction project's map data.
 
-## Kurt Hosted Additions
+## Hosted 2026 Extensions
 
 This fork keeps the original-project live hosts green even if the local
 deployment improved or repaired them. Garnet is reserved for live hosts whose
@@ -50,7 +50,7 @@ The map data lives in `arpa/assets/js/arpanet-nodes.js`.
 
 - `liveStatus` is this deployment's availability state.
 - `origin: "original"` keeps a live node green.
-- `origin: "kurt"` makes a live node garnet and adds the small plus badge.
+- `origin: "kurt"` marks a live 2026 extension in garnet and adds the small plus badge.
 - `mapHidden: true` suppresses color and badge drawing for placeholder records.
 
 The home-page legend is in `arpanet_home.html`.
