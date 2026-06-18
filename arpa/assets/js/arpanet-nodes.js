@@ -2,7 +2,7 @@
 
 const arpanetNodes = [
 
-  { name: 'SRI - PDP-10', name1: 'SRI', name2: 'PDP-10', x: 177, y: 92, rx: 33, ry: 18, 		host: 2, 	hostname: 'SRI-ARC', system: 'TENEX, NLS', status: 'dedicated Server',  scenario: 'SRI-ARC (NIC) ==• HOST #2', scenstat: 1  },
+  { name: 'SRI - PDP-10', name1: 'SRI', name2: 'PDP-10', x: 177, y: 92, rx: 33, ry: 18, 		host: 2, 	hostname: 'SRI-ARC', system: 'TENEX, NLS', status: 'dedicated Server', liveStatus: 'planned', origin: 'original', scenario: 'SRI-ARC (NIC) ==• HOST #2', scenstat: 1  },
   { name: 'SRI - PDP-10', name1: 'SRI', name2: 'PDP-10', x: 98, y: 197, rx: 30, ry: 15, 		host: 66, 	hostname: 'SRI-AI', system: 'TENEX', status: 'limited Server' },
   { name: 'SRI - PDP-15', name1: 'SRI', name2: 'PDP-15', x: 98, y: 150, rx: 30, ry: 15, 		host: 66, 	hostname: 'SRI-AI', system: '?', status: '?', front: 1 },
   { node: 2, modem1: 16, modem2: 34, modem3: 32, name: 'SRI - IMP', name1: 'SRI', name2: 'IMP', x: 177, y: 150, rx: 18, ry: 13,		host: 2, lat: 37.4564811, lon: -122.1753924 },
@@ -28,11 +28,11 @@ const arpanetNodes = [
   { name: 'ILLINOIS - PDP-11', name1: 'ILLINOIS', name2: 'PDP-11', x: 708, y: 92, rx: 35, ry: 18, host: 12, hostname: 'ILL-CAC', computer: 'PDP-11/20', system: 'ANTS', status: 'User' },
   { node: 12, modem1: 4, modem2: 6, name: 'ILLINOIS - IMP', name1: 'ILLINOIS', name2: 'IMP', x: 713, y: 150, rx: 18, ry: 13, lat: 40.1131564, lon: -88.2247919 },
 
-  { name: 'MIT - PDP-10 (DMS)', name1: 'MIT', name2: 'PDP-10 (DMS)', x: 1010, y: 76, rx: 33, ry: 18, host: 70, hostname: 'MIT-DMS', computer: 'PDP-10', system: 'ITS', status: 'Server', scenario: 'MIT-DMS ITS PDP-10 — HOST #70', scenstat: 0 },
-  { name: 'MIT - PDP-10 (AI)', name1: 'MIT', name2: 'PDP-10 (AI)', x: 940, y: 106, rx: 33, ry: 18,  host: 134, hostname: 'MIT-AI', computer: 'PDP-10', system: 'ITS', status: 'Server', scenario: 'MIT-AI PDP-10 === HOST #134', scenstat: 0  },
-  { name: 'MIT - PDP-10 (ML)', name1: 'MIT', name2: 'PDP-10 (ML)', x: 1095, y: 106, rx: 33, ry: 18, host: 198, hostname: 'MIT-ML', computer: 'PDP-10', system: 'ITS', status: 'Server', scenario: 'MIT-ML === HOST #198', scenstat: 0  },
+  { name: 'MIT - PDP-10 (DMS)', name1: 'MIT', name2: 'PDP-10 (DMS)', x: 1010, y: 76, rx: 33, ry: 18, host: 70, hostname: 'MIT-DMS', computer: 'PDP-10', system: 'ITS', status: 'Server', liveStatus: 'live', origin: 'original', scenario: 'MIT-DMS ITS PDP-10 — HOST #70', scenstat: 0 },
+  { name: 'MIT - PDP-10 (AI)', name1: 'MIT', name2: 'PDP-10 (AI)', x: 940, y: 106, rx: 33, ry: 18,  host: 134, hostname: 'MIT-AI', computer: 'PDP-10', system: 'ITS', status: 'Server', liveStatus: 'live', origin: 'original', scenario: 'MIT-AI PDP-10 === HOST #134', scenstat: 0  },
+  { name: 'MIT - PDP-10 (ML)', name1: 'MIT', name2: 'PDP-10 (ML)', x: 1095, y: 106, rx: 33, ry: 18, host: 198, hostname: 'MIT-ML', computer: 'PDP-10', system: 'ITS', status: 'Server', liveStatus: 'live', origin: 'original', scenario: 'MIT-ML === HOST #198', scenstat: 0  },
   { node: 6, modem1: 12, modem2: 31, modem3: 10, name: 'MIT - IMP', name1: 'MIT', name2: 'IMP', x: 1010, y: 150, rx: 18, ry: 13, 		host: 6, lat: 42.3582529, lon: -71.0966272 },
-  { name: 'MIT - H-645', name1: 'MIT', name2: 'H-645', x: 1091, y: 164, rx: 28, ry: 13, 	host: 6, hostname: 'MIT-MULTICS', computer: 'H-6180', system: 'Multics', status: 'Server', scenario: 'MIT H645 MULTICS === HOST #6', scenstat: 2  },
+  { name: 'MIT - H-645', name1: 'MIT', name2: 'H-645', x: 1091, y: 164, rx: 28, ry: 13, 	host: 6, hostname: 'MIT-MULTICS', computer: 'H-6180', system: 'Multics', status: 'Server', liveStatus: 'live', origin: 'kurt', scenario: 'MIT H645 MULTICS === HOST #6', scenstat: 0  },
 
   { name: 'LINCOLN - TX-2', name1: 'LINCOLN', name2: 'TX-2', x: 785, y: 193, rx: 28, ry: 15, 	host: 74, hostname: 'LL-TX2', computer: 'TX-2', status: 'Server' },
   { name: 'LINCOLN - 360/67', name1: 'LINCOLN', name2: '360/67', x: 868, y: 189, rx: 42, ry: 13, host: 10, hostname: 'LL-67', computer: 'IBM 360/67', status: 'limited Server' },
@@ -46,7 +46,7 @@ const arpanetNodes = [
 
 //this is for testing, remove together with modem3:31 line in CCA above:
   { node: 62, modem1: 31, name: 'HILTON - IMP', name1: 'HILTON', name2: 'IMP', x: 10, y: 10, rx: 25, ry: 12, 		host: 62 },
-  { name: 'HILTON-KA1', name1: 'HILTON', name2: 'KA', x: 10, y: 10, rx: 33, ry: 18, 	host: 126, hostname: 'HILTON-KA1', computer: 'PDP-10', system: 'ITS', status: 'Server' },
+  { name: 'HILTON-KA1', name1: 'HILTON', name2: 'KA', x: 10, y: 10, rx: 33, ry: 18, 	host: 126, hostname: 'HILTON-KA1', computer: 'PDP-10', system: 'ITS', status: 'Server', liveStatus: 'live', origin: 'kurt', scenstat: 0 },
   { name: 'HILTON-KA0', name1: 'HILTON', name2: 'KA', x: 10, y: 10, rx: 33, ry: 18, 	host: 62, hostname: 'HILTON-KA0', computer: 'PDP-10', system: 'ITS', status: 'Server' },
 
 
@@ -55,14 +55,14 @@ const arpanetNodes = [
 
   { node: 5, modem1: 31, modem2:9, modem3: 30, name: 'BBN - IMP', name1: 'BBN', name2: 'IMP', x: 1016, y: 340, rx: 18, ry: 13,			host: 5, lat: 42.3908323, lon: -71.1469589 },
   { name: 'BBN - H316', name1: 'BBN', name2: 'H316', 						x: 1095, y: 374, rx: 28, ry: 15, 							host: 5, hostname: 'BBN-NCC', computer: 'H-316', system: 'H-316', status: 'User' },
-  { name: 'BBN - PDP-10 (TENEX)', name1: 'BBN', name2: 'PDP-10 (TENEX)', 	x: 967, y: 279, rx: 33, ry: 15, 							host: 69,  hostname: 'BBN-TENEX', computer: 'PDP-10', system: 'TENEX', status: 'Server', scenario: 'BBN TENEX === HOST #69', scenstat: 1  },
+  { name: 'BBN - PDP-10 (TENEX)', name1: 'BBN', name2: 'PDP-10 (TENEX)', 	x: 967, y: 279, rx: 33, ry: 15, 							host: 69,  hostname: 'BBN-TENEX', computer: 'PDP-10', system: 'TENEX', status: 'Server', liveStatus: 'planned', origin: 'original', scenario: 'BBN TENEX === HOST #69', scenstat: 1  },
   { name: 'BBN - PDP-10 (TENEXB)', name1: 'BBN', name2: 'PDP-10 (TENEXB)', 	x: 970, y: 389, rx: 33, ry: 15, 							host: 133, hostname: 'BBN-TENEXB', computer: 'PDP-10', system: 'TENEX', status: 'limited Server' },
   { name: 'BBN - PDP-1', name1: 'BBN', name2: 'PDP-1', 						x: 1095, y: 309, rx: 30, ry: 15, 							host: 197, hostname: 'BBN-1D', computer: 'PDP-1', system: 'PDP-1 TS', status: 'User' },
 
   { node: 30, modem1: 5, name: 'BBN2 - TIP', name1: 'BBN2', name2: 'TIP', 	x: 942, y: 340, rx: 22, ry: 12, 		host: 158, hostname: 'BBN-TESTIP', computer: 'TIP', status: 'TIP'},
 
   { node: 9, modem1: 5, modem2: 29, name: 'HARVARD - PDP-11', name1: 'HARVARD', name2: 'PDP-11', x: 930, y: 493, rx: 35, ry: 15, host: 137, hostname: 'HARV-11', computer: 'PDP-11', status: 'User' },
-  { name: 'HARVARD - PDP-10', name1: 'HARVARD', name2: 'PDP-10', x: 930, y: 437, rx: 35, ry: 15, host: 9, hostname: 'HARV-10', computer: 'PDP-10', status: 'Server', scenario: 'HARVARD PDP-10 === HOST #9', scenstat: 1  },
+  { name: 'HARVARD - PDP-10', name1: 'HARVARD', name2: 'PDP-10', x: 930, y: 437, rx: 35, ry: 15, host: 9, hostname: 'HARV-10', computer: 'PDP-10', status: 'Server', liveStatus: 'planned', origin: 'original', scenario: 'HARVARD PDP-10 === HOST #9', scenstat: 1  },
   { name: 'HARVARD - IMP', name1: 'HARVARD', name2: 'IMP', x: 1014, y: 488, rx: 18, ry: 13, lat: 42.3657432, lon: -71.1222139 },
   { name: 'HARVARD - PDP-1', name1: 'HARVARD', name2: 'PDP-1', x: 1095, y: 488, rx: 30, ry: 15, host: 73, hostname: 'HARV-1', computer: 'PDP-1', status: 'User' },
 
@@ -104,9 +104,9 @@ const arpanetNodes = [
   { node: 8, modem1: 23, modem2: 1, name: 'SDC - IMP', name1: 'SDC', name2: 'IMP', x: 496, y: 553, rx: 40, ry: 15,		host: 8 },
   { name: 'SDC - DDP-516', name1: 'SDC', name2: 'DDP-516', x: 588, y: 553, rx: 40, ry: 15,  	host: 8, hostname: '?', computer: 'DDP-516', status: '?', front: 1 },
 
-  { name: 'UCLA - SIGMA7', name1: 'UCLA', name2: 'SIGMA7', x: 255, y: 639, rx: 38, ry: 15, 	host: 1, hostname: 'UCLA-NMC', computer: 'Sigma 7', system: 'SEX', status: 'Server', scenario: 'UCLA-NMC SIGMA-7 === HOST #1', scenstat: 1  },
+  { name: 'UCLA - SIGMA7', name1: 'UCLA', name2: 'SIGMA7', x: 255, y: 639, rx: 38, ry: 15, 	host: 1, hostname: 'UCLA-NMC', computer: 'Sigma 7', system: 'SEX', status: 'Server', liveStatus: 'live', origin: 'kurt', scenario: 'UCLA-NMC SIGMA-7 === HOST #1', scenstat: 0  },
   { node: 1, modem1: 8, modem2: 3, modem3:35, name: 'UCLA - IMP', name1: 'UCLA', name2: 'IMP', x: 378, y: 643, rx: 22, ry: 12,		host: 1,  lat: 34.0708777, lon: -118.4468503 },
-  { name: 'UCLA - 360/91', name1: 'UCLA', name2: '360/91', x: 460, y: 641, rx: 33, ry: 13, 	host: 65, hostname: 'UCLA-CCn', computer: 'IBM 360/91', status: 'Server', scenario: 'HOST #65'  , scenstat: 2 },
+  { name: 'UCLA - 360/91', name1: 'UCLA', name2: '360/91', x: 460, y: 641, rx: 33, ry: 13, 	host: 65, hostname: 'UCLA-CCn', computer: 'IBM 360/91', system: 'OS/360 MVT / TSO', status: 'Server', liveStatus: 'live', origin: 'kurt', scenario: 'UCLA-CCN 360/91 TSO FORTRAN === HOST #65'  , scenstat: 0 },
 
   { node: 35, modem1: 1, modem2:7, name: 'UCSD - 316 IMP', name1: 'UCSD', name2: '316 IMP', x: 323, y: 694, rx: 25, ry: 13 },
   { name: 'UCSD - MICRO/810', name1: 'UCSD', name2: 'MICRO/810', x: 408, y: 690, rx: 35, ry: 15, host: 35, hostname: 'UCSD-CC', computer: 'Micro 810 / B6700', status: 'Server', front: 1 },
@@ -123,7 +123,7 @@ const arpanetNodes = [
   { name: 'UCSB - 360/75', name1: 'UCSB', name2: '360/75', x: 425, y: 570, rx: 33, ry: 13, 	host: 3, hostname: 'UCSB-MOD75', computer: 'IBM 360/75', system: 'OLS', status: 'Server' },
   { node: 3, modem1: 1, modem2: 33, name: 'UCSB - IMP', name1: 'UCSB', name2: 'IMP', x: 342, y: 570, rx: 22, ry: 12,		host: 3, lat: 34.4146025, lon: -119.84581 },
 
-  { name: 'STANFORD - PDP-10', name1: 'STANFORD', name2: 'PDP-10', x: 103, y: 618, rx: 33, ry: 15, host: 11, hostname: 'SU-AI', computer: 'PDP-10', system: 'WAITS', status: 'Server', scenario: 'SAIL PARRY === HOST #11', scenstat: 0 },
+  { name: 'STANFORD - PDP-10', name1: 'STANFORD', name2: 'PDP-10', x: 103, y: 618, rx: 33, ry: 15, host: 11, hostname: 'SU-AI', computer: 'PDP-10', system: 'WAITS', status: 'Server', liveStatus: 'live', origin: 'original', scenario: 'SAIL PARRY === HOST #11', scenstat: 0 },
   { node: 11, modem1: 22, modem2: 16, name: 'STANFORD - IMP', name1: 'STANFORD', name2: 'IMP', x: 181, y: 621, rx: 18, ry: 13,	host: 11, lat: 37.4351796, lon: -122.1746129 },
 
   { node: 17, modem1: 26, modem2:28, name: 'MITRE - TIP', name1: 'MITRE', name2: 'TIP', x: 949, y: 692, rx: 22, ry: 12, host: 145, hostname: 'MITRE-TIP', computer: 'TIP', status: 'TIP', lat: 42.5052939, lon: -71.2370477 },
@@ -146,6 +146,46 @@ function getNodeDetailPage(nodeToDisplay, impNumber) {
   return Object.prototype.hasOwnProperty.call(nodeDetailPageOverrides, firstWord)
     ? nodeDetailPageOverrides[firstWord]
     : `arpa/arpanet-node-${impNumber}-${firstWord}.html`;
+}
+
+function getLiveStatus(node) {
+  if (node.liveStatus) return node.liveStatus;
+  if (node.scenstat === 0) return 'live';
+  if (node.scenstat === 1) return 'planned';
+  if (node.scenstat === 2) return 'longterm';
+  return null;
+}
+
+function getAvailabilityLabel(node) {
+  const status = getLiveStatus(node);
+  if (status === 'live' && node.origin === 'kurt') return 'Live now - Kurt-added';
+  if (status === 'live') return 'Live now - original project';
+  if (status === 'planned') return 'Planned / expected online soon';
+  if (status === 'longterm') return 'Long-term reconstruction';
+  return 'Historical map node';
+}
+
+function getOriginLabel(node) {
+  if (node.origin === 'kurt') return 'Kurt-added 2026 extension';
+  if (node.origin === 'original') return 'Original reconstruction tracking';
+  return 'Historical map data';
+}
+
+function getAvailabilityColors(node) {
+  const status = getLiveStatus(node);
+  if (status === 'live' && node.origin === 'kurt') {
+    return { fill: 'rgba(115, 0, 10, 0.12)', stroke: 'rgba(115, 0, 10, 0.85)' };
+  }
+  if (status === 'live') {
+    return { fill: 'rgba(0, 255, 0, 0.14)', stroke: 'rgba(0, 255, 0, 0.65)' };
+  }
+  if (status === 'planned') {
+    return { fill: 'rgba(255, 255, 0, 0.14)', stroke: 'rgba(255, 255, 0, 0.65)' };
+  }
+  if (status === 'longterm') {
+    return { fill: 'rgba(255, 0, 0, 0.14)', stroke: 'rgba(255, 0, 0, 0.65)' };
+  }
+  return null;
 }
 
 // Initialize the interactive map
@@ -271,33 +311,32 @@ function initArpanetMap() {
     ellipse.setAttribute('ry', node.ry);
     ellipse.setAttribute('data-name', node.name);
 
-    // Set color based on scenario and scenstat
-    if (!node.scenario) {
-      // No scenario: invisible but clickable
+    // Set color based on live availability. Scenario text is independent.
+    const colors = getAvailabilityColors(node);
+    if (!colors) {
+      // No availability status: invisible but clickable
       ellipse.style.fill = 'none';
       ellipse.style.stroke = 'none';
     } else {
-      // Has scenario: color based on scenstat
-      let fillColor, strokeColor;
-      if (node.scenstat === 0) {
-        // Green
-        fillColor = 'rgba(0, 255, 0, 0.1)';
-        strokeColor = 'rgba(0, 255, 0, 0.5)';
-      } else if (node.scenstat === 1) {
-        // Yellow
-        fillColor = 'rgba(255, 255, 0, 0.1)';
-        strokeColor = 'rgba(255, 255, 0, 0.5)';
-      } else if (node.scenstat === 2) {
-        // Red
-        fillColor = 'rgba(255, 0, 0, 0.1)';
-        strokeColor = 'rgba(255, 0, 0, 0.5)';
-      } else {
-        // Default green if scenstat not specified
-        fillColor = 'rgba(0, 255, 0, 0.1)';
-        strokeColor = 'rgba(0, 255, 0, 0.5)';
-      }
-      ellipse.style.fill = fillColor;
-      ellipse.style.stroke = strokeColor;
+      ellipse.style.fill = colors.fill;
+      ellipse.style.stroke = colors.stroke;
+    }
+    ellipse.style.strokeWidth = node.origin === 'kurt' && getLiveStatus(node) === 'live' ? '3' : '1.5';
+
+    if (node.origin === 'kurt') {
+      const badge = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      badge.setAttribute('cx', Number(node.x) + Number(node.rx) + 5);
+      badge.setAttribute('cy', Number(node.y) - Number(node.ry) - 5);
+      badge.setAttribute('r', 6);
+      badge.setAttribute('class', 'kurt-origin-badge');
+      svg.appendChild(badge);
+
+      const badgeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      badgeText.setAttribute('x', Number(node.x) + Number(node.rx) + 5);
+      badgeText.setAttribute('y', Number(node.y) - Number(node.ry) - 2);
+      badgeText.setAttribute('class', 'kurt-origin-badge-text');
+      badgeText.textContent = '+';
+      svg.appendChild(badgeText);
     }
 
     // Helper function to display node details in hover box
@@ -320,6 +359,11 @@ function initArpanetMap() {
       if (nodeToDisplay.computer) details.push(`Computer: ${nodeToDisplay.computer}`);
       if (nodeToDisplay.system) details.push(`System: ${nodeToDisplay.system}`);
       if (nodeToDisplay.status) details.push(`Status: ${nodeToDisplay.status}`);
+      details.push(`Availability: ${getAvailabilityLabel(nodeToDisplay)}`);
+      details.push(`Origin: ${getOriginLabel(nodeToDisplay)}`);
+      if (nodeToDisplay.scenario) details.push(`Scenario: ${nodeToDisplay.scenario}`);
+      if (!nodeToDisplay.scenario && getLiveStatus(nodeToDisplay) === 'live') details.push('Scenario: No guided scenario yet');
+      if (nodeToDisplay.origin === 'kurt') details.push('Map color: Garnet marks Kurt-added hosts');
 
       if (details.length > 0) {
         displayHTML += `<div style="font-size: 0.85em; line-height: 1.4; color: #333;">${details.join('<br>')}</div>`;

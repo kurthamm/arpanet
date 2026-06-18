@@ -372,6 +372,22 @@
             pointer-events: none;
         }
 
+        #arpanet-map-svg .kurt-origin-badge {
+            fill: #73000a;
+            stroke: #ffffff;
+            stroke-width: 1.5;
+            pointer-events: none;
+        }
+
+        #arpanet-map-svg .kurt-origin-badge-text {
+            fill: #ffffff;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            font-weight: bold;
+            text-anchor: middle;
+            pointer-events: none;
+        }
+
         /* Node hover box tooltip */
         .node-hover-box {
             position: absolute;
@@ -944,9 +960,10 @@
                     <!--<div id="node-display">TEST</div> -->
                     <br><br>
                     <b>Hover over the nodes for their detailed subpages.</b>
-                    <br><br>The colored nodes played a role in the Scenarios for the 1972 Arpanet Ball described below.
+                    <br><br>Color shows availability in this reconstruction.
 
-                    <br><br>Green nodes: accessible in the reconstruction; <br>yellow nodes: expected online soon;<br>red ones: will take longer to reconstruct.
+                    <br><br>Green nodes: live original-project hosts;<br>garnet nodes: live Kurt-added hosts;<br>yellow nodes: expected online soon;<br>red ones: will take longer to reconstruct.
+                    <br><br>A garnet <b>+</b> badge also marks a Kurt-added 2026 extension beyond the original project. Go Cocks!
                     <br><br>
                 </div>
             </div>
@@ -1699,7 +1716,7 @@ requestAnimationFrame(drawLoop);
 connectWS();
     </script>
 
-<script src="arpa/assets/js/arpanet-nodes.js"></script>
+	<script src="arpa/assets/js/arpanet-nodes.js?v=20260618-garnet2"></script>
 
 <script>
 // Terminal definitions
