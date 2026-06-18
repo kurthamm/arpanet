@@ -5,6 +5,7 @@ This branch documents and supports two related but separate work streams:
 - Hosted ARPANET terminal operation: see [docs/hosted-terminal-fixes.md](docs/hosted-terminal-fixes.md).
 - Safe hosted ITS host lifecycle commands: see [docs/host-lifecycle.md](docs/host-lifecycle.md).
 - Stanford/SU-AI PARRY restoration: see [docs/host11-parry-restoration.md](docs/host11-parry-restoration.md).
+- Home-page map color/provenance rules: see [docs/map-provenance.md](docs/map-provenance.md).
 - DigitalOcean migration and runtime hardening: see [docs/digitalocean-migration.md](docs/digitalocean-migration.md).
 - Physical PiDP-10 external host integration: see [kurthamm/pidp10-arpanet-node](https://github.com/kurthamm/pidp10-arpanet-node).
 
@@ -43,6 +44,14 @@ KA host at IMP #62 host index 1. It is separate from MIT-ML, which is host
 Their browser sessions use localhost-only simulator terminal lines so the public
 terminal remains usable even when a vintage ITS image does not accept ARPANET
 TELNET from the browser source NCP.
+
+On the home-page 1973 map, host `126` is intentionally hidden from the overlay:
+the original map data keeps the Hilton test host at placeholder coordinates in
+the upper-left corner. Visible garnet map nodes are the live hosts this fork
+promoted beyond the original reconstruction map status: UCLA-NMC `#1`,
+MIT-MULTICS `#6`, and UCLA-CCN `#65`. Original-project live nodes, including
+Stanford/SU-AI `#11`, MIT-DMS `#70`, MIT-AI `#134`, and MIT-ML `#198`, remain
+green.
 
 ## Hosted ITS Host Operations
 
