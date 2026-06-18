@@ -46,7 +46,7 @@ const arpanetNodes = [
 
 //this is for testing, remove together with modem3:31 line in CCA above:
   { node: 62, modem1: 31, name: 'HILTON - IMP', name1: 'HILTON', name2: 'IMP', x: 10, y: 10, rx: 25, ry: 12, 		host: 62 },
-  { name: 'HILTON-KA1', name1: 'HILTON', name2: 'KA', x: 10, y: 10, rx: 33, ry: 18, 	host: 126, hostname: 'HILTON-KA1', computer: 'PDP-10', system: 'ITS', status: 'Server', liveStatus: 'live', origin: 'kurt', scenstat: 0 },
+  { name: 'HILTON-KA1', name1: 'HILTON', name2: 'KA', x: 10, y: 10, rx: 33, ry: 18, 	host: 126, hostname: 'HILTON-KA1', computer: 'PDP-10', system: 'ITS', status: 'Server', liveStatus: 'live', origin: 'kurt', scenstat: 0, mapHidden: true },
   { name: 'HILTON-KA0', name1: 'HILTON', name2: 'KA', x: 10, y: 10, rx: 33, ry: 18, 	host: 62, hostname: 'HILTON-KA0', computer: 'PDP-10', system: 'ITS', status: 'Server' },
 
 
@@ -172,6 +172,7 @@ function getOriginLabel(node) {
 }
 
 function getAvailabilityColors(node) {
+  if (node.mapHidden) return null;
   const status = getLiveStatus(node);
   if (status === 'live' && node.origin === 'kurt') {
     return { fill: 'rgba(115, 0, 10, 0.12)', stroke: 'rgba(115, 0, 10, 0.85)' };
@@ -321,9 +322,9 @@ function initArpanetMap() {
       ellipse.style.fill = colors.fill;
       ellipse.style.stroke = colors.stroke;
     }
-    ellipse.style.strokeWidth = node.origin === 'kurt' && getLiveStatus(node) === 'live' ? '3' : '1.5';
+    ellipse.style.strokeWidth = node.origin === 'kurt' && getLiveStatus(node) === 'live' && !node.mapHidden ? '3' : '1.5';
 
-    if (node.origin === 'kurt') {
+    if (node.origin === 'kurt' && !node.mapHidden) {
       const badge = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       badge.setAttribute('cx', Number(node.x) + Number(node.rx) + 5);
       badge.setAttribute('cy', Number(node.y) - Number(node.ry) - 5);
