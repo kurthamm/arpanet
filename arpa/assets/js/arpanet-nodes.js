@@ -342,7 +342,12 @@ function initArpanetMap() {
 
     // Helper function to display node details in hover box
     const displayNodeInfo = (nodeToDisplay, mouseX, mouseY) => {
-      let displayHTML = `<div style="font-weight: bold; margin-bottom: 6px;">${nodeToDisplay.name}</div>`;
+      const isKurtAddedLive = nodeToDisplay.origin === 'kurt' && getLiveStatus(nodeToDisplay) === 'live' && !nodeToDisplay.mapHidden;
+      let displayHTML = '';
+      if (isKurtAddedLive) {
+        displayHTML += '<div class="map-origin-badge">Kurt-added live host</div>';
+      }
+      displayHTML += `<div style="font-weight: bold; margin-bottom: 6px;">${nodeToDisplay.name}</div>`;
 
       // Add additional information if available
       const details = [];
@@ -374,7 +379,8 @@ function initArpanetMap() {
       if (impNumber !== null) {
         const detailPage = getNodeDetailPage(nodeToDisplay, impNumber);
         if (detailPage) {
-          displayHTML += `<button onclick="window.location.href='${detailPage}'">View Node Details</button>`;
+          const buttonText = isKurtAddedLive ? 'View Kurt-Added Node Details' : 'View Node Details';
+          displayHTML += `<button onclick="window.location.href='${detailPage}'">${buttonText}</button>`;
         }
       }
 
