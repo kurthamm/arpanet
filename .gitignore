@@ -24,6 +24,10 @@ mini/host11/SYSTEM.DMP.*
 mini/host11/*.log
 mini/host11/*.zip
 mini/host11-ap-lab/
+mini/host69-bbn-tenex/kit-cache/
+mini/host69-bbn-tenex/runtime/
+mini/host69-bbn-tenex/logs/
+mini/host69-bbn-tenex/transcripts/
 mini/src/bbn-ncc/bbn-ncc
 mini/src/apps/ncp-telnet
 mini/src/ncpd-scanner/ncc
