@@ -11,6 +11,8 @@ TRANSCRIPTS="$ROOT/transcripts"
 TIMEOUT_SECS="${TIMEOUT_SECS:-10}"
 
 TENEX_REPO_URL="${TENEX_REPO_URL:-https://github.com/PDP-10/tenex.git}"
+BSYS_REPO_URL="${BSYS_REPO_URL:-https://github.com/PDP-10/bsys.git}"
+IMSSS_REPO_URL="${IMSSS_REPO_URL:-https://github.com/PDP-10/imsss.git}"
 
 ARTIFACTS=(
   "133-tenex/eddt.10x"
@@ -49,6 +51,72 @@ prepare() {
   fi
 
   echo "Prepared BBN-TENEX lab under $ROOT"
+}
+
+clone_or_update() {
+  local url="$1"
+  local dir="$2"
+  if [[ -d "$dir/.git" ]]; then
+    git -C "$dir" pull --ff-only >/dev/null
+  else
+    git clone "$url" "$dir"
+  fi
+}
+
+prepare_support_repos() {
+  mkdirs
+  clone_or_update "$BSYS_REPO_URL" "$ROOT/kit-cache/bsys"
+  clone_or_update "$IMSSS_REPO_URL" "$ROOT/kit-cache/imsss"
+}
+
+first_match() {
+  local pattern="$1"
+  find "$ROOT/kit-cache" -type f 2>/dev/null | rg -i "$pattern" | sort | head -1 || true
+}
+
+survey_install_media() {
+  prepare
+  prepare_support_repos
+
+  local out="$TRANSCRIPTS/install-media-survey.txt"
+  {
+    echo "BBN-TENEX host #69 install media survey"
+    echo
+    echo "Primary install recipe:"
+    echo "  https://github.com/PDP-10/tenex/issues/18"
+    echo
+    echo "The public TENEX issue says the install path wants a bootable DECtape"
+    echo "with TENEX.SAV and TENEX.SWP. Once the mini-exec is reached, it"
+    echo "loads DLUSER.SAV, USERS.TXT, DUMPER.SAV, and a Dumper saveset."
+    echo
+    echo "Local evidence:"
+    printf '  %-28s %s\n' "TENEX.SAV" "$(first_match '/TENEX[.]SAV$|/tenex[.]sav[.]')"
+    printf '  %-28s %s\n' "TENEX.SWP" "$(first_match '/TENEX[.]SWP$|/tenex[.]swp[.]')"
+    printf '  %-28s %s\n' "DLUSER.SAV" "$(first_match '/dluser[.]sav')"
+    printf '  %-28s %s\n' "USERS.TXT" "$(first_match '/users[.]txt$|/users[.]txt[.]')"
+    printf '  %-28s %s\n' "DUMPER.SAV" "$(first_match '/dumper[.]sav')"
+    printf '  %-28s %s\n' "Dumper/BSYS tape images" "$(first_match '[.]tap$')"
+    printf '  %-28s %s\n' "EXEC.SAV" "$(first_match '/exec[.]sav')"
+    printf '  %-28s %s\n' "SYSJOB.SAV" "$(first_match '/sysjob[.]sav')"
+    printf '  %-28s %s\n' "CHECKDSK.SAV" "$(first_match '/checkdsk[.]sav')"
+    printf '  %-28s %s\n' "MDDT*.SAV" "$(first_match '/mddt.*[.]sav')"
+    printf '  %-28s %s\n' "MACRO.SAV" "$(first_match '/macro[.]sav')"
+    printf '  %-28s %s\n' "LOADER.SAV" "$(first_match '/loader[.]sav')"
+    printf '  %-28s %s\n' "LINK*.SAV" "$(first_match '/link.*[.]sav')"
+    printf '  %-28s %s\n' "TECO.SAV" "$(first_match '/teco[.]sav')"
+    printf '  %-28s %s\n' "SOS.SAV" "$(first_match '/sos[.]sav')"
+    printf '  %-28s %s\n' "READMAIL.SAV" "$(first_match '/readmail[.]sav')"
+    printf '  %-28s %s\n' "AMON monitor files" "$(first_match '/amon[.]')"
+    printf '  %-28s %s\n' "RLRMON files" "$(first_match '/rlrmon')"
+    echo
+    echo "Conclusion:"
+    echo "  IMSSS supplies many needed TENEX system and subsystem files, including"
+    echo "  DLUSER.SAV and DUMPER.SAV. The still-missing hard gate is a bootable"
+    echo "  TENEX installation DECtape/disk path with TENEX.SWP and/or a proven"
+    echo "  way to enter mini-exec SYSLOD on the simulator."
+  } > "$out"
+
+  cat "$out"
 }
 
 status() {
@@ -164,9 +232,10 @@ case "${1:-status}" in
   stop) stop ;;
   probe-config) probe_config ;;
   probe-load) probe_load ;;
+  survey-install-media) survey_install_media ;;
   verify) verify ;;
   *)
-    echo "usage: $0 {prepare|status|stop|probe-config|probe-load|verify}" >&2
+    echo "usage: $0 {prepare|status|stop|probe-config|probe-load|survey-install-media|verify}" >&2
     exit 64
     ;;
 esac

@@ -76,3 +76,28 @@ format`, and none reaches a TENEX banner.
 That means the next blocker is the real TENEX bootstrap/media path: construct
 or restore a 3330-style TENEX disk image with BOOTS/GETBTS and a usable TENEX
 file system. This lab should stay private until that succeeds.
+
+## Install Media Survey
+
+Run:
+
+```sh
+./mini/host69-bbn-tenexctl.sh survey-install-media
+```
+
+The survey pulls the public `PDP-10/bsys` and `PDP-10/imsss` repositories into
+ignored cache and writes `transcripts/install-media-survey.txt`.
+
+The current evidence is better than source-only:
+
+- `PDP-10/tenex` issue 18 documents the intended install path: boot a DECtape
+  with `TENEX.SAV` and `TENEX.SWP`, enter mini-exec `SYSLOD$G`, then load
+  `DLUSER.SAV`, `USERS.TXT`, `DUMPER.SAV`, and a Dumper saveset.
+- `PDP-10/imsss` contains recovered TENEX files from Stanford IMSSS, including
+  `DLUSER.SAV`, `DUMPER.SAV`, `EXEC.SAV`, `SYSJOB.SAV`, `CHECKDSK.SAV`,
+  `MDDT*.SAV`, `MACRO.SAV`, `LOADER.SAV`, `LINK*.SAV`, `TECO.SAV`, `SOS.SAV`,
+  `READMAIL.SAV`, monitor `AMON` files, and `RLRMON` files.
+
+The remaining hard gate is still bootstrapping: no `TENEX.SWP` or ready
+bootable TENEX install DECtape/disk image has been found locally yet, and the
+IMSSS extracted `.SAV`/monitor files are not direct SIMH `LOAD` images.

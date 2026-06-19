@@ -86,6 +86,32 @@ material, including:
 
 This is real material, but it is not yet a proven bootable BBN #69 disk pack.
 
+`PDP-10/tenex` issue 18, "Installation media", documents the likely install
+path: a bootable DECtape containing `TENEX.SAV` and `TENEX.SWP`; from the
+mini-exec, run `SYSLOD$G`, initialize the disk, then load `DLUSER.SAV`,
+`USERS.TXT`, `DUMPER.SAV`, and a Dumper saveset.
+
+The public `PDP-10/imsss` repository adds important recovered TENEX system
+files from Stanford IMSSS. The host69 lab survey finds local copies of:
+
+- `DLUSER.SAV`
+- `DUMPER.SAV`
+- `EXEC.SAV`
+- `SYSJOB.SAV`
+- `CHECKDSK.SAV`
+- `MDDT*.SAV`
+- `MACRO.SAV`
+- `LOADER.SAV`
+- `LINK*.SAV`
+- `TECO.SAV`
+- `SOS.SAV`
+- `READMAIL.SAV`
+- monitor `AMON` files
+- `RLRMON` files
+
+The survey does not find `TENEX.SWP` or `USERS.TXT` locally. The IMSSS files
+are recovered TENEX files, not direct SIMH `LOAD` inputs.
+
 ### Emulator Path
 
 The existing project SIMH PDP-10 binary is the best first path. It already
@@ -109,7 +135,7 @@ bring-up task requiring BBN pager work.
 ## Hard Blocker
 
 The blocker is not the web route or the active host card. The blocker is a
-real TENEX disk image / file system.
+real TENEX boot/install medium and disk image / file system.
 
 We need one of these:
 
@@ -117,6 +143,9 @@ We need one of these:
 2. A restorable TENEX backup tape/dump that can create a working file system.
 3. A reproducible build path that creates a TENEX disk image from the public
    monitor, EXEC, system files, account files, and subsystems.
+4. A bootable DECtape/read-in path that reaches the mini-exec `SYSLOD$G`
+   installation dialogue using recovered `TENEX.SAV` plus the required
+   support files.
 
 Until one of those exists, `@L 69` must remain disabled or marked planned.
 
@@ -184,6 +213,10 @@ Investigate the public TENEX tree in this order:
      bootstrap/file-system path, not generic SIMH loader input.
 2. Determine whether BOOTS/GETBTS, BSYS, or other restore utilities can create a
    TENEX file system from public files.
+   - Current evidence: `PDP-10/imsss` supplies many required files and two
+     `.tap` images, while `PDP-10/bsys` supplies a BSYS tape reader. The old
+     BSYS reader does not directly list the IMSSS `.tap` images in the lab yet,
+     but the IMSSS repo already includes extracted files.
 3. Build a minimal disk image with:
    - monitor
    - EXEC
