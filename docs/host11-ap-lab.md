@@ -38,12 +38,23 @@ Verified in the lab clone:
   WAITS job banner.
 - Live `@L 11` remains separate and untouched.
 
-Not yet validated:
+Completed AP/APE test result:
 
 - The AP Hotline / APE scenario is not ready for the public 2026 scenario list.
-- `verify-ap` currently reaches real WAITS and `R HOT` starts far enough to ask
-  for `Project and Programmer name`, but the full `HOT` and `APE` flow has not
-  been validated.
+- In the private direct-DCS lab, `R HOT` and `R APE` start far enough to ask
+  for `Project and Programmer name`, but the lab cannot use `1,REG` as a remote
+  login there: WAITS reports `Remote login prohibited for that account`.
+- Existing public-path transcripts from the real `@L 11` route show that after
+  logging in as `1,REG`, `HOT.DMP[1,2]` exists and starts, but reports
+  `SORRY -- CANNOT RUN HOT LINE NOW. HOT LINE IS DOWN.`
+- Existing public-path transcripts also show that `APE.DMP[1,3]` exists and
+  starts, but a query reaches `SUPER HORRENDOUS ERROR #8` instead of returning
+  the 1972 booklet's AP news database results.
+
+Conclusion: AP/APE software is present in part, but the 1972 AP Hotline
+scenario is not currently runnable.  Do not add it to the 2026 scenarios until
+the AP news feed/database support files are restored and `verify-ap` reaches
+real `HOT` output or APE's `KEYWORD EXPRESSION:` query flow.
 
 ## Evidence lead
 
