@@ -3,6 +3,9 @@
 Use `mini/hostctl.sh` to manage the active hosted ITS PDP-10 hosts (`70`, `126`, `134`, and `198`).
 Use `mini/host11ctl.sh` to manage Stanford/SU-AI host `11`, which is a separate
 WAITS/SAIL lane and is not part of the MIT ITS trio.
+Use `mini/host11-ap-labctl.sh` only for the private Stanford AP/APE restoration
+lab; it clones host 11 packs into an ignored workspace and must not be exposed
+as a public host until validation passes.
 Use `mini/host01-sigma/host01-sigmactl.sh` to manage UCLA-NMC host `1`, which is
 a SIMH Sigma 7 CP-V system exposed through the browser terminal path.
 Use `mini/host06-multicsctl.sh` to manage MIT-MULTICS host `6`, which is a
@@ -25,6 +28,9 @@ mini/hostctl.sh start 70
 mini/host11ctl.sh status 11
 mini/host11ctl.sh verify 11
 mini/host11ctl.sh restart 11
+mini/host11-ap-labctl.sh prepare
+mini/host11-ap-labctl.sh verify-parry
+mini/host11-ap-labctl.sh verify-ap
 mini/host01-sigma/host01-sigmactl.sh status
 mini/host01-sigma/host01-sigmactl.sh verify
 mini/host01-sigma/host01-sigmactl.sh restart
