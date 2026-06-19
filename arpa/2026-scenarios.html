@@ -423,6 +423,97 @@ Start your therapy, two returns after your replies!
 
 -->
 
+<section data-title="SCENARIO 4: MIT H645 MULTICS === HOST #6">
+	<hr>
+	<br>
+    <h3>SCENARIO 4: MIT H645 MULTICS === HOST #6</h3>
+
+	<br>	MIT-MULTICS is host #6 / octal #006 at IMP #6, host index 0. The 1972 booklet used an MIT H645 running Multics 17.6b. This live host uses the DPS8M simulator with public Multics MR12.8 media, so the storage is later than the original ICCC system, but the session below uses real Multics commands validated on the live host.
+	<br>
+    <br>	1. To connect to MIT-MULTICS:
+	<br>
+    <br>	<u>@L</u>  [SP] <u>6</u> [LF]
+	<br>
+	<br>
+
+	<br>	2. To login:
+	<br>
+	<br>	When Multics prints its system banner, type:
+	<br>	<u>l</u> [SP] <u>Iccc</u> [CR]
+	<br>	Password:
+	<br>	<u>iccc2026</u> [CR]
+	<br>
+	<br>	Multics should respond with a ready message beginning with <code>r</code>.
+	<br>
+	<br>
+
+	<br>	3. To print help for PL/I:
+	<br>
+	<br>	<u>help</u> [SP] <u>pl1</u> [CR]
+	<br>	If Multics asks <code>More help?</code>, type:
+	<br>	<u>no</u> [CR]
+	<br>
+	<br>
+
+	<br>	4. To use help with another command:
+	<br>
+	<br>	<u>help</u> [SP] <u>who</u> [CR]
+	<br>	If Multics asks <code>More help?</code>, type:
+	<br>	<u>no</u> [CR]
+	<br>
+	<br>
+
+	<br>	5. To see who is on the system:
+	<br>
+	<br>	<u>who</u> [CR]
+	<br>
+	<br>
+
+	<br>	6. To print your working directory:
+	<br>
+	<br>	<u>print_wdir</u> [CR]
+	<br>	The short form also works:
+	<br>	<u>pwd</u> [CR]
+	<br>
+	<br>
+
+	<br>	7. To list segments in your working directory:
+	<br>
+	<br>	<u>list</u> [CR]
+	<br>
+	<br>
+
+	<br>	8. To send a short mail message to the ICCC visitor account:
+	<br>
+	<br>	<u>mail</u> [SP] <u>*</u> [SP] <u>Iccc</u> [SP] <u>SysEng</u> [CR]
+	<br>	Multics prints <code>Input:</code>. Type one line of text:
+	<br>	<u>Hello from the ARPANET scenario.</u> [CR]
+	<br>	Then type a period on a line by itself:
+	<br>	<u>.</u> [CR]
+	<br>
+	<br>
+
+	<br>	9. To read mail:
+	<br>
+	<br>	<u>mail</u> [CR]
+	<br>	If Multics asks <code>mail: Delete?</code>, answer:
+	<br>	<u>yes</u> [CR]
+	<br>
+	<br>
+
+	<br>	10. Historical attention note:
+	<br>
+	<br>	The 1972 booklet demonstrates sending TIP synch / terminal attention to get a Multics <code>QUIT</code>. That exact attention key is not currently mapped in the browser terminal path, so it is not a required step in this working scenario.
+	<br>
+	<br>
+
+	<br>	11. To logout:
+	<br>
+	<br>	<u>logout</u> [CR]
+	<br>
+	<br>
+</section>
+
 <section data-title="SCENARIO 4A: MIT-MULTICS PL/I === HOST #6">
 	<hr>
 	<br>
