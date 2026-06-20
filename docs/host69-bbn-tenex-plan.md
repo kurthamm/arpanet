@@ -203,6 +203,25 @@ the disk system or by read-in media, then loads monitor files such as
 `DSK:<MON>AMON.SAV;0,G`. The public files are therefore not enough by
 themselves as direct SIMH `LOAD` inputs.
 
+Additional DTBOOT testing moved the blocker forward:
+
+- The correct simulator device for the recovered TENEX DTBOOT code is `DT`,
+  not SIMH `DTC`; DTBOOT uses device codes `DTC==320` and `DTS==324`, which
+  line up with SIMH `DT`.
+- A DECtape built from `134-tenex/TENEX.SAV` lists correctly as `TENEX.SAV`
+  under DTBOOT.
+- The raw `TENEX.SAV` file is not itself a DTBOOT SAVE stream. A generated
+  chunked SAVE stream plus a small trampoline is required so DTBOOT can load
+  the resident monitor without clobbering its own AC registers before the
+  final transfer.
+- That tape reaches the real monitor entry at PC `000066` under BBN CPU mode,
+  and also with PMP and IMP enabled.
+- After transfer, the monitor calls `TENDMP` to load the swappable monitor and
+  then returns to DTBOOT because the matching `TENEX.SWP` file is absent.
+
+The current hard gate is therefore specific: the BBN 134 public material has
+`TENEX.SAV` but no matching `TENEX.SWP` / bootable TENEX disk state.
+
 ### Phase 3: Media Construction Or Restore
 
 Investigate the public TENEX tree in this order:
@@ -211,6 +230,9 @@ Investigate the public TENEX tree in this order:
    can produce a bootable monitor under SIMH BBN mode.
    - Result: direct SIMH `LOAD` does not work. These files need the TENEX
      bootstrap/file-system path, not generic SIMH loader input.
+   - Result: DTBOOT can load a generated resident-monitor DECtape stream and
+     transfer to PC `000066`, but startup cannot continue without the matching
+     swappable monitor image (`TENEX.SWP`) or a complete TENEX disk build.
 2. Determine whether BOOTS/GETBTS, BSYS, or other restore utilities can create a
    TENEX file system from public files.
    - Current evidence: `PDP-10/imsss` supplies many required files and two

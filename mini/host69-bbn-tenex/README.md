@@ -77,6 +77,30 @@ That means the next blocker is the real TENEX bootstrap/media path: construct
 or restore a 3330-style TENEX disk image with BOOTS/GETBTS and a usable TENEX
 file system. This lab should stay private until that succeeds.
 
+## DTBOOT Result
+
+The lab now proves the DECtape loader path, but not a full TENEX boot.
+
+Confirmed:
+
+- SIMH device `DT`, not `DTC`, matches the TENEX DTBOOT device codes used by
+  the recovered loader.
+- A DECtape built from `134-tenex/TENEX.SAV` can be listed by DTBOOT as
+  `TENEX.SAV`.
+- A chunked DTBOOT stream with a small high-memory trampoline reaches the
+  real monitor entry at PC `000066` under SIMH BBN mode.
+- The same result holds with PMP and IMP enabled.
+
+Current failure:
+
+- After transfer, the monitor calls `TENDMP` to load the swappable monitor.
+- The local BBN 134 media has `TENEX.SAV` but no `TENEX.SWP`.
+- DTBOOT/TENDMP returns to the loader command loop at `777012/777013`.
+
+So the hard gate is now specific: find or build the matching `TENEX.SWP`
+swappable-monitor image, or build a complete TENEX monitor/disk image from
+the recovered sources. Do not expose `@L 69` while this remains true.
+
 ## Install Media Survey
 
 Run:

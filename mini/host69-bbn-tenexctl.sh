@@ -130,6 +130,7 @@ status() {
   echo "  logs:        $LOGS"
   echo "  transcripts: $TRANSCRIPTS"
   echo "  public:      disabled; no @L 69 route is started by this script"
+  echo "  boot gate:   DTBOOT reaches TENEX.SAV entry 000066; matching TENEX.SWP/disk state still missing"
   matches="$(ps -eo pid=,args= | awk -v root="$ROOT" 'index($0, root) && $0 !~ /host69-bbn-tenexctl/ {print}' || true)"
   if [[ -n "$matches" ]]; then
     echo "$matches"
