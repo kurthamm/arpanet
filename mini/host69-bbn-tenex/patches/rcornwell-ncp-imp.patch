@@ -291,7 +291,7 @@ index 0000000..70a0adc
 +
 +#endif /* IMP_UDP_H_ */
 diff --git a/PDP10/kx10_imp.c b/PDP10/kx10_imp.c
-index f97aec5..1ad0503 100644
+index f97aec5..521dd0e 100644
 --- a/PDP10/kx10_imp.c
 +++ b/PDP10/kx10_imp.c
 @@ -26,6 +26,7 @@
@@ -314,15 +314,16 @@ index f97aec5..1ad0503 100644
  #define TYPE_MIT        0              /* MIT Style KAIMP ITS */
  #define TYPE_BBN        1              /* BBN style interface TENEX */
  #define TYPE_WAITS      2              /* IMP connected to waits system. */
-@@ -468,6 +474,7 @@ struct imp_device {
+@@ -468,6 +474,8 @@ struct imp_device {
      int               init_state;              /* Initialization state */
      uint32            dhcp_xid;                /* Transaction ID */
      int               padding;                 /* Type zero padding */
 +    int               udp_link;                /* 1822/UDP link handle (ncp mode), or IMP_UDP_NOLINK */
++    int               imp_link_up;             /* ncp: host has driven its first 1822 output (gate input) */
      uint64            obuf;                    /* Output buffer */
      uint64            ibuf;                    /* Input buffer */
      int               obits;                   /* Output bits */
-@@ -519,6 +526,8 @@ void           imp_timer_task(struct imp_device *imp);
+@@ -519,6 +527,8 @@ void           imp_timer_task(struct imp_device *imp);
  void           imp_send_rfmn(struct imp_device *imp);
  void           imp_packet_in(struct imp_device *imp);
  void           imp_send_packet (struct imp_device *imp_data, int len);
@@ -331,7 +332,7 @@ index f97aec5..1ad0503 100644
  void           imp_free_packet(struct imp_device *imp, struct imp_packet *p);
  struct imp_packet * imp_get_packet(struct imp_device *imp);
  void           imp_arp_update(struct imp_device *imp, in_addr_T ipaddr, ETH_MAC ethaddr, int age);
-@@ -593,6 +602,10 @@ MTAB imp_mod[] = {
+@@ -593,6 +603,10 @@ MTAB imp_mod[] = {
             "Don't aquire address from DHCP"},
      { UNIT_DHCP, UNIT_DHCP, "DHCP", "DHCP", NULL, NULL, NULL,
             "Use DHCP to set IP address"},
@@ -342,7 +343,7 @@ index f97aec5..1ad0503 100644
      { MTAB_XTD|MTAB_VDV, 0, "DHCPIP", NULL,
        NULL, &imp_show_dhcpip, NULL, "DHCP info" },
  #if KS
-@@ -1213,8 +1226,12 @@ t_stat imp_srv(UNIT * uptr)
+@@ -1213,8 +1227,12 @@ t_stat imp_srv(UNIT * uptr)
          check_interrupts (uptr);
      }
  #endif
@@ -357,7 +358,7 @@ index f97aec5..1ad0503 100644
      return SCPE_OK;
  }
  
-@@ -1296,6 +1313,14 @@ t_stat imp_eth_srv(UNIT * uptr)
+@@ -1296,6 +1314,14 @@ t_stat imp_eth_srv(UNIT * uptr)
  {
      sim_clock_coschedule(uptr, 1000);              /* continue poll */
  
@@ -372,7 +373,7 @@ index f97aec5..1ad0503 100644
      imp_timer_task(&imp_data);
      if (uptr->ILEN == 0 && (uptr->STATUS & (IMPIB|IMPID)) == 0)
          imp_packet_in(&imp_data);
-@@ -1608,6 +1633,79 @@ imp_packet_in(struct imp_device *imp)
+@@ -1608,6 +1634,89 @@ imp_packet_in(struct imp_device *imp)
     }
  }
  
@@ -396,6 +397,8 @@ index f97aec5..1ad0503 100644
 +
 +    if (imp->udp_link == IMP_UDP_NOLINK)
 +        return;
++    /* The host's monitor is now driving its IMP interface; open the input gate. */
++    imp->imp_link_up = 1;
 +    /* A complete 1822 message is assembled per call, and the host is up. */
 +    buf[0] = PFLG_FINAL | PFLG_READY;
 +    nw = 1;
@@ -418,6 +421,14 @@ index f97aec5..1ad0503 100644
 +
 +    if (imp->udp_link == IMP_UDP_NOLINK)
 +        return;
++    /* Until the host's monitor brings up its IMP interface (sends its first
++       1822 output), drain and DISCARD inbound datagrams.  Delivering input +
++       interrupts to the host before then wedges the fragile install/disk-init
++       monitor, and pre-handshake IMP chatter is not meaningful to the host. */
++    if (!imp->imp_link_up) {
++        (void)udp_receive(&imp_dev, imp->udp_link, buf, IMP_UDP_MAXDATA);
++        return;
++    }
 +    /* Don't fetch a new message while one is still being delivered. */
 +    if (imp_unit[0].ILEN != 0 || (imp_unit[0].STATUS & (IMPIB|IMPID)) != 0)
 +        return;
@@ -452,7 +463,7 @@ index f97aec5..1ad0503 100644
  void
  imp_send_packet (struct imp_device *imp, int len)
  {
-@@ -1619,6 +1717,12 @@ imp_send_packet (struct imp_device *imp, int len)
+@@ -1619,6 +1728,12 @@ imp_send_packet (struct imp_device *imp, int len)
      int        lk;
      int        mt;
  
@@ -465,15 +476,16 @@ index f97aec5..1ad0503 100644
      lk = 0;
      n = len;
      switch (imp->sbuffer[0] & 0xF) {
-@@ -3103,6 +3207,7 @@ t_stat imp_reset (DEVICE *dptr)
+@@ -3103,6 +3218,8 @@ t_stat imp_reset (DEVICE *dptr)
          /* Clear ARP table. */
          memset(imp_data.arp_table, 0, sizeof(imp_data.arp_table));
          imp_data.dhcp_state = DHCP_STATE_OFF;
 +        imp_data.udp_link = IMP_UDP_NOLINK;   /* no authentic 1822/UDP link yet */
++        imp_data.imp_link_up = 0;             /* gate IMP input until host drives it */
      }
      /* Clear queues. */
      imp_data.sendq = NULL;
-@@ -3146,6 +3251,29 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
+@@ -3146,6 +3263,30 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
                     break;
      }
  #endif
@@ -486,6 +498,7 @@ index f97aec5..1ad0503 100644
 +        if (status != SCPE_OK)
 +            return status;
 +        imp_data.udp_link = link;
++        imp_data.imp_link_up = 0;             /* gate IMP input until host drives it */
 +        tptr = (char *) malloc(strlen(cptr) + 1);
 +        if (tptr == NULL) {
 +            udp_release(&imp_dev, link);
@@ -503,7 +516,7 @@ index f97aec5..1ad0503 100644
      if (!(uptr->flags & UNIT_DHCP) && imp_data.ip == 0)
        return sim_messagef (SCPE_NOATT, "%s: An IP Address must be specified when DHCP is disabled\n",
                 imp_dev.name);
-@@ -3229,6 +3357,18 @@ t_stat imp_detach(UNIT* uptr)
+@@ -3229,6 +3370,18 @@ t_stat imp_detach(UNIT* uptr)
  {
  
      if (uptr->flags & UNIT_ATT) {

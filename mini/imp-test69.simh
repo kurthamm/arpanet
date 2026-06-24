@@ -18,6 +18,6 @@ set hi4 disabled
 ; Host 1 = BBN-TENEX (host 69) on hi2, isolated test ports.
 set hi2 enabled
 set hi2 debug
-attach -u hi2 31051:localhost:31052
+attach -u hi2 41051:localhost:41052
 
 go
