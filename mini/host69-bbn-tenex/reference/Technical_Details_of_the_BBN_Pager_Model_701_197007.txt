@@ -1,0 +1,2308 @@
+Copy Number
+
+BBN Proprietary
+
+TECHNICAL DETAILS OF THE BBN PAGER MODEL 701
+
+Theodore R. Strollo
+Jerry D. Burchflel
+Raymond S. Tomlinson
+
+22 July 1970
+
+Bolt Beranek and Newman Inc.
+50 Moulton Street
+
+Cambridge, Mass. 02138
+
+cj Bolt Beranek and Newman Inc., July 1970
+
+/£
+
+7 June 70
+
+BBN PROPRIETARY
+
+10.
+
+ARITHMETIC PROCESSOR PAGING
+
+10.1
+
+Introduction
+
+10-1-4
+
+BBN has implemented a device called the BBN Pager which is
+connected between the KA10 (PDP-10 arithmetic processor)
+and the KA10’s memory port.
+In conjunction with a set of
+hardware modifications to the KA10, the BBN Pager changes
+the core memory mapping mechanism such that core memory
+is allocated and protected in 512 word pages. The address
+space of the machine is mapped for EXEC mode as well as
+USER mode with the BBN Pager. The paging mechanism can be
+bypassed by executing a specific CONO to the pager or by
+executing (or depressing) IOB reset to invoke a so called
+"transparent mode" for the running of the standard DEC
+monitors or diagnostic software.
+
+10.2
+
+The Associative Mapping Process
+
+When mapping is enabled in the pager, the 9 high order
+virtual address bits, state of the EXEC/USER mode flip
+flop, and type of request (read, write, execute) from the
+KA10 are compared and tested with the contents of 1 to 54
+(depends on pager configuration) associative registers.
+This comparison is performed on all associative registers
+simultaneously.
+If a match is found, the particular as­
+sociative register containing the match also contains
+11 bits which become the high order 11 bits of the real
+core address (hereafter abbreviated as R.C.A.).
+**
+The use
+of 11 R.C.A. high order bits permits the KA10
+to reference up to 1024K
+*
+words of memory.
+In this simple
+case, the overall delay directly attributed to the pager
+is about 100 nanoseconds plus cable delay. The simple case
+is represented by Figure 10-1.
+
+*K=1024 words
+~
+———————
+** A glossary of terms is presented at the end of this section
+
+7 June 70
+
+BBN PROPRIETARY
+
+From KA10
+
+Inside BBN Pager
+
+Priority Inter-^
+rupt Cycle
+J
+
+These three levels are
+used when a trap con­
+dition arises, but not
+in the association
+process itself.
+
+Key Cycle (When
+Examine or
+Deposit Switch
+is pushed on
+computer
+console)
+Indirect AddreslL.
+Fetch
+J
+
+Read Level(R)--- > These levels are
+tested against the
+Write Level(W)—> permission bits in
+Execute Level(E)-5 each Associative
+Register
+EXEC/USER Mode
+These levels are tested
+for equivalence with the
+9 Highest Bits
+corresponding bits in
+of 18 Bit
+each Associative Register
+Address
+
+9 Lowest Bits'i
+of 18 Bit
+Address
+I
+
+10-2-4
+
+To Memory (When
+a match is found)
+
+> Read Level(R+E)
+Write Level(W)
+
+11 Highest Bits
+of Absolute
+Address
+9 Lowest Bits
+of Absolute
+Address
+
+f
+
+Bits in Associative Registers
+
+USER Mode (0 for EXEC Mode)
+
+Figure 10-1
+Mapping From Virtual to Absolute Addresses
+(Simplest Case, Match Found in Associative Register)
+
+7 June 70
+10.3
+
+BBN PROPRIETARY
+
+10-3-4
+
+USER Mode Mapping when the Association Falls
+
+When a match Is not found in an associative register (hereafter
+abbreviated as A.R.), the pager begins a self-loading sequence
+which basically involves the loading of an A.R. from infor­
+mation found in one or more tables in core memory. The
+particular A.R. to get self-loaded is determined in a very
+simple cyclic fashion. That is, if the last A.R. loaded was
+A.R. 5, the next to be loaded will be A.R. 6(if it exists;
+if not, the next existing A.R. in the cyclic sequence is used)
+...
+The average pager is configured with 16 A.R.’s which
+means that if the program confines most of its references to
+an 8K or less working set, self-loading will be invoked
+infrequently.
+
+The first stage of the self-loading sequence involves reading
+some Information from a table in core memory called the page
+table (hereafter abbreviated as P.T.). This table is 512
+words long and is itself a page which may be anywhere in core
+memory. The origin of the P.T. is specified by the contents
+of a register in the pager called the User Mode Base Register
+(hereafter abbreviated as U.B.R.). The 11 bits of the U.B.R.
+are used as the 11 high order address bits and are concaten­
+ated with the original 9 high order address bits (on which the
+association failed) to reference the appropriate word in the
+P.T.
+
+The word which is read from the page table is of one of four
+types as determined by bits 0 and 1 of the word. These types
+are :
+
+10.3.1
+
+00
+
+private page
+
+01
+10
+
+shared page pointer
+indirect page pointer
+
+11
+
+illegal format
+
+Private Page
+
+In the simplest case of a private page type, the rightmost 11
+bits contain the high order R.C.A. bits and bits 2-4 contain
+the read, write, execute access information which are used to
+self-load an associative register. The private page entry
+has many options which are detailed in Figure 10-2.
+
+BBN PROPRIETARY
+
+7 June 1970
+
+10-4- 4
+
+Entry type code 00, Private Page
+
+Access permission bit
+Trap to Monitor—ll=trap immediately
+10=trap after loading A.R.
+01=and 00 ■ don’t trap
+
+;
+
+;
+Trap on write or read------- modi fy-write re ference
+(useful to make private
+copy of a page)
+
+I------- Trap to User bit
+
+*not used by Pager hardware
+Figure 10-2, Private Page Entry in P.T.
+Most of the option bits cause traps to occur which cause
+the KA10 to take some special action when a page is
+referenced in a particular way.
+
+7 June 70
+10.3.1.1
+
+BBN PROPRIETARY
+
+10-5-4
+
+The Location Field
+
+The location field is 22 bits wide.
+This permits the speci­
+fication of where a page really is in primary, secondary, or
+even tertiary storage. If bits 14-17 are all 0’s, the right
+most 11 bits contain the high order R.C.A. bits. If any of
+bits 14-17 are set, a page not-in-core trap will be invoked
+which will cause the KA10 to take special action.
+
+10.3.1.2
+
+Limiting the Size of the User Address Space
+
+The pager contains a register called the Address Limit Reg­
+ister (A.L.R.) which is capable of restricting the legal
+USER mode virtual addresses to the first 16k, 32K, 48K,
+64K, 80K, 96K, 112K or the entire 256K.
+
+10.3.2
+
+The Core Status Table
+
+Whenever an associative register is successfully loaded, a
+word in the core memory status table is updated. This table
+contains an entry for every page of real core in the system.
+An entry contains information about that page related to:
+the relative amount of time the page has been in core (con­
+tained in a 9 bit pager register called A.G.E.R.—AGE Reg­
+ister) , whether the page has been written into (the modification
+bit), and which processes (of a subset of all processes
+existing in the system) have referenced the page. The par­
+ticular processes referencing a page are identified by bits
+in the process use field of the entry. These bits are
+updated by the contents of a 26 bit pager register called
+P.U.R.—Process Use Register.
+
+The use of the core status table (C.S.T.) causes one additional
+read-modify-wrlte cycle of overhead (while referencing the
+C.S.T.) in the self-loading sequence.
+The modification bit and write permission bits at the A.R. are
+handled in a slightly complicated way. The modification bit
+is set only if the memory request which initiated the loading
+of an A.R. was a write or read-modify-wrlte cycle. The mod­
+ification bit is never cleared by the pager.
+If an A.R. is
+loaded due to a non-write request, the write permission bit
+of the A.R. is not set regardless of whether writes are per­
+mitted by the page table entry unless the page has already
+been modified (indicated by the modification bit already set
+from some previous operation) and write permission is specified
+by the page table entry.
+
+7 June 70
+
+BBN PROPRIETARY
+
+10-6-4
+
+A.R. write permit *■ PT write permit A (WRRQ V modification bit)
+
+new modification bit «- old modification V (WRRQ A PT write permit)
+As special aid for the control of shared pages, a pager trap
+is generated if the three high order bits of the page age field
+in the C.S.T. entry are all 0’s. This provides a way for the
+core manager to defer use of a particular real core page while
+the page’s state is being tested or changed.
+The core status table starts at absolute real core location
+40008. A diagram of the table and its use by the pager is
+shown in Figure 10-3.
+
+BBN PROPRIETARY
+
+7 June 70
+
+10-7-4
+
+Absolute Core Location
+(Start of Table)
+4000g
+CORE STATUS
+TABLE
+Dispatched into by
+Real Core Page
+Number
+
+Absolute Core
+z
+Location
+/
+10000g (highest,
+address to which
+table can extend if 1O24K real memory is used)
+8
+
+0
+
+Core Status Table Entry
+9
+
+10
+
+AGER
+Register
+
+x
+35
+
+PUR
+Register
+
+1.
+
+Bits 0 - 8 of AGER replace Bits 0 - 8 of CST entry.
+
+2.
+
+Bits 10 - 35 are "ORed" into Bits 10 - 35 of CST
+entry.
+
+3.
+
+Write request level is ”0Red” into Bit 9 of the
+CST entry (if the write is permitted).
+
+Figure 10-3
+Pager References to the Core Status Table
+
+BBN PROPRIETARY
+
+7 June 70
+
+10.3.3
+
+10-8-4
+
+Shared Page Pointer
+
+The Shared Page Pointer entry in the P.T. is used for the
+most commonly shared pages in the system. This type of
+entry is detailed in Figure 10-4.
+
+Entry Code (XI, Shared Page Pointer
+
+Read
+' Write
+(Execute
+\\ Directed Traps and Loading Information
+
+(X 1 2
+
+k\4
+
+(X 1 R W X
+
+5 6_______ ZV
+it
+
+it
+
+26 27
+
+14
+if
+
+Shared Page
+Number 13 bits
+
+35
+
+Unused *
+
+Access permission bit
+
+Trap to Monitor- -ll=trap immediately
+10=trap after loading
+A.R.
+01=and (X(X = don’t trap
+Trap on write or readmodify-write reference
+(useful to make private
+copy of a page)
+
+Trap to User bit
+
+Figure 10-4 Shared Page Pointer
+The Shared Page Number/fleld is used as a dispatch into the
+Special Pages Table (S.P.T.) which starts at absolute core
+location 20,0(X(?g.
+The contents of the specified S.P.T. entry
+contains the page location information In bits 14-35 In the
+same format as a private P.T. entry bits 14-35.
+(see section
+10.3.1.1).
+
+BBN PROPRIETARY
+
+7 June 70
+10.3.4
+
+10-9-4
+
+Indirect Page Pointer
+
+The Indirect Page Pointer entry in the P.T. is used for
+uncommonly shared files or processes or for indirectly
+referencing the dynamic address space of a file or process
+which is expected to change. This type of entry is de­
+tailed in Figure 10-5.
+Entry Code 10, Indirect Page Pointer
+
+Read
+Write
+Execute
+
+Directed Traps and Loading Information
+
+Trap to Monitor—ll=trap immediately
+10=trap after loading
+A.R.
+01=and 00 = don’t
+trap
+Trap on write or readmodify-wrlte reference
+(useful to make private
+copy of a page)
+-Trap to User bit
+
+Figure 10-5 Indirect Page Pointer
+
+7 June 70
+
+BBN PROPRIETARY
+
+10-10-4
+
+The Page Table Number (P.T.N.) is used as a dispatch into
+S.P.T. to fetch an entry which contains the location in
+bits 14-35 (see section 10.3.1.1) Of the indirect page
+table. The Page Number Field of the Indirect Page Pointer
+is used as a dispatch into the Indirect Page Table. The
+specified entry of this table can be any of the three page
+table entry types just described. An attempt to use indi­
+rect page pointers to a depth of more than 2 will result
+in a pager trap.
+
+The access permission finally granted via Indirect Page
+Pointer mapping is the ’’AND” of the R,W,X bits and other
+access permissions starting with the first Indirect Page
+Pointer down through all P.T. entries until the destination
+page is found. This generally results in a reduction of
+the final access granted.
+
+10*3.5
+
+Summary of p.T. Entry Types
+
+All three page table entry types have the virtue that the
+actual location of a page is kept in only one place instead
+of being replicated in many page tables (for example).
+Detailed examples of the three P.T. entries are presented
+in Figure 10-6.
+
+June 70
+
+BBN PROPRIETARY
+
+BBN PROPRIETARY
+
+7 June 70
+
+10.4
+
+10-12-4
+
+EXEC Mode Mapping
+
+EXEC Mode mapping is really quite similar to USER Mode mapping.
+The major difference being that four distinct areas of the
+EXEC Mode address space are separately mapped and mapping of
+the ’’Resident Monitor” is separately enabled. These four areas
+are shown in Figure 10-7.
+
+P
+Resident Monitor Code
+Mapping Optional
+(normally not invoked)
+
+32K
+
+Mapped Individually
+per KA10 processor
+
+64K
+
+Swappable Monitor
+Code
+
+19 2K
+
+Mapped Privately
+per process
+
+256K
+
+Figure 10-7 Exec Mode Address Space
+The associative mapping process is exactly the same for EXEC
+mode as USER mode. However, most of the page table (for the
+self-loading sequence) for the EXEC mode address space is
+fixed in absolute addresses. Namely:
+
+Optional Resident Monitor Map
+3 PPP 8 to 3P778
+(Not used unless Resident
+Monitor Mapping is turned on)
+First KA10’s Map
+
+31PP8 to 31778
+
+Second KAlp’s Map
+
+37PP8 to 37778
+
+Common Swappable Monitor Map
+
+32PP8 to 35778
+
+absolute
+Real Core
+locations
+
+7 June 70
+
+BBN PROPRIETARY
+
+10-13-4
+
+The area that is mapped privately per process is actually
+mapped by an area of the special overhead page associated
+with each process called the Process Storage Block (P.S.B.).
+The address of the P.S.B. is specified’ by the-contents of
+an 11 bit pager register called the Monitor Base Register
+(M.B.R.). Only the highest 128 words of the P.S.B. are used
+for mapping purposes. The remainder is used for process
+specific temporary storage, stacks, and 2 more words are
+used by the pager. Thus locations 600ft - 777o of the P.S.B
+map the highest 64K of the EXEC mode address Space.
+
+10-1M
+
+BBN PROPRIETARY
+
+7 June 70
+
+Invoking the USER Address Space With the KAlff In EXEC Mode
+
+10.5
+
+There are two classes of instruction modifications which were
+made to the KA10 to enable the system to make references to
+parameters in the user’s address space when the machine is in
+EXEC mode.
+
+10.5.1
+
+UMOVEx
+
+The first class of instruction modifications is the UMOVEx
+set which forces MOVES to and from USER space.
+User Map Move
+
+UMOVE
+
+100
+
+0
+
+6 7
+
+M
+8
+
+A
+
+I
+
+X
+
+9 12 13 :Lil
+
+Y
+17 18
+
+35
+
+Move one word from the source to the destination specified by
+M, using the user address map. The source is unaffected, the
+original contents of the destination are lost.
+UMOVE
+
+User Move
+
+100
+
+UMOVEI
+
+User Move Immediate
+
+101
+
+UMOVEM
+
+User Move to Memory
+User Move to Self
+
+102
+
+UMOVES
+
+10 3
+
+These instructions provide a convenient way for the monitor
+to Invoke the USER address mapping to fetch or store infor­
+mation into the USER address space (UMOVE or UMOVEM).
+UMOVEI
+provides a way for the monitor to do address computation
+using indirect addressing through the USER address space.
+Of course, indexing and AC references are not affected by the
+choice of USER map/EXEC map. However, addresses which indirect
+through the USER AC’s are handled specially (see section 10.5.3).
+10.5.2
+
+XCT AC, E
+
+The next instruction change is a modification to the XCT
+instruction to use the AC Field (formerly ignored) to affect
+which map is used.
+
+The AC field is interpreted as shown in Figure 10-8.
+If the
+specified bit is on, use of USER address space is forced for
+any of the conditions indicated.
+
+10-15-4
+
+BBN PROPRIETARY
+
+7 June 70
+
+AC Field
+
+Effective
+Address
+Computation,
+Last Address
+of BLT
+
+Data Fetch,
+Byte Pointer
+Fetch,
+Po^r Stack,
+Push Memory,
+’’From* of
+BLT
+
+Address
+■ Computation
+From
+Byte Pointer
+
+Data Store,
+Byte
+Fetch/Store,
+Push Stack,
+Pop Memory,
+‘To’ of BLT
+
+9
+
+10
+
+11
+
+12
+
+Bit
+Figure 10-8 XCT AC bits
+The Instruction to be executed is always fetched from monitor
+space. To BLT a data block from a user location specified in
+AC left,
+
+HRRI AC, FIRST
+XCT 4, [BLT AC, LAST|
+•••
+FIRST: BLOCK N
+
+LAST = .-1
+To BLT a data block into a user region specified by the first
+and last user locations in AC left and right respectively,
+HRRM AC, INSTR
+
+HLR AC, AC
+
+HRLI AC, FIRST
+XCT 11, INSTR
+
+BBN PROPRIETARY
+
+7 June 70
+INSTR:
+FIRST:
+
+1O-16-4
+
+BLT AC, 0
+BLOCK N
+
+XCT 15, INSTR can BLT data from one place to another in the
+user’s address space.
+(Useful for zeroing out a region)
+
+To transfer a series of bytes specified by a user byte
+pointer in AC,
+LP:
+
+XCT 3,
+
+|lLDB AC2, AC]
+
+(or
+(iDPB AC2, ACj )
+UMOVEx AC, E is equivalent to XCT 15, |MOVEx AC, E~l .
+
+7 June 70
+10.5.3
+
+BBN PROPRIETARY
+
+10-17-4
+
+Call From Monitor Flag (PC Flag Bit 7)
+
+Bit 7 of the PC flags word Is used to store the state of a
+flip flop named CALL FROM MONITOR. This bit is saved and
+restored in the same fashion as the other PC flag bits. It
+is cleared by MR START, and set whenever an EX JSYS (ef­
+fective address<1000) Is executed in EXEC mode. This bit
+indicates to the called JSYS routine that effective addres­
+ses, byte pointers, and BLT pointers passed as arguments
+should refer to the EXEC mode address space, not the cur­
+rent USER address space. When this bit is on, special
+XCT and UMOVEX references are automatically forced into
+the EXEC mode address space instead of the USER’S space.
+
+This feature simplifies the coding of EX JSYS routines
+which accept pointers as arguments and which may be called
+either from USER mode or EXEC mode. The routine merely
+makes use of any pointers with UMOVEx, or special XCT
+instructions, and the CALL FM MON flag automatically forces
+references into the correct address space.
+
+7 June 70
+
+10.5.4
+
+BBN PROPRIETARY
+
+10-28-4
+
+Forced References to USER Space Locations 0-17g
+
+A 5 bit AC BASE REGISTER exists in the pager to provide an
+independent mapping mechanism for saved accumulators.
+This
+special mapping process to reference saved AC’s is invoked
+by forced references to USER space (UMOVEX or special XCT)
+with addresses <20g.
+During the mapping process, the low 4 bits are taken from
+the virtual address, the next 5 bits (27-31) are supplied
+from the AC BASE REGISTER, the top 9 bits (18-26) are
+forced to 775, and EXEC mode addressing is forced. This
+intermediate virtual address is then passed to the pager
+for mapping in the standard fashion. This means that the
+saved accumulators are mapped into one of 32 blocks, (selected
+by the AC BASE REGISTER) each 16 words long, located in
+page 775 of the EXEC mode virtual address space.
+(Recall
+this page is mapped privately per process).
+
+This space is ordinarily used as a stack of saved AC’s.
+Upon entry to an EX JSYS which is pseudo-interruptable,
+the AC’s are BLT’ed into this save region. The EX JSYS
+then references its own AC’s in the normal fashion, and the
+AC’s saved from the calling program via UMOVEX and XCT
+instructions with forced user space effective addresses
+<20g. Pointers passed from the calling program which orig­
+inally pointed into the AC’s are evaluated with UMOVE or
+special XCT instructions, and automatically reference
+these saved AC’s. This feature operates in the same­
+fashion whether the calling program was USER mode or EXEC
+mode, i.e. the CALL FM MON flag forces special references
+2.20g into the EXEC mode space, but special references <200
+go Into the saved AC stack independent of this flag.
+0
+A side effect of this feature is that forced references
+<20q in USER mode reference the user’s shadow core.
+(The
+first 20glocations of the user’s page zero).
+
+BBN PROPRIETARY
+
+7 June 70
+10.6
+
+10-19-4
+
+Pager Traps
+
+A paging trap will occur whenever one of the following
+events happens:
+
+1.
+
+The trap bits in the process page table
+force a trap.
+
+2.
+
+The addressed page (or indirecting page
+table) is not in core.
+
+3.
+
+An illegal condition is detected.
+
+4.
+
+The Core Status Table entry for an ad­
+dressed page contains an age with the
+three highest bits = 0.
+
+When one of the above conditions happens, the pager first
+stores the cause and location of the trap into the P.S.B.
+at location 571g. The format of this word is shown in
+Figure 10-9. Tnen, if the APR operation in progress was
+a write, it stores the data into location 572ft of the P.S.B.
+Finally, it forces the APR to execute absolute location
+70o (170o if second APR).
+Location 70o should contain a
+JSYS instruction to a trap routine.
+0
+
+The arrangement of the Trap Cause field was chosen so that
+decoding of the cause could be easily accomplished by the
+JFFO instruction.
+To restart a process which was terminated by a pager trap,
+the following Information is of value:
+1.
+
+The program counter (PC) saved by the JSYS
+at location 70g is correct.
+
+2.
+
+If the read or execute bits in 571ft of the
+P.S.B. are set, restart is completed by
+performing a JRSTF @ through the PC word
+saved by the JSYS at location 70g (170g).
+
+3.
+
+If the read bit is not set but the write
+bit is set in 571o of the P.S.B., the data
+572g of the P.S.B. must be written into
+the address in 571g of the P.S.B. before
+returning control to the process via JRSTF.
+
+7 June 70
+
+BBN PROPRIETARY
+
+10-20-l|
+
+A sample program to restart a process whicn was terminated
+by a paging trap is given below:
+CONO PGR, 0
+
+;L0AD PAGER WITH NEW BASE REGISTERS,
+ETC. (see section 10.7 for details)
+
+MOVE 1, 777571
+
+;GET TRAP STATUS WORD
+
+TLNE 1, 12
+
+;SKIP IF NEITHER READ NOR EXECUTE
+;BITS SET
+
+JRST BEGIN
+MOVE 777572
+
+;GET DATA WORD
+
+TLNE 1, 1
+
+;SKIP IF USER MODE
+
+JRST MONWR
+
+BEGIN:
+
+UMOVEM (1)
+
+;COMPLETE USER MODE WRITE
+
+HRLZI 17, 777520
+
+;RESTORE AC’s FOR THE PROCESS
+
+BLT 17, 17
+
+JRSTF @777573
+
+;RESUME PROCESS (JSYS IN LOCATION 70g
+;SAVES THE FLAGS AND PC IN 777573).
+
+MONWR:
+
+MOVEM (1)
+
+;COMPLETE MONITOR MODE WRITE
+
+JRST BEGIN
+
+Figure 10-1 shows that the PI cycle, Key Cycle, and Indirect
+Address Fetch levels are provided to the pager. The reason
+for the PI cycle and KEY cycle bits is to distinguish traps
+of the running program from PI and KEY cycle traps (KEY cycles
+occur when the console EXAMINE, DEPOSIT, or XCT switches are
+pushed). The Trap Status Word in Figure 10-9 contains suf­
+ficient information to simulate a KEY cycle operation and
+recover from the trap provided timing is not critical (e.g.
+BLKO or BLKI to magtape or dectape might get data late In­
+dications). However, a pager trap during a PI cycle should
+never occur and is a disaster so recovery is impossible. The
+running program can be continued after such a trap by JRSTF
+@777573 as in the sample restart program. The indirect address
+sequence bit is used to distinguish data reads of non-existent
+memory from Indirect addressing reads of non-existent memory.
+
+7 June 70
+
+BBN PROPRIETARY
+
+10-21- 4
+
+In the former case, the software may wish to create a ’’new
+memory page” and proceed, but in the latter case, a prog­
+ramming error has been made.
+Another interesting feature of the pager is the monitor
+after-loading trap. All other directed traps take place
+at the beginning of the self-loading sequence, before any
+associative register has been loaded with mapping information
+for the new page, but the after-loading trap takes place at
+completion of the self-loading sequence. This enables the
+Monitor to perform statistics-taking operations for specified
+pages each time one is loaded into an associative register.
+
+BBN PROPRIETARY
+
+7 June 70
+
+10-22-4
+
+TRAP STATUS WORD
+
+0
+
+8 9 10
+
+E (Execute request)
+V
+W (Write request)
+
+V
+R (Read request)
+I (Indirect address sequence in progress)
+PI (Priority Interrupt cycle in progress)
+
+KEY (KEY cycle in progress—console Examine,
+XCT, or deposit switch pushed)
+
+Non-EX-MEM
+V
+Parity Error
+Figure 10-9
+
+Bits 0-8, trap cause are decoded as follows: Bits 0 and 1
+define one of four groups each defined below:
+Group 0:
+
+Bit
+2
+3
+4
+5
+6
+
+TSR 0, 1 = 00
+Meaning if ON
+AGE = 00X
+AGE = 02X
+< as read from
+AGE = 04X
+C
+C.S.T.
+AGE = 06X
+Monitor After-Loading A.R. trap
+
+7 June 70
+
+BBN PROPIETARY
+
+10-23-4
+
+Group 1:
+
+TSR 0, 1 - 01
+
+Bit
+
+Meaning if on
+
+3
+4
+5
+6
+7
+8
+
+Shared not in core
+page table not in core (p.t.2)
+2nd indirect, private not in core (p.t.3)
+Indirect shared not in core (p.t.2 or p.t. 3)
+Indirect page table not in core (p.t.3)
+Excessive Indirect pointers (>2)
+
+Group 2:
+
+TSR 0, 1 = 10
+
+Bit
+
+Meaning If on
+
+2
+3
+4
+5
+6
+7
+8
+
+Private Not in core
+Write copy trap (bit 9 in P.T.)
+User trap (bit 8 in P.T.)
+Access trap (P.T. bit 12 = 0 or bits 10-11=3)
+Illegal Read or Execute
+Illegal Write
+Address Limit Register Violation or P.T. bits
+0,1=3 (illegal format)
+
+Group 3:
+
+TSR 0, 1 = 11
+
+Bit
+
+Meaning if on
+
+2
+(in 2nd or 3rd ?
+page table)
+c
+b
+6
+7
+8
+
+Private Not in core
+Write copy trap (bit 9 in P.T.)
+User trap (bit 8 in P.T.)
+Access trap (P.T. bit 12 = 0 or bits 10-11=3)
+Illegal Read or Execute
+Illegal Write
+Address Limit Register Violation or P.T. bits
+0,1=3 (illegal format)
+
+BBN PROPRIETARY
+
+7 June 70
+
+10.7
+
+10-24-4
+
+Controlling the Pager via I/O Buss CONO's
+
+The I0B reset pulse generated by the APR causes the pager
+to completely clear Itself. In the cleared state no map­
+ping is performed by the pager and all memory requests
+are passed unchanged to the memory buss. The pager is
+assigned device mnemonic PGR (device number 24) and int­
+erprets the three low bits of CONO PGR, X as described
+below. Other bits of the CONO are ignored.
+
+CONO PGR, 0
+
+Clears all associative registers
+and reloads the Monitor and User
+mode base registers and Address
+Limit Register from location 71
+and the Core Status age and process
+use registers from location 72.
+(see Figure 10-10)
+
+CONO PGR , 1
+
+Clears all associative registers
+mapping EXEC mode pages.
+
+CONO PGR , 2
+
+Clears the associative register
+mapping the page addressed by the
+next write (or read-modify-write)
+memory reference. The Pager op­
+erates in the normal manner both
+before and after this write ref­
+erence but does not complete the
+write operation.
+
+Note that because a priority interrupt may occur between the
+execution of this CONO and the following write instruction,
+it is normally required to do the following:
+
+CONO PI, 40T0T
+CONO PGR, 2
+MOVEM PAGE*1000
+CONO PI, 200
+
+;TURN OFF PI SYSTEM
+;CLEAR PAGE OF NEXT WRITE
+;CLEAR PAGE
+;TURN PI SYSTEM BACK ON
+
+CONO PGR, 3
+
+Clears all associative registers
+mapping USER mode pages
+
+CONO PGR, 4
+
+Turns off all mapping, leaving base
+registers and associative registers
+unchanged
+
+CONO PGR, 5
+
+is equivalent to CONO PGR, 4
+
+7 June 70
+CONO PGR, 6
+
+CONO PGR, 7
+
+BBN PROPRIETARY
+
+10-25-4
+
+Turns off mapping for resident
+monitor (virtual addresses
+20-777778) and turns on USER
+mode mapping and mapping of
+EXEC space 100000 - 777777
+8
+8
+Turns on mapping for all address
+208 - 777777c for both EXEC mode
+ana USER mode references
+
+CONO PGR, 0
+
+1.
+
+causes the Pager to reload its
+main registers as follows:
+
+Read absolute location 71g.
+interpreted as below.
+
+xxxx
+
+17
+
+6 7
+
+3 4
+
+0
+
+10-26-4
+
+BBN PROPRIETARY
+
+7 June 70
+
+18
+
+22 23 24 25
+
+5 bits
+
+11 bits
+
+3
+
+(171g if second APR),
+
+11 bits
+
+XX
+
+MBR (Monitor Base
+Register) Location
+of the Process Storage Block.
+AC Base
+Register
+
+UBR (User Mode Base Register)
+The location of the User Mode
+page table
+000 =
+001 =
+ALR (Address Limit Register)
+010 =
+Limits Legal USER mode virtual
+011 =
+addresses to the first 16K,
+100 =
+32K, 48K, 64K, 80K, 96K, or
+101 =
+112K.
+110 =
+111 =
+2.
+
+No restriction
+112K restriction
+96K restriction
+80K restriction
+64k restriction
+48K restriction
+32K restriction
+16K restriction
+
+Read location 72g (172g if second APR)
+
+8
+
+9
+
+10
+
+35
+26 bits
+
+9 bits
+
+v'
+Not Used
+
+PUR (Process Use Register)
+
+AGER (AGE Register)
+
+Figure 10-0
+Initializing the Pager For Running a New Process
+
+7 June 70
+
+BBN PROPRIETARY
+
+10-27-^
+
+Glossary
+A.G.E.R.
+
+AGE Register
+
+A.L.R.
+
+Address Limit Register
+
+A.P.R.
+
+Arithmetic PRocessor (KA10)
+
+A.R.
+
+Associative Register
+
+C.S.T.
+
+Core Status Table
+
+M.B.R.
+
+Monitor Base Register
+
+PGR
+
+PaGeR device mnemonic
+
+P.S.B.
+
+Process Storage Block
+
+P.T.
+
+Page Table
+
+P.T.N.
+
+Page Table Number
+
+P.U.R.
+
+Process Use Register
+
+R.C.A.
+
+Real Core Address
+
+S.P.N.
+
+Shared Page Number
+
+S.P.T.
+
+Special Pages Table
+
+U.B.R.
+
+User Mode Base Register
+
+BBN Pager Model 701
+
+I.
+
+9July?0
+
+INTRODUCTION
+
+The BBN Pager Model 701 is a device available to research
+PDP-10 users from Bolt Beranek and Newman Inc. for changing
+the memory mapping mechanism of the PDP-10.
+In conjunction
+with a set of modifications to the DEC PDP-10 arithmetic
+processor (the KA10), the BBN Pager allows paging of core
+memory, that is individual relocation of each 512 word page
+of the machine’s address space.
+
+II. ADVANTAGES OF PAGING
+
+There are a number of advantages to the entire computer
+system when core memory is paged.
+Efficient Use of Core Memory
+
+One advantage of paging is that core memory is used more
+efficiently. Pieces (l.e. pages) of programs may be
+scattered anywhere in real core and the BBN pager relo­
+cates each page to provide a contiguous ’’virtual memory”
+for the user. Thus, the system no longer has to worry
+about collecting "holes" in core memory (as is required
+by the current PDP-10 dual relocation hardware) in order
+to fit programs in a contiguous area of real core.
+
+Virtual Memory Increases the Effective Size of Real Core
+Another advantage of paging is that a program can run which
+would physically take more core than the real core available
+in the system. This concept is called "virtual memory".
+Only pages that are needed at the moment must be in core.
+When new pages which are not in core are requested they can
+be swapped in from the drum and the program can then con­
+tinue execution. Running partially loaded programs can
+substantially Increase core memory efficiency.
+
+Access Protection on a Page Basis
+Another feature of the pager is the ability to provide
+separate access protection for each 512 word page in the
+address space. Independent Read, Write, and Execute pro­
+tections are provided.
+
+III. PARTICULAR ADVANTAGES OF TEE BBN PAGER MODEL 701
+
+The Core Status Table
+The BBN pager maintains a core status table which keeps
+records of the activity of the pages in core memory. The
+
+BBN Pager Model 701
+
+9July70
+
+pager notes when a page has been used, which processes
+have used that page, how long that page has been in
+core, and whether or not the page has been written into.
+High Quality Engineering
+The pager is constructed by machine wire wrapping and is
+made up primarily of standard DEC M-series modules, except
+for the BBN designed associative register card.
+Good
+engineering practice has been observed throughout the
+implementation of the pager.
+For ease in maintenance
+and software debugging, Indicator lights are used on every
+control flip-flop and all critical levels in the pager.
+Also, the pager has a single stepping feature which
+enables one to step through or loop on each hardware
+"subroutine" of the pager cycle. In addition, the wire
+list for the pager has been carefully processed by
+computer programs to assure that no signal overloads
+exist, etc. The pager is also isolated from the memory
+buss during power up and down sequencing.
+Software Support
+
+The BBN pager has a complete set of diagnostic support
+and time sharing support software. The BBN TENEX time
+sharing system was explicitly designed for use with the
+BBN pager.
+Compatibility with DEC Software
+
+Modifications to the KA10 have been made in such a way
+that the hardware will continue to run in a so-called
+transparent mode if desired.
+In this transparent mode
+all of the DEC diagnostics will run and the DEC 10/50
+system will also run.
+IV.
+
+BRIEF TECHNICAL DESCRIPTION OF BBN PAGER
+
+The paging mechanism involves the "association" of the
+9 high order address bits from the KA10 with the contents
+of a set of associative registers.
+If a match is found,
+the register which contained the match also contains 11
+"real" high order core address bits.
+(The reason for 11
+bits is to permit up to 1 million words of real core to
+If no match is found, ref­
+be referenced by the KA10).
+erence .is made to a 512 word "page table" in real core
+memory. The word in this page table which is referenced
+is determined by a dispatch based on the original 9 high
+-2-
+
+BBN Pager Model 701
+
+9July70
+
+order address bits. In the simple case of a private page
+which is in core, the 11 high order address bits are found
+in this word and are automatically loaded into an as­
+sociative register by the pager. There are 3 other cases:
+
+a.
+
+The page is not in core or is non­
+existent in which case a page fault
+(trap) will occur.
+
+b.
+
+The page is shared—in which case a
+reference is made to another table
+in core to find out where the page
+is really located.
+
+c.
+
+The page indirectly points to an
+entry in another page table.
+
+The pager maps both the user’s address space and the mon­
+itor’s address space separately. £The full technical
+details of the memory mapping mechanism are described in
+a forthcoming documentQ One of the particular advantages
+of our mapping implementation Is that the real core
+address of a page (even a shared page) is kept in one
+(and only one) place in the system!
+V.
+
+PRICE, DELIVERY, AND OPTIONS
+
+BBN will supply a fully assembled and checked out pager
+for $50K
+,
+*
+F.O.B., Cambridge, Mass. The pager will be
+checked out on a PDP-10 at BBN, Cambridge, Mass, and will
+undergo an 8 hour reliability test at BBN which the cust­
+omer may witness. Payment terms are 30 days after ac­
+ceptance at BBN, Cambridge. Delivery is 6 to 8 months
+*
+ARO.
+Included with the pager are a complete set of pager prints,
+pager wire list, and the pager diagnostic (symbolic and
+binary) on a DECTAPE. Also included are a package of print
+updates and a set of instructions for the necessary wiring
+changes and module additions which must be made to the KA10
+to accomodate the BBN pager. Contact Ted Strollo for
+details on assistance from BBN on the KA10 modifications.
+Associative Registers
+
+The BBN pager is normally configured with 16 associative
+registers. The pager will function with 1 to 54 associative
+*Priae and Delivery quotes are subject to change.
+
+-3-
+
+BBN Pager Model 701
+
+9July7O
+
+registers but if you ever intend to go beyond 16 registers,
+let us know with yourorder! (A larger power supply is needed).
+The number 16 is reasonable for most use of the TENEX
+system.
+Installations which will be running many user
+programs with large ’’working sets’’ (e.g. LISP) will operate
+more efficiently with more associative registers. These
+registers are available at approximately $250 per register
+from BBN. Such registers are added in the field by simply
+plugging them In.
+
+VI.
+
+CONDITIONS OF PAGER SALE
+
+The KA10 processor mods for the BBN pager have been engine­
+ered to be compatible with KAlO’s which have up to and
+including ECO #KA10-00060 installed in the machine. BBN
+cannot take responsibility for keeping the processor mods
+compatible with any future DEC modifications of the KA10.
+It is envisioned that there will be very few modifications
+to the KA10 in the future since DEC is busily working on
+new machines and most of the bugs and problems with the
+KA10 have been solved.
+(We have confirmed that no KA10
+ECO’s are in progress or envisioned by DEC personnel).
+If,
+of course, a major problem is found with the KA10 which
+is fixed by a DEC ECO, BBN will make every effort to find
+a way to make its modifications compatible with the ECO or
+vice versa. When we find this possible we will distribute
+these changes to our customers.
+The BBN KA10 processor modifications assume the KA10 wiring
+runs are exactly the same as in BBN’s two KAlO’s. This
+means that the basic KA10 wiring runs as well as all ECO’s
+must not have been changed by either DEC or customer person­
+nel.
+If there have been any deviations, our add/delete
+lists cannot be followed literally to achieve the correct
+results.
+In order to help those who may have deviated, we
+have Included the mnemonics of signals being added and
+deleted with our processor modifications.
+
+It has been our experience at BBN that DEC will continue
+to maintain a KA10 with the BBN processor mods installed.
+The customer is responsible for obtaining the memory buss
+cable to connect the pager to the memory buss connection
+of the KA10. Two special additional cables to connect the
+KA10 to the pager are provided by BBN (length to be specified
+by customer with order and not to exceed 30 feet).
+BBN will distribute documentation on pager ECO’s (should any
+be issued) to our customers.
+
+-4-
+
+BBN Pager Model 701
+
+VII
+
+9July70
+
+TENEX SOFTWARE DISTRIBUTION
+
+The TENEX software will be available to research PDP-10 users
+under a special licensing arrangment (detailed in a forth­
+coming document). Those customers who buy the BBN Pager
+Model 701 are entitled to a copy of the TENEX software package
+at the price of reproduction. Those research PDP-10 users
+who are not interested in buying the BBN Pager Model 701
+but would like a copy of the TENEX software may obtain the
+TENEX software package for a licensing fee of $15K plus
+the price of reproduction.
+Because of variations in customer equipment configurations,
+this TENEX system software will in most cases, require some
+software modifications to work on the customer’s PDP-10
+installation.
+BBN will be able to provide assistance with
+these modifications; contact Ted Strollo for details.
+Our customers will also be included on all public distri­
+butions of TENEX software modifications, improvements, and
+bug fixes which will be distributed for the price of repro­
+duction .
+
+-5-
+
+8December69
+
+10.
+
+10.1
+
+BBN
+
+PROPRIETARY
+
+ARITHMETIC PROCESSOR PAGING
+
+Introduction
+
+BBN is designing an interface between the KA-10 arithmetic
+processor and core memory which we call the Pager.
+This
+device receives from the APR over a standard memory buss
+execute,'read, write, and read-modify-write requests. It
+then maps any incoming virtual address into an appropriate
+real core address (provided the request is legal) and passes
+the request to the memory modules over another standard memorybuss.
+The mapping requires about 100 nanoseconds.
+The paging hardware performs the following functions:
+
+(1)
+
+Independently maps each 512-word block (or page)
+of the 262,14M-word virtual address space into an
+absolute core location, or, if the block is not
+currently in core, traps to a core managing
+program.
+
+(2)
+
+Provides independent protection for each 512-word
+page in the read, write, and execute modes.
+
+(3)
+
+Records statistics in a Core Status Table which
+4“ rs thfi
+V'^.7 ••'.TYi r\T-,
+
+The principal advantage of paging over the current dualprotect-and-relocate scheme incorporated in the KA-10 is
+that each process is provided with a large, constant
+262,1^-word virtual machine, yet requires only those pages
+which are referenced during an interaction to be in core.
+This can significantly reduce the core memory requirements of
+running programs.
+10.2
+
+Mapping
+
+.
+
+It is presently impractical to keep mapping information for
+all 512 pages of a virtual address space in hardware because
+of the quantity of hardware required. For this reason, a
+limited number (16 originally, expandable to 32) of asso­
+ciative hardware registers are employed and the mapping
+information is kept in 512-word Page Tables in core memory.
+The manner in which virtual addresses are mapped into real
+addresses is shown in Figure 10-1.
+Whenever a page not mapped by the associative registers is
+referenced, the pager initiates a loading sequence (requiring
+about three memory cycles) during which the appropriate page
+table entry is referenced and an associative register loaded
+with the required mapping information. Associative registers
+are reloaded in a round-robin fashion. We hold the theory
+that a program’s memory references will be sufficiently
+’’collected ” that 16 mapping registers are enough to prevent
+too frequent reloading.
+■
+.
+
+10-1-2
+
+ouecemoeroy
+
+BBN PROPRIETARY
+
+As shown in Figure 10-2, which page table is referenced
+during the loading sequence depends upon the memory re­
+quest. There is one page table for user mode requests
+and three possible partial page tables for monitor mode
+requests. The locations of the monitor mode page tables
+are as follows:
+
+3000g to 3077g \
+
+Optional Map
+
+(Not used unless Resident
+Monitor Mapping is turned on)
+
+First APR’s Map
+
+3100g to 31778
+
+Second APR’ s Map
+
+3700g to 3777g
+
+Common Map
+
+3200g to 3577g
+
+Private Map
+
+600g to
+
+/■Absolute locations
+
+7778
+
+I
+t
+
+t
+of the Process Storage Block
+
+The locations of the user mode page table and of the pro­
+cess state page are loaded into the pager when processes
+are switched, as described later.
+
+10.3
+T’XIS
+
+Controlling the Pager via I/O Buss CONO * s
+27OSSL
+
+puiss
+
+nn
+
+Hy
+
+APR C8US2S
+
+tho
+
+to completely clear itself.
+In the cleared state no
+mapping is performed by the pager and all memory requests
+are passed unchanged to the memory buss.
+The pager is
+assigned device number 24 and interprets the three low
+bits of CONO*24, X as described below. Other bits of the
+CONO are ignored.
+CONO 24,0
+
+Clears all associative registers and
+reloads the Monitor and User mode base
+registers and Address Limit Register
+from location 71 and the Core Status
+age and process registers from location
+570 of the (newly mapped) Process Storage
+Block.
+
+CONO 24,1
+
+Clears all associative registers map­
+ping monitor mode pages.
+
+CONQ 24,2
+
+Clears the associative register map­
+ping the page addressed by the next
+write (or read-modify-write) memory
+reference. The Pager operates in the
+normal manner both before and after
+this write reference but does not
+complete the write operation.
+
+Monitor Mode
+
+User Mode
+
+20g
+16 K
+
+Although processes
+may operate in
+16 K
+environments as
+16 K
+large as 256 K,
+s
+the
+Upper Bound
+16 K
+Register may be
+16 K
+set to exclude
+all memory refer-’
+16 K
+ences above 16,
+16 K J
+4R. fill. Rn.
+96’ or’112’K.
+Processes not requiring
+a large virtual address
+space may achieve economy
+by using the Upper Bound
+Register and merging the
+User Mode page table into
+the top of the Process
+Storage Block. The num—
+. ber of overhead pages re-j
+• quited is then reduced
+:
+i from two to one.
+1
+
+K
+
+Unmapped area*
+Absolute addresses
+
+K
+
+$
+
+Mapped individuallj
+per Processor
+
+128 K
+
+Mapped commonly
+for all processes ,
+and all processors.
+Non-resident in­
+formation in the
+Exec and Monitor
+is referenced via
+this map. The map
+itself is in the
+unmapped core area,
+between 3200fl and
+35778.
+a
+
+64 K Mapped privately
+per process
+
+111111%
+
+Figure 10-2
+Mapping of Virtual Addresses
+
+*Optionally mapped by locations 3000 to 3077
+
+CONO 24,0
+
+causes the Pager to reload its main registers.
+
+as follows:
+1.
+
+Read absolute location 71g» (171g if second APR),
+interpreted as below.
+
+0
+
+17
+xxxx
+
+3
+
+35
+
+xxxxxxx
+
+11 bits
+
+11 bits
+
+MBR (Monitor Base Register)
+Location of the Process
+State Page.
+
+2.
+
+>->■
+
+= No restriction
+= 112K restriction
+= 96K restriction
+= 80K restriction
+= 64K restriction
+= 48k restriction
+= 32K restriction
+ii
+
+UBR (User Mode Base Register)
+The location of the User Mode
+page table.
+000
+001
+ALR (Address Limit Register)
+010
+Limits legal virtual addresses
+011
+to the first 16K, 32K, 48K, 64K
+100
+80K, 96K, or 112K.
+101
+110
+111
+
+Read location (MBR) 570g.
+
+Figure 10-3
+
+Initializing the Pager For a Nev; Process
+
+LCO U1J.L/U LUU
+
+t
+(1
+c
+(1
+
+c
+(1
+
+c
+
+BBH PROPRIETARY
+X
+
+BBL’ PROPRIETARY
+
+4000$
+CORE STATUS
+TABLE
+
+Absolute
+Page No.
+
+10000g
+/
+
+Core Status Table Entry ,
+
+0Z______ 8
+
+9
+
+10
+
+9 Bits
+|
+[
+i
+i—
+---------
+
+_____ ______ __________ ______ j35
+26
+
+Bits
+
+26
+
+Bits
+
+modification
+9 Bits
+
+0
+
+8
+AGER
+
+35
+
+PUR
+
+1.
+
+Bits 0 - 8 of AGER replace Bits 0 - 8 of CST entry.
+
+2.
+
+Bits 10 - 35 are ”0Red” into Bits 10 - 35 of
+CST entry.
+
+3.
+
+Write request level is ”ORed" into Bit 9 of
+the CST entry (if the write is permitted).
+
+Figure 10-6
+
+Pager References to the Core Status Table
+
+i
+If no trap condition occurs during self-loading, an asso­
+ciative register is loaded with the required mapping in­
+formation and the pager proceeds. Note, however, that
+the write permission bit in an associative register is set
+only when both the modification bit in the Core Status
+Table and the write permit bit in the page table entry
+are set.
+10.5
+
+Pager Traps
+
+A paging trap will occur whenever one of the following
+events happens:
+
+1.
+
+The trap bits in the process page table force
+a trap.
+
+2.
+
+The addressed page (or indirecting page table)
+is not in core.
+
+3.
+
+An illegal condition is detected.
+
+4.
+
+The Core Status Table entry for an addressed page
+contains an age with the three highest bits = 0
+(meaning that the core manager is controlling
+the page).
+
+When one of the above conditions happens, the pager first
+stores the cause and location of the trap into the Process Sto­
+rage block at location 571p. The format of this word is
+f* K
+
+wmvhx*
+
+y*
+
+rviinri
+
+*1 t~A
+
+Q
+( •
+
+rn
+
+4 +*
+
+♦- K a
+
+ATJX7
+4*.*
+
+i-w*
+
+S
+
+v» r'* _
+~
+
+gress was a write, it stores the data into location 572$
+of the state page. Finally, it forces the APR to execute
+absolute location 70g (170g if second APR).
+Location 70g
+should contain a JSYS Instruction to a trap routine.
+
+The arrangement of the Trap Cause field was chosen so that
+decoding of the cause could be easily accomplished by the
+JFFO instruction.
+To restart a process which was terminated by a pager trap,
+the following information is of value:
+
+1.
+
+The program counter (PC) saved by the JSYS at
+location 70g is correct.
+
+2.
+
+If the read or execute bits in 571q of the state
+page are set, restart is completed°by performing
+a JRSTF @ through the PC word saved by the JSYS
+at location 70g (170g).
+
+. 3.
+
+If the read bit is not set but the write bit is
+set in 571g, the data in 572g must be written
+into the address of 571g before returning control
+to the process via JRSTF.
+
+CDecember69
+
+BBN PROPRIETARY
+
+10-11-2
+
+A sample program to restart a process which was terminated
+by a paging trap is given below:
+CONO 24,0
+MOVE 1,777571
+SETZM 777571
+TLNE 1,12
+JRST BEGIN
+MOVE 777572
+TLNE 1,1
+JRST MONWR
+UMOVEM (1)
+BEGIN: HRLZI 17,777520
+BLT 17,17
+JRSTF @777573
+
+MONWR: MOVEM (1)
+JRST BEGIN
+
+;LOAD PAGER WITH NEW BASE REGISTERS
+;UPPER BOUND REGISTER, AND DUMP REGISTER
+;GET TRAP STATUS WORD
+■jCLEAR TRAP STATUS FOR NEXT TIME
+;SKIP IF NEITHER READ NOR EXECUTE
+jBITS SET
+
+;GET DATA WORD
+;SKIP IF USER MODE
+^COMPLETE USER MODE WRITE
+;RESTORE AC’s FOR THE PROCESS
+
+;RESUME PROCESS (JSYS IN LOCATION 70o
+;SAVES THE FLAGS AND PC IN 777573).
+;COMPLETE MONITOR MODE WRITE
+
+In Figure 10-7 the function of the PI cycle, Key Cycle, and
+Indirect Address Sequence bits may not be clear.
+The reason
+for the PI cycle and KEY cycle bits is to distinguish traps
+'of the running program from PI and KEY cycle traps (KEY
+cycles occur when the console EXAMINE, DEPOSIT, Or XCT
+switches are pushed). The Trap Status Word in Figure 10-7
+contains sufficient information to simulate a KEY cycle
+operation and recover from the trap provided timing is not
+critical (e.g., BLKO or BLKI to magtape or dectape might miss
+latency).
+However, a pager trap during a PI cycle is a
+disaster and recovery is impossible.
+The running program can
+be continued after such a trap by JRSTF @777573 as in the sam­
+ple restart program. The Indirect address sequence bit is
+used to distinguish data reads of non-existent memory from
+indirect addressing reads of non-existent memory.
+In the
+former case, the’ software may wish to create new memory and
+proceed, but in the latter case, a programming error has
+been made..
+
+Another interesting feature of the pager is the monitor
+after-loading trap. All other directed traps take place at
+the beginning of the self-loading sequence, before any
+associative register has been loaded with mapping information
+for the new page, but the after-loading trap takes place at
+completion of the self-loading sequence. This enables the
+Monitor to perform statistics-taking operations for specified
+pages each time one is loaded into an associative register.
+Such statistics may be very useful in evaluating core
+management strategies and in evaluating the performance of
+the pager.
+*
+
+yuecemoeroy
+
+10.6
+
+BBN PROPRIETARY
+
+Core Management Philosophy
+
+Core management for processes with large virtual address
+spaces is a significant problem. To minimize difficulties
+we have designed into the Pager several features (Figure
+10-6).
+
+(1)
+
+Recording modification
+
+Because a write request will set the modified bit
+in the Core Status Table, core-to-drum swaps need
+be performed only for pages with this bit set.
+
+(2)
+
+Identifying Processes using a page
+By loading the process use register (PUR with a
+bit identifying the current process the Core
+Status Table entry for each page will contain a
+record of the processes which have used each page.
+The core management program can then discriminate
+pages in use by active processes from those which
+were used by processes now inactive.
+
+(3)
+
+Marking time-of-last-reference
+When a large process is compute bound, its ’’working
+H rr-} 11
+i
+1
+nK'inn'a t.r 4 In i" *5 m o
+Mw
+periodically incrementing the age register, the
+core manager can look at the Gbre Status Table and
+for each process distinguish recently referenced
+pages from ones not referenced for a long time.
+The latter are likely to be outside current
+working sets and are good candidates for replace­
+ment by new pages.
+
+(1|)
+
+Provide for dual-processor operation
+
+Because one APR may be computing for a process,
+while the other APR is tampering with the Core
+Status Table, we have included a special check in
+the paging hardware for ages less than 20g. When
+the software is about to examine sDme entry in the
+Core Status Table, it may EXCH' a word with the
+left-most three bits = 0 for the Core Status Table
+entry. This will prevent the other APR from
+Inadvertently loading this page during the
+examination.
+
+

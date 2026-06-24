@@ -249,6 +249,250 @@ Investigate the public TENEX tree in this order:
    - LISP
 4. Only after a shell login works, load scenario application files.
 
+Current reproducible private checks:
+
+- `mini/host69-bbn-tenexctl.sh verify-cornwell-patches` confirms the local
+  Cornwell checkout carries the BBN/TENEX fixes for JSYS PC handling, BBN page
+  faults, and the TYM queue guard. The earlier PI-hold change is excluded
+  because it was traced to the `JSYS IN PI ROUTINE` bug-halt path.
+- `mini/host69-bbn-tenexctl.sh verify-build-tenex-media` confirms Lars'
+  generated `syslod.dta` contains `TENEX.SWP`, `TENEX.SAV`, `DLUSER.SAV`,
+  `USERS.TXT`, `DUMPER.SAV`, and `EXEC.SAV`.
+
+June 21, 2026 live blocker update:
+
+- The current best lead is no longer the public BBN 134 raw `TENEX.SAV`
+  direct-load path. That path lacks a matching `TENEX.SWP`.
+- The active path is Lars Brinkhoff's `build-tenex` harness run exactly from
+  `mini/host69-bbn-tenex/kit-cache/build-tenex/install` with Cornwell
+  `pdp10-ki` on `PATH`.
+- DDT's `$G` notation is printed notation for ESC/Altmode plus `G`. Literal
+  `SYSGO$G` and literal `113471$G` are rejected by the DDT prompt; sending
+  `113471` followed by ESC and `G` is accepted.
+- A live run of `pdp10-ki simh/install.do` reached `SYSLOD$G`. It appeared to
+  sit at `PC 477641 (CONSO 324,1)`, but the TENEX/SYSLOD prompt later surfaced.
+  Operator text intended for SIMH inspection was accidentally consumed by
+  SYSLOD until a final `Y` answered the disk reinitialization prompt. The run
+  then reached:
+
+  ```text
+  OK, YOU ASKED FOR IT.
+  TENEX RESTARTING, WAIT... NO CHECKDSK
+  ```
+
+- Next work item: continue from the `NO CHECKDSK` dialogue using the exact
+  responses from Lars' `install/simh/syslod.do` (`I`, `.`, `TTY:`, confirm),
+  then determine whether it reaches mini-exec / `DTA0:EXEC.SAV`.
+- Follow-up: after answering the disk reinitialization prompt, output appeared
+  on the TYM listener (`nc 127.0.0.1 12346`), not the simulator console:
+
+  ```text
+  Connected to the KI-10 simulator TYM device, line 0
+
+  TENEX RESTARTING, WAIT...
+  ```
+
+  Therefore the next diagnostic must check the TYM line before interrupting a
+  seemingly silent simulator console. Sending `I` on TYM echoed the character
+  but did not immediately advance, so the remaining question is whether the
+  monitor is waiting for TYM input, console input, or a DECtape/status event.
+- Boot milestone from the same live run: the DC listener on TCP port `12345`
+  showed that TENEX continued through startup and reached operation:
+
+  ```text
+  RUNNING DDMP
+  LOGIN JOB 0, USER SYSTEM, ACCT 220100, TTY 100
+  DETACHED JOB 0, USER SYSTEM, ACCT 220100, TTY 100
+  NO SYSJOB
+  LOGIN JOB 1, USER SYSTEM, ACCT 220100, TTY 100
+  *****BUGCHK AT 117441 F - (FAILED TO GTJFN/OPEN BUGTABLE FILE)
+  DETACHED JOB 1, USER SYSTEM, ACCT 220100, TTY 100
+  NO AUTOJOBS FILE
+  TENEX IN OPERATION
+  ```
+
+  This moves host69 past the previous boot blocker. The current blocker is
+  now interactive access: prove that a TYM/DC line can reach real EXEC/login,
+  then create a reproducible validation script. `@L 69` remains disabled until
+  that transcript exists.
+- `mini/host69-bbn-tenexctl.sh verify-build-tenex-syslod` runs the private
+  Lars SYSLOD harness with host69-specific terminal ports and records a
+  transcript without starting any public route.
+
+Current result: the media is present and the local simulator has now reached
+`TENEX IN OPERATION` through the Lars/Cornwell SYSLOD path. The earlier
+TENDMP/DECtape and `exbugh` traces are still useful history, but they are no
+longer the current stopping point. The current stopping point is interactive
+access:
+
+Checkpoint rule: every time the blocker moves, update this file and
+`mini/host69-bbn-tenex/README.md` before starting the next long experiment.
+The update must include the transcript milestone, the process/port cleanup
+state, and the current public-exposure decision. Until real EXEC/login is
+validated, `@L 69`, the active host card, and any 2026 scenario stay disabled.
+
+- Fresh TYM connections still show stale `TENEX RESTARTING, WAIT...` text and
+  close after Return.
+- DC shows detached SYSTEM jobs and monitor BUGCHK diagnostics.
+- Pressing Return on DC produced:
+
+  ```text
+  BUGCHK AT 402542 - (FAILED TO GTJFN/OPEN BUGTABLE FILE)
+  ```
+
+The next technical target is therefore the TENEX support-file/login path:
+identify and install or expose the expected BUGTABLE file and determine why
+TYM line startup is not reaching a usable EXEC/login. This is still backend
+work, not browser routing or ARPANET topology.
+
+Follow-up test: the non-destructive Lars `simh/run.do` path was tried after
+clearing stale host69 processes. It did not reach TENEX text on DC or TYM.
+Interrupting to SIMH showed the machine in the DECtape bootstrap area
+(`PC 777430`, then `EX PC` displayed `777400`). Treat the generated disk
+`run.do` path as unproven; the SYSLOD/install path remains the only path that
+has reached `TENEX IN OPERATION` in this workspace.
+
+Support-file experiment: real IMSSS TENEX `BUGTABLE` and `BUGSTRINGS` files
+were staged under the expected SUMEX-AIM filenames in the ignored Lars install
+tree and `system.tap` was rebuilt. The tape now lists
+`<SYSTEM>BUGTABLE.SUMEX-AIM` and `<SYSTEM>BUGSTRINGS.SUMEX-AIM`. A first
+private `runtime/build-tenex-syslod-dumper-load.do` run was not a valid
+install, because the SIMH `expect` ordering let TENEX reach `TENEX IN
+OPERATION` and `NO EXEC` before the later SYSLOD inputs were consumed. The
+next blocker is a correctly ordered SYSLOD/mini-EXEC driver; the BUGTABLE fix
+is staged but not validated.
+
+Follow-up driver tests:
+
+- Adding `continue` after the badspots `[Confirm]` response did not fix the
+  plain-SIMH script; it hung after `TENEX RESTARTING, WAIT... NO CHECKDSK`,
+  with TYM showing only the restart banner and DC showing only the device
+  banner.
+- A pexpect/PTTY driver changed the timing enough to be misleading. Sending
+  `SYSLOD<ESC>G` after `go 100` produced a bell, while issuing SIMH `send`
+  from `sim>` only echoed `SYSLOD$G`. The original Lars timing depends on
+  SIMH `expect` injecting the string while `go 100` is running.
+- Current process state after these tests: no host69 simulator or netcat
+  listener remains on `16945/16946` or `12345/12346`.
+
+Controller gate update, June 21, 2026:
+
+- Added explicit private gates:
+  `verify-build-tenex-syslod-boot`,
+  `verify-build-tenex-install-files`, and `verify-build-tenex-login`.
+- `verify` now remains closed until login is proven; `@L 69` remains disabled.
+- `verify-build-tenex-system-tape` passed. The private `system.tap` lists
+  `<SYSTEM>BUGTABLE.SUMEX-AIM`, `<SYSTEM>BUGSTRINGS.SUMEX-AIM`,
+  `<SYSTEM>EXEC.SAV`, and `<SUBSYS>DUMPER.SAV`.
+- `verify-build-tenex-syslod-boot` now passes and captures the DC listener as
+  part of the gate. It reaches `TENEX IN OPERATION`, but still shows `NO EXEC`
+  and `FAILED TO GTJFN/OPEN BUGTABLE FILE`. Current transcripts:
+  `build-tenex-syslod.txt`, `build-tenex-syslod-dc.txt`, and
+  `build-tenex-syslod-tym.txt`.
+- `verify-build-tenex-install-files` was rerun after removing the invalid
+  `Ctrl-Z` sends. That removed the `.^Z ?` errors, but did not complete the
+  install. The gate stops after
+  `READ BADSPOTS FROM FILE: TTY: [Confirm]`; DC still reaches
+  `TENEX IN OPERATION`, `NO EXEC`, and the BUGTABLE GTJFN failure.
+- Driver conclusion: one queued SIMH `expect` script is not reliable for the
+  full install path because repeated prompt strings collide before `go 100`.
+  Next implementation should split the install into smaller gates or switch to
+  a terminal-driven control path after the boot milestone.
+
+Manual-console checkpoint, June 21, 2026:
+
+- Added `mini/host69-bbn-tenexctl.sh manual-install-console` as the safer
+  operator path for the current blocker. It runs the Lars/Cornwell simulator
+  in the foreground and keeps `@L 69` disabled.
+- Address distinction:
+  - Mini-exec install work is on the foreground SIMH console.
+  - DC observation port while the manual console is running:
+    `127.0.0.1:16945`.
+  - TYM observation port while the manual console is running:
+    `127.0.0.1:16946`.
+  - These TCP ports are private diagnostics, not the public ARPANET host.
+- Current evidence from `verify-build-tenex-install-files`:
+  - TENEX reaches `TENEX IN OPERATION`.
+  - `^Z` reaches the mini-exec dot prompt.
+  - `G` invokes `GET FILE`.
+  - Automation is still garbling `DTA0:EXEC.SAV` at the filename prompt, so
+    hand-driving the console may get past this faster than more scripted
+    pacing experiments.
+- The next manual command sequence to validate is:
+
+  ```text
+  ^Z
+  G
+  DTA0:EXEC.SAV
+  ```
+
+  If this succeeds, continue with the Lars flow (`S`, start EXEC, then install
+  users/DUMPER). Capture screenshots/transcripts before changing public
+  routing.
+
+Manual-console progress checkpoint, June 21, 2026, later pass:
+
+- The hand-driven foreground SIMH console got further than the current
+  automation. Treat the manual transcript as the best evidence for the next
+  pass.
+- Confirmed manual path:
+
+  ```text
+  READ BADSPOTS FROM FILE: TTY: [Confirm]
+  [Return]
+  ^E
+  sim> send "\032"
+  sim> continue
+  ^Z
+  .GET FILE DTA0:EXEC.SAV [Confirm]
+  [Return]
+  .
+  .START
+    ?
+  .START.
+
+   SUMEX-AIM Tenex 1.31.82, SUMEX-AIM EXEC 1.51
+   ENTER DATE AND TIME AS MM/DD/YY HH:MM -- 06/21/28 00:00
+   PLEASE RECONFIRM: THURSDAY, JUNE 21, 1928 00:00:00
+  @ENABLE
+  !
+  !MOUNT DTA0:
+  !
+  ```
+
+- This proves the real SUMEX-AIM TENEX EXEC can be loaded from `DTA0` and
+  started from the mini-exec path. It also proves `ENABLE` reaches the EXEC
+  privileged `!` prompt and `MOUNT DTA0:` returns to `!`.
+- The manual session later became nonresponsive after additional file work.
+  Interrupting showed `PC: 105056`. Do not treat that as a failed EXEC load;
+  the earlier `@` and `!` prompts are real progress.
+- The current automation still only reaches:
+
+  ```text
+  .GET FILE DTA0:EXEC.SAV [Confirm]
+  ```
+
+  and then times out. Latest private transcript:
+  `mini/host69-bbn-tenex/transcripts/build-tenex-install-files.txt`.
+  The failure is the SIMH scripted input/control path at the confirmation
+  prompt, not the TENEX media itself.
+- Clean state after stopping the run: no `pdp10-ki`, no host69 controller
+  process, and no listeners on `16945`, `16946`, `12345`, `12346`, `16969`,
+  or `10569`.
+- Tomorrow's best path is manual continuation from:
+
+  ```sh
+  cd /home/deltaprism/arpanet
+  ./mini/host69-bbn-tenexctl.sh manual-install-console
+  ```
+
+  Then use the proven sequence above. After reaching `!`, skip any extra
+  `GET DTA0:EXEC.SAV` / `SSAVE` attempt until the exact Lars flow is re-read.
+  The next target is `RUN DTA0:DLUSER.SAV`, loading users from
+  `DTA0:USERS.TXT`, and capturing the exact errors or success.
+- `@L 69` remains disabled. No public host card or scenario should be added
+  until a real EXEC/login transcript is captured.
+
 ### Phase 4: Scenario Gates
 
 Expose only scenarios that run on the real booted host:

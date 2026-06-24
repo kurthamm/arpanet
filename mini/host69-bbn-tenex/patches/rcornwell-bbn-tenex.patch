@@ -1,0 +1,80 @@
+diff --git a/PDP10/kx10_cpu.c b/PDP10/kx10_cpu.c
+index 2d51230..e48a187 100644
+--- a/PDP10/kx10_cpu.c
++++ b/PDP10/kx10_cpu.c
+@@ -6386,8 +6386,9 @@ dpnorm:
+                        FLAGS = (uint32)(BR >> 23); /* On error restore flags */
+                        goto last;
+                    }
+-                   PC = AR & RMASK;
+-                   break;
++                   PC = AR & RMASK;
++                   f_pc_inh = 1;
++                   break;
+               }
+ #endif
+               goto unasign;
+@@ -12036,13 +12037,14 @@ fetch_opr:
+ last:
+     modify = 0;
+ #if BBN
+-    if (QBBN && page_fault) {
+-        page_fault = 0;
+-        AB = 070 + maoff;
+-        f_pc_inh = 1;
+-        pi_cycle = 1;
+-        goto fetch;
+-    }
++    if (QBBN && page_fault) {
++        page_fault = 0;
++        AB = 070 + maoff;
++        f_pc_inh = 1;
++        pi_enc = 4;
++        pi_cycle = 1;
++        goto fetch;
++    }
+ #endif
+ #if KS
+     /* Handle page fault and traps */
+@@ -12288,10 +12290,10 @@ last:
+ #if KI | KL | KS
+             if (f_pc_inh && trap_flag == 0)
+                 set_pi_hold(); /* Hold off all lower interrupts */
+-#else
+-            if (!QITS || f_pc_inh)
+-                set_pi_hold(); /* Hold off all lower interrupts */
+-#endif
++#else
++            if (!QITS || f_pc_inh)
++                set_pi_hold(); /* Hold off all lower interrupts */
++#endif
+ #if PDP6
+             if ((IR & 0700) == 0700)
+                 pi_cycle = 1;
+diff --git a/PDP10/kx10_tym.c b/PDP10/kx10_tym.c
+index 0124b66..76732ca 100644
+--- a/PDP10/kx10_tym.c
++++ b/PDP10/kx10_tym.c
+@@ -209,13 +209,15 @@ static void tym_input(uint64 data)
+     M[address] = data;
+ }
+ 
+-static uint64 room (int h, int t, int s)
+-{
+-    uint64 head = M[tym_base + h];
+-    uint64 tail = M[tym_base + t];
+-    uint64 size = M[tym_base + s] >> 4;
+-    return size - (head - tail) % size;
+-}
++static uint64 room (int h, int t, int s)
++{
++    uint64 head = M[tym_base + h];
++    uint64 tail = M[tym_base + t];
++    uint64 size = M[tym_base + s] >> 4;
++    if (size == 0)
++        return 0;
++    return size - (head - tail) % size;
++}
+ 
+ static void send_word(int type, int port, int data1, int data2)
+ {
