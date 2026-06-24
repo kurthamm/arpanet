@@ -1,0 +1,564 @@
+diff --git a/PDP10/imp_udp.c b/PDP10/imp_udp.c
+new file mode 100644
+index 0000000..0b1c9cf
+--- /dev/null
++++ b/PDP10/imp_udp.c
+@@ -0,0 +1,252 @@
++/* imp_udp.c: 1822 host-interface-over-UDP socket routines for the PDP-10 IMP
++
++   Derived from h316_udp.c, Copyright (c) 2013 Robert Armstrong, bob@jfcl.com.
++
++   Permission is hereby granted, free of charge, to any person obtaining a
++   copy of this software and associated documentation files (the "Software"),
++   to deal in the Software without restriction, including without limitation
++   the rights to use, copy, modify, merge, publish, distribute, sublicense,
++   and/or sell copies of the Software, and to permit persons to whom the
++   Software is furnished to do so, subject to the following conditions:
++
++   The above copyright notice and this permission notice shall be included in
++   all copies or substantial portions of the Software.
++
++   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
++   ROBERT ARMSTRONG BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY.
++
++   PURPOSE
++
++   This is Robert Armstrong's portable IMP/host UDP modem emulation, lifted
++   from the H316 ARPAnet IMP simulator (h316_udp.c) so that the rcornwell
++   PDP-10 IMP device (kx10_imp.c) can speak the SAME wire protocol when run in
++   authentic "ncp" mode.  An H316 IMP's host-interface ("hi") device and a
++   PDP-10 host both call this module; they exchange raw 1822 host messages as
++   datagrams.  The datagram layout (magic 'H316', per-link sequence number,
++   16-bit word count, then network-order H316 words) is unchanged from RLA's
++   original, which is exactly why a PDP-10 built with this module interoperates
++   with the lab's H316 IMP (h316ov) over a UDP port pair, e.g.
++
++        TENEX :  attach -u imp 21052:localhost:21051   (set imp ncp)
++        IMP05 :  attach -u hi2  21051:localhost:21052
++
++   The only changes from h316_udp.c are: (a) self-contained constants so we do
++   not depend on H316-specific h316_imp.h, and (b) no VM_IMPTIP build guard.
++*/
++
++#include "sim_defs.h"           /* simh machine independent definitions       */
++#include "sim_tmxr.h"           /* MUX layer: packet send/receive semantics    */
++#include "sim_sock.h"           /* sim_parse_addr()                            */
++#include "imp_udp.h"
++
++/* Self-contained equivalents of the H316 constants this module relied on. */
++#define MAXDATA      IMP_UDP_MAXDATA   /* longest IMP packet (in H316 words)   */
++#define NOLINK       IMP_UDP_NOLINK
++#define IMP_DBG_UDP  0x0004            /* trace bit; harmless if dev lacks it  */
++
++/* Local constants ... */
++#define MAXLINKS        10      /* maximum number of simultaneous connections  */
++
++/* UDP connection data structure ... */
++struct _UDP_LINK {
++  t_bool  used;                 /* TRUE if this UDP_LINK is in use             */
++  char    rhostport[90];        /* Remote host:port                            */
++  char    lport[64];            /* Local port                                  */
++  uint32  rxsequence;           /* next message sequence number for receive    */
++  uint32  txsequence;           /* next message sequence number for transmit   */
++  DEVICE  *dptr;                /* Device associated with link                 */
++};
++typedef struct _UDP_LINK UDP_LINK;
++
++/*   This magic number is stored at the beginning of every UDP message and is
++   checked on receive.  It MUST match h316_udp.c so the two ends agree. */
++#define MAGIC   ((uint32) (((((('H' << 8) | '3') << 8) | '1') << 8) | '6'))
++
++/* UDP wrapper data structure - all fields in NETWORK byte order on the wire. */
++struct _UDP_PACKET {
++  uint32  magic;                /* UDP "magic number" (see above)              */
++  uint32  sequence;             /* UDP packet sequence number                  */
++  uint16  count;                /* number of H316 words to follow              */
++  uint16  data[MAXDATA];        /* and the actual H316 data words/IMP packet   */
++};
++typedef struct _UDP_PACKET UDP_PACKET;
++#define UDP_HEADER_LEN  (2*sizeof(uint32) + sizeof(uint16))
++
++/* Locals ... */
++static UDP_LINK udp_links[MAXLINKS] = { {0} };          /* per-connection data */
++static TMLN udp_lines[MAXLINKS] = { {0} };              /* line descriptors    */
++static TMXR udp_tmxr = { MAXLINKS, NULL, 0, udp_lines}; /* datagram mux        */
++
++static int32 udp_find_free_link (void)
++{
++  int32 i;
++  for (i = 0;  i < MAXLINKS;  ++i) {
++    if (udp_links[i].used == 0) {
++      memset(&udp_links[i], 0, sizeof(UDP_LINK));
++      return i;
++    }
++  }
++  return NOLINK;
++}
++
++static t_stat udp_parse_remote (int32 link, const char *premote)
++{
++  /* Parse "llll:host:rrrr", "llll::rrrr", "host:rrrr" forms.  See h316_udp.c. */
++  char *end;  int32 lport, rport;
++  char host[64], port[16];
++
++  if (*premote == '\0') return SCPE_2FARG;
++  memset (udp_links[link].lport, 0, sizeof(udp_links[link].lport));
++  memset (udp_links[link].rhostport, 0, sizeof(udp_links[link].rhostport));
++  if (2 == sscanf (premote, "%d::%d", &lport, &rport)) {
++    if ((lport < 1) || (lport >65535) || (rport < 1) || (rport >65535)) return SCPE_ARG;
++    snprintf (udp_links[link].lport, sizeof (udp_links[link].lport) - 1, "%d", lport);
++    snprintf (udp_links[link].rhostport, sizeof (udp_links[link].rhostport) - 1, "localhost:%d", rport);
++    return SCPE_OK;
++  }
++
++  lport = strtoul(premote, &end, 10);
++  if ((*end == ':') && (lport > 0)) {
++    snprintf (udp_links[link].lport, sizeof (udp_links[link].lport) - 1, "%d", lport);
++    premote = end+1;
++  }
++
++  if (sim_parse_addr (premote, host, sizeof(host), "localhost", port, sizeof(port), NULL, NULL))
++    return SCPE_ARG;
++  snprintf (udp_links[link].rhostport, sizeof (udp_links[link].rhostport) - 1, "%s:%s", host, port);
++  if (udp_links[link].lport[0] == '\0')
++    strlcpy (udp_links[link].lport, port, sizeof (udp_links[link].lport));
++
++  if ((strcmp (udp_links[link].lport, port) == 0) &&
++      (strcmp ("localhost", host) == 0))
++    return sim_messagef (SCPE_ARG, "WARNING - use different transmit and receive ports!\n");
++
++  return SCPE_OK;
++}
++
++t_stat udp_create (DEVICE *dptr, const char *premote, int32 *pln)
++{
++  t_stat ret;
++  char linkinfo[256];
++  int32 link = udp_find_free_link();
++  if (link < 0) return SCPE_MEM;
++
++  if ((ret = udp_parse_remote(link, premote)) != SCPE_OK) return ret;
++
++  sprintf(linkinfo, "Buffer=%d,Line=%d,%s,UDP,Connect=%s", (int)(sizeof(UDP_PACKET)+sizeof(int32)), link, udp_links[link].lport, udp_links[link].rhostport);
++  ret = tmxr_open_master (&udp_tmxr, linkinfo);
++  if (ret != SCPE_OK) return ret;
++
++  udp_links[link].used = TRUE;  *pln = link;
++  udp_lines[link].dptr = udp_links[link].dptr = dptr;      /* save device */
++  udp_tmxr.uptr = dptr->units;
++  udp_tmxr.last_poll_time = 1;          /* don't poll periodically for connects */
++  (void)tmxr_poll_conn (&udp_tmxr);     /* force connection initialization now  */
++  udp_tmxr.last_poll_time = 1;
++  sim_debug(IMP_DBG_UDP, dptr, "link %d - listening on port %s and sending to %s\n", link, udp_links[link].lport, udp_links[link].rhostport);
++  return SCPE_OK;
++}
++
++t_stat udp_release (DEVICE *dptr, int32 link)
++{
++  if ((link < 0) || (link >= MAXLINKS)) return SCPE_IERR;
++  if (!udp_links[link].used) return SCPE_IERR;
++  if (dptr != udp_links[link].dptr) return SCPE_IERR;
++
++  tmxr_detach_ln (&udp_lines[link]);
++  udp_links[link].used = FALSE;
++  sim_debug(IMP_DBG_UDP, dptr, "link %d - closed\n", link);
++  return SCPE_OK;
++}
++
++t_stat udp_send (DEVICE *dptr, int32 link, uint16 *pdata, uint16 count)
++{
++  UDP_PACKET pkt;  int pktlen;  uint16 i;  t_stat iret;
++  if ((link < 0) || (link >= MAXLINKS)) return SCPE_IERR;
++  if (!udp_links[link].used) return SCPE_IERR;
++  if ((pdata == NULL) || (count == 0) || (count > MAXDATA)) return SCPE_IERR;
++  if (dptr != udp_links[link].dptr) return SCPE_IERR;
++
++  /* Build the packet - EVERYTHING in network order, matching h316_udp.c. */
++  pkt.magic = htonl(MAGIC);
++  pkt.sequence = htonl(udp_links[link].txsequence++);
++  pkt.count = htons(count);
++  for (i = 0;  i < count;  ++i)  pkt.data[i] = htons(*pdata++);
++  pktlen = UDP_HEADER_LEN + count*sizeof(uint16);
++
++  iret = tmxr_put_packet_ln (&udp_lines[link], (const uint8 *)&pkt, (size_t)pktlen);
++  if (iret != SCPE_OK) return sim_messagef(iret, "UDP%d - tmxr_put_packet_ln() failed with error %s\n", link, sim_error_text(iret));
++  sim_debug(IMP_DBG_UDP, dptr, "link %d - packet sent (sequence=%d, length=%d)\n", link, ntohl(pkt.sequence), ntohs(pkt.count));
++  return SCPE_OK;
++}
++
++static int32 udp_receive_packet (int32 link, UDP_PACKET *ppkt)
++{
++  size_t pktsiz;
++  const uint8 *pbuf;
++  t_stat ret;
++
++  udp_lines[link].rcve = TRUE;          /* Enable receiver  */
++  tmxr_poll_rx (&udp_tmxr);
++  ret = tmxr_get_packet_ln (&udp_lines[link], &pbuf, &pktsiz);
++  udp_lines[link].rcve = FALSE;         /* Disable receiver */
++  if (ret != SCPE_OK) {
++    sim_messagef (ret, "UDP%d - tmxr_get_packet_ln() failed with error %s\n", link, sim_error_text(ret));
++    return NOLINK;
++  }
++  if (pbuf == NULL) return 0;
++  memcpy (ppkt, pbuf, pktsiz);
++  return pktsiz;
++}
++
++int32 udp_receive (DEVICE *dptr, int32 link, uint16 *pdata, uint16 maxbuf)
++{
++  UDP_PACKET pkt;  int32 pktlen, explen, implen, i;  uint32 magic, pktseq;
++  if ((link < 0) || (link >= MAXLINKS)) return SCPE_IERR;
++  if (!udp_links[link].used) return SCPE_IERR;
++  if (dptr != udp_links[link].dptr) return SCPE_IERR;
++
++  while ((pktlen = udp_receive_packet(link, &pkt)) > 0) {
++    if (((size_t)pktlen) < UDP_HEADER_LEN) {
++      sim_debug(IMP_DBG_UDP, dptr, "link %d - received packet w/o header (length=%d)\n", link, pktlen);
++      continue;
++    }
++    magic = ntohl(pkt.magic);
++    if (magic != MAGIC) {
++      sim_debug(IMP_DBG_UDP, dptr, "link %d - received packet w/bad magic number (magic=%08x)\n", link, magic);
++      continue;
++    }
++    implen = ntohs(pkt.count);
++    explen = UDP_HEADER_LEN + implen*sizeof(uint16);
++    if (explen != pktlen) {
++      sim_debug(IMP_DBG_UDP, dptr, "link %d - received packet length wrong (expected=%d received=%d)\n", link, explen, pktlen);
++      continue;
++    }
++
++    pktseq = ntohl(pkt.sequence);
++    if ((pktseq == 0) && (udp_links[link].rxsequence != 0)) {
++      sim_debug(IMP_DBG_UDP, dptr, "link %d - remote modem restarted\n", link);
++    } else if (pktseq < udp_links[link].rxsequence) {
++      sim_debug(IMP_DBG_UDP, dptr, "link %d - received packet out of sequence 1 (expected=%d received=%d\n", link, udp_links[link].rxsequence, pktseq);
++      continue;
++    }
++    else if (pktseq != udp_links[link].rxsequence) {
++      sim_debug(IMP_DBG_UDP, dptr, "link %d - received packet out of sequence 2 (expected=%d received=%d\n", link, udp_links[link].rxsequence, pktseq);
++    }
++    udp_links[link].rxsequence = pktseq+1;
++
++    if ((pdata == NULL) || (maxbuf == 0)) {
++      sim_debug(IMP_DBG_UDP, dptr, "link %d - received packet discarded (no buffer available)\n", link);
++      return implen;
++    }
++
++    sim_debug(IMP_DBG_UDP, dptr, "link %d - packet received (sequence=%d, length=%d)\n", link, pktseq, pktlen);
++    for (i = 0;  i < (implen < maxbuf ? implen : maxbuf);  ++i)
++      *pdata++ = ntohs(pkt.data[i]);
++    return implen;
++  }
++
++  return pktlen;
++}
+diff --git a/PDP10/imp_udp.h b/PDP10/imp_udp.h
+new file mode 100644
+index 0000000..70a0adc
+--- /dev/null
++++ b/PDP10/imp_udp.h
+@@ -0,0 +1,28 @@
++/* imp_udp.h: 1822 host-interface-over-UDP socket routines for the PDP-10 IMP
++
++   Derived verbatim (framing-compatible) from Robert Armstrong's h316_udp.c,
++   Copyright (c) 2013 Robert Armstrong, bob@jfcl.com.  See imp_udp.c.
++
++   This header exposes the minimal UDP datagram interface used by the rcornwell
++   PDP-10 IMP device (kx10_imp.c) when running in authentic "ncp" mode, talking
++   to an H316 IMP simulator's host-interface (hi) over a UDP port pair.  The
++   on-the-wire datagram format is IDENTICAL to h316_udp.c (magic 'H316',
++   per-link sequence number, count of 16-bit words, then network-order words),
++   so a PDP-10 host built with this module is the matched peer of the H316 `hi`.
++*/
++
++#ifndef IMP_UDP_H_
++#define IMP_UDP_H_
++
++#include "sim_defs.h"
++
++#define IMP_UDP_NOLINK   (-1)        /* "no link" handle (cf. h316 NOLINK)      */
++#define IMP_UDP_MAXDATA  16384       /* longest IMP packet, in 16-bit words     */
++
++/* All lengths/counts below are in 16-bit words, NOT bytes - matching RLA. */
++t_stat udp_create  (DEVICE *dptr, const char *premote, int32 *pln);
++t_stat udp_release (DEVICE *dptr, int32 link);
++t_stat udp_send    (DEVICE *dptr, int32 link, uint16 *pdata, uint16 count);
++int32  udp_receive (DEVICE *dptr, int32 link, uint16 *pdata, uint16 maxbuf);
++
++#endif /* IMP_UDP_H_ */
+diff --git a/PDP10/kx10_imp.c b/PDP10/kx10_imp.c
+index f97aec5..1ad0503 100644
+--- a/PDP10/kx10_imp.c
++++ b/PDP10/kx10_imp.c
+@@ -26,6 +26,7 @@
+ 
+ #include "kx10_defs.h"
+ #include "sim_ether.h"
++#include "imp_udp.h"            /* authentic 1822-over-UDP host interface (ncp mode) */
+ 
+ #if NUM_DEVS_IMP > 0
+ #define IMP_DEVNUM      0460
+@@ -41,6 +42,11 @@
+ #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
+ #define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
+ 
++#define UNIT_V_NCP      (UNIT_V_UF + 3)         /* authentic 1822-over-UDP (ncp) mode */
++#define UNIT_NCP        (1 << UNIT_V_NCP)
++#define PFLG_FINAL      00001                   /* H316 hi flag: last word of message */
++#define PFLG_READY      00002                   /* H316 hi flag: host/imp ready line   */
++
+ #define TYPE_MIT        0              /* MIT Style KAIMP ITS */
+ #define TYPE_BBN        1              /* BBN style interface TENEX */
+ #define TYPE_WAITS      2              /* IMP connected to waits system. */
+@@ -468,6 +474,7 @@ struct imp_device {
+     int               init_state;              /* Initialization state */
+     uint32            dhcp_xid;                /* Transaction ID */
+     int               padding;                 /* Type zero padding */
++    int               udp_link;                /* 1822/UDP link handle (ncp mode), or IMP_UDP_NOLINK */
+     uint64            obuf;                    /* Output buffer */
+     uint64            ibuf;                    /* Input buffer */
+     int               obits;                   /* Output bits */
+@@ -519,6 +526,8 @@ void           imp_timer_task(struct imp_device *imp);
+ void           imp_send_rfmn(struct imp_device *imp);
+ void           imp_packet_in(struct imp_device *imp);
+ void           imp_send_packet (struct imp_device *imp_data, int len);
++void           imp_udp_send(struct imp_device *imp, int len);
++void           imp_udp_packet_in(struct imp_device *imp);
+ void           imp_free_packet(struct imp_device *imp, struct imp_packet *p);
+ struct imp_packet * imp_get_packet(struct imp_device *imp);
+ void           imp_arp_update(struct imp_device *imp, in_addr_T ipaddr, ETH_MAC ethaddr, int age);
+@@ -593,6 +602,10 @@ MTAB imp_mod[] = {
+            "Don't aquire address from DHCP"},
+     { UNIT_DHCP, UNIT_DHCP, "DHCP", "DHCP", NULL, NULL, NULL,
+            "Use DHCP to set IP address"},
++    { UNIT_NCP, 0, NULL, "NONCP", NULL, NULL, NULL,
++           "Use the modern IP/Ethernet IMP backend"},
++    { UNIT_NCP, UNIT_NCP, "NCP", "NCP", NULL, NULL, NULL,
++           "Authentic 1822 host interface over UDP to an H316 IMP"},
+     { MTAB_XTD|MTAB_VDV, 0, "DHCPIP", NULL,
+       NULL, &imp_show_dhcpip, NULL, "DHCP info" },
+ #if KS
+@@ -1213,8 +1226,12 @@ t_stat imp_srv(UNIT * uptr)
+         check_interrupts (uptr);
+     }
+ #endif
+-    if (uptr->ILEN == 0 && (uptr->STATUS & (IMPIB|IMPID)) == 0)
+-        imp_packet_in(&imp_data);
++    if (uptr->ILEN == 0 && (uptr->STATUS & (IMPIB|IMPID)) == 0) {
++        if (uptr->flags & UNIT_NCP)
++            imp_udp_packet_in(&imp_data);
++        else
++            imp_packet_in(&imp_data);
++    }
+     return SCPE_OK;
+ }
+ 
+@@ -1296,6 +1313,14 @@ t_stat imp_eth_srv(UNIT * uptr)
+ {
+     sim_clock_coschedule(uptr, 1000);              /* continue poll */
+ 
++    /* In authentic ncp mode the receiver is a UDP datagram socket to the H316
++       IMP; the DHCP/IP/Nop-handshake machinery below does not apply (the real
++       IMP performs the 1822 Nop handshake over the wire). */
++    if (imp_unit[0].flags & UNIT_NCP) {
++        imp_udp_packet_in(&imp_data);
++        return SCPE_OK;
++    }
++
+     imp_timer_task(&imp_data);
+     if (uptr->ILEN == 0 && (uptr->STATUS & (IMPIB|IMPID)) == 0)
+         imp_packet_in(&imp_data);
+@@ -1608,6 +1633,79 @@ imp_packet_in(struct imp_device *imp)
+    }
+ }
+ 
++/*
++ * Authentic 1822-over-UDP host interface (ncp mode).
++ *
++ * These two routines relay the raw 1822 host<->IMP message between the PDP-10
++ * host-facing side (sbuffer/rbuffer) and an H316 IMP simulator's host
++ * interface ("hi") over a UDP datagram socket, using R.Armstrong's framing
++ * (imp_udp.c).  The datagram carries an array of 16-bit words: data[0] is an
++ * out-of-band flags word (PFLG_READY = host/imp ready line, PFLG_FINAL = end
++ * of message); data[1..] are the message words.  Because udp_send/udp_receive
++ * htons() each word, the on-the-wire byte order is exactly the sbuffer byte
++ * order, so packing is a plain big-endian byte<->word pairing.
++ */
++void
++imp_udp_send(struct imp_device *imp, int len)
++{
++    uint16 buf[IMP_UDP_MAXDATA];
++    int    i, nw;
++
++    if (imp->udp_link == IMP_UDP_NOLINK)
++        return;
++    /* A complete 1822 message is assembled per call, and the host is up. */
++    buf[0] = PFLG_FINAL | PFLG_READY;
++    nw = 1;
++    for (i = 0; i < len && nw < IMP_UDP_MAXDATA; i += 2) {
++        uint16 w = (uint16)imp->sbuffer[i] << 8;
++        if (i + 1 < len)
++            w |= imp->sbuffer[i + 1];
++        buf[nw++] = w;
++    }
++    sim_debug(DEBUG_DETAIL, &imp_dev, "IMP ncp send %d bytes (%d words)\n", len, nw);
++    (void)udp_send(&imp_dev, imp->udp_link, buf, (uint16)nw);
++}
++
++void
++imp_udp_packet_in(struct imp_device *imp)
++{
++    uint16 buf[IMP_UDP_MAXDATA];
++    int32  nw;
++    int    i, nb;
++
++    if (imp->udp_link == IMP_UDP_NOLINK)
++        return;
++    /* Don't fetch a new message while one is still being delivered. */
++    if (imp_unit[0].ILEN != 0 || (imp_unit[0].STATUS & (IMPIB|IMPID)) != 0)
++        return;
++    nw = udp_receive(&imp_dev, imp->udp_link, buf, IMP_UDP_MAXDATA);
++    if (nw <= 0)
++        return;
++    /* buf[0] = out-of-band flags; surface the IMP-ready line to the host. */
++    if (buf[0] & PFLG_READY)
++        imp_unit[0].STATUS |= IMPR;
++    else
++        imp_unit[0].STATUS &= ~IMPR;
++    /* Unpack the message words (after the flags word) into rbuffer bytes. */
++    nb = 0;
++    for (i = 1; i < nw; i++) {
++        imp->rbuffer[nb++] = (buf[i] >> 8) & 0xff;
++        imp->rbuffer[nb++] = buf[i] & 0xff;
++    }
++    sim_debug(DEBUG_DETAIL, &imp_dev, "IMP ncp recv %d words (%d msg bytes) flags=%o\n",
++              nw, nb, buf[0]);
++    if (nb == 0) {              /* ready-status datagram only, no message body */
++        check_interrupts(&imp_unit[0]);
++        return;
++    }
++    imp_unit[0].STATUS |= IMPIB;
++    imp_unit[0].IPOS = 0;
++    imp_unit[0].ILEN = nb * 8;
++    check_interrupts(&imp_unit[0]);
++    if (!sim_is_active(&imp_unit[0]))
++        sim_activate(&imp_unit[0], 100);
++}
++
+ void
+ imp_send_packet (struct imp_device *imp, int len)
+ {
+@@ -1619,6 +1717,12 @@ imp_send_packet (struct imp_device *imp, int len)
+     int        lk;
+     int        mt;
+ 
++    /* Authentic ncp mode: relay the raw 1822 message to the H316 IMP. */
++    if (imp_unit[0].flags & UNIT_NCP) {
++        imp_udp_send(imp, len);
++        return;
++    }
++
+     lk = 0;
+     n = len;
+     switch (imp->sbuffer[0] & 0xF) {
+@@ -3103,6 +3207,7 @@ t_stat imp_reset (DEVICE *dptr)
+         /* Clear ARP table. */
+         memset(imp_data.arp_table, 0, sizeof(imp_data.arp_table));
+         imp_data.dhcp_state = DHCP_STATE_OFF;
++        imp_data.udp_link = IMP_UDP_NOLINK;   /* no authentic 1822/UDP link yet */
+     }
+     /* Clear queues. */
+     imp_data.sendq = NULL;
+@@ -3146,6 +3251,29 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
+                    break;
+     }
+ #endif
++    /* Authentic ncp mode: open a UDP datagram link to the H316 IMP's host
++       interface instead of an Ethernet device.  cptr is the udp connect
++       string, e.g. "21052:localhost:21051" (local:host:remote). */
++    if (imp_unit[0].flags & UNIT_NCP) {
++        int32 link;
++        status = udp_create(&imp_dev, cptr, &link);
++        if (status != SCPE_OK)
++            return status;
++        imp_data.udp_link = link;
++        tptr = (char *) malloc(strlen(cptr) + 1);
++        if (tptr == NULL) {
++            udp_release(&imp_dev, link);
++            imp_data.udp_link = IMP_UDP_NOLINK;
++            return SCPE_MEM;
++        }
++        strcpy(tptr, cptr);
++        uptr->filename = tptr;
++        uptr->flags |= UNIT_ATT;
++        imp_data.init_state = 0;
++        sim_activate_after(&imp_unit[1], 1000);       /* start UDP receiver poll */
++        sim_activate_after(&imp_unit[2], 1000000);    /* start timer service     */
++        return SCPE_OK;
++    }
+     if (!(uptr->flags & UNIT_DHCP) && imp_data.ip == 0)
+       return sim_messagef (SCPE_NOATT, "%s: An IP Address must be specified when DHCP is disabled\n",
+                imp_dev.name);
+@@ -3229,6 +3357,18 @@ t_stat imp_detach(UNIT* uptr)
+ {
+ 
+     if (uptr->flags & UNIT_ATT) {
++        if (uptr->flags & UNIT_NCP) {       /* authentic 1822/UDP link */
++            sim_cancel (uptr+1);            /* stop the UDP receiver poll */
++            sim_cancel (uptr+2);            /* stop the clock timer service */
++            if (imp_data.udp_link != IMP_UDP_NOLINK) {
++                udp_release (&imp_dev, imp_data.udp_link);
++                imp_data.udp_link = IMP_UDP_NOLINK;
++            }
++            free(uptr->filename);
++            uptr->filename = NULL;
++            uptr->flags &= ~UNIT_ATT;
++            return SCPE_OK;
++        }
+         /* If DHCP, release our IP address */
+         if (uptr->flags & UNIT_DHCP) {
+           imp_dhcp_release(&imp_data);
+diff --git a/makefile b/makefile
+index d40abfb..3574eaf 100644
+--- a/makefile
++++ b/makefile
+@@ -1554,7 +1554,7 @@ KA10 = ${KA10D}/kx10_cpu.c ${KA10D}/kx10_sys.c ${KA10D}/kx10_df.c \
+ 	${KA10D}/kx10_rp.c ${KA10D}/kx10_rc.c ${KA10D}/kx10_dt.c \
+ 	${KA10D}/kx10_dk.c ${KA10D}/kx10_cr.c ${KA10D}/kx10_cp.c \
+ 	${KA10D}/kx10_tu.c ${KA10D}/kx10_rs.c ${KA10D}/ka10_pd.c \
+-	${KA10D}/kx10_rh.c ${KA10D}/kx10_imp.c ${KA10D}/ka10_tk10.c \
++	${KA10D}/kx10_rh.c ${KA10D}/kx10_imp.c ${KA10D}/imp_udp.c ${KA10D}/ka10_tk10.c \
+ 	${KA10D}/ka10_mty.c ${KA10D}/ka10_imx.c ${KA10D}/ka10_ch10.c \
+ 	${KA10D}/ka10_stk.c ${KA10D}/ka10_ten11.c ${KA10D}/ka10_auxcpu.c \
+ 	${KA10D}/ka10_pmp.c ${KA10D}/ka10_dkb.c ${KA10D}/pdp6_dct.c \
+@@ -1586,7 +1586,7 @@ KI10 = ${KI10D}/kx10_cpu.c ${KI10D}/kx10_sys.c ${KI10D}/kx10_df.c \
+ 	${KI10D}/kx10_rh.c ${KI10D}/kx10_rp.c ${KI10D}/kx10_rc.c \
+ 	${KI10D}/kx10_dt.c ${KI10D}/kx10_dk.c ${KI10D}/kx10_cr.c \
+ 	${KI10D}/kx10_cp.c ${KI10D}/kx10_tu.c ${KI10D}/kx10_rs.c \
+-	${KI10D}/kx10_imp.c ${KI10D}/kx10_dpy.c ${KI10D}/kx10_disk.c \
++	${KI10D}/kx10_imp.c ${KI10D}/imp_udp.c ${KI10D}/kx10_dpy.c ${KI10D}/kx10_disk.c \
+ 	${KI10D}/kx10_ddc.c ${KI10D}/kx10_tym.c ${DISPLAYL} ${DISPLAY340}
+ KI10_OPT = -DKI=1 -DUSE_INT64 -I ${KI10D} -DUSE_SIM_CARD ${NETWORK_OPT} ${DISPLAY_OPT} ${KI10_DISPLAY_OPT}
+ ifneq (${PANDA_LIGHTS},)
+@@ -1606,7 +1606,7 @@ KL10 = ${KL10D}/kx10_cpu.c ${KL10D}/kx10_sys.c ${KL10D}/kx10_df.c \
+     ${KA10D}/kx10_pt.c ${KA10D}/kx10_dc.c ${KL10D}/kx10_rh.c \
+     ${KA10D}/kx10_dt.c ${KA10D}/kx10_cr.c ${KA10D}/kx10_cp.c \
+ 	${KL10D}/kx10_rp.c ${KL10D}/kx10_tu.c ${KL10D}/kx10_rs.c \
+-	${KL10D}/kx10_imp.c ${KL10D}/kl10_fe.c ${KL10D}/ka10_pd.c \
++	${KL10D}/kx10_imp.c ${KL10D}/imp_udp.c ${KL10D}/kl10_fe.c ${KL10D}/ka10_pd.c \
+ 	${KL10D}/ka10_ch10.c ${KL10D}/kl10_nia.c ${KL10D}/kx10_disk.c \
+     ${KL10D}/kl10_dn.c
+ KL10_OPT = -DKL=1 -DUSE_INT64 -I ${KL10D} -DUSE_SIM_CARD ${NETWORK_OPT} 
+@@ -1620,7 +1620,7 @@ KS10 = ${KS10D}/kx10_cpu.c ${KS10D}/kx10_sys.c ${KS10D}/kx10_disk.c \
+ 	${KS10D}/ks10_cty.c ${KS10D}/ks10_uba.c ${KS10D}/kx10_rh.c \
+ 	${KS10D}/kx10_rp.c ${KS10D}/kx10_tu.c ${KS10D}/ks10_dz.c \
+     ${KS10D}/ks10_tcu.c ${KS10D}/ks10_lp.c ${KS10D}/ks10_ch11.c \
+-    ${KS10D}/ks10_kmc.c ${KS10D}/ks10_dup.c ${KS10D}/kx10_imp.c
++    ${KS10D}/ks10_kmc.c ${KS10D}/ks10_dup.c ${KS10D}/kx10_imp.c ${KS10D}/imp_udp.c
+ KS10_OPT = -DKS=1 -DUSE_INT64 -I ${KS10D} ${NETWORK_OPT} 
+ ifneq (${PIDP10},)
+ KS10_OPT += -DPIDP10=1
