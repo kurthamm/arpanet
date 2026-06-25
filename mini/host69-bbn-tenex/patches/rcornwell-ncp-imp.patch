@@ -291,7 +291,7 @@ index 0000000..70a0adc
 +
 +#endif /* IMP_UDP_H_ */
 diff --git a/PDP10/kx10_imp.c b/PDP10/kx10_imp.c
-index f97aec5..610df2d 100644
+index f97aec5..c8ac797 100644
 --- a/PDP10/kx10_imp.c
 +++ b/PDP10/kx10_imp.c
 @@ -26,6 +26,7 @@
@@ -345,10 +345,23 @@ index f97aec5..610df2d 100644
      { MTAB_XTD|MTAB_VDV, 0, "DHCPIP", NULL,
        NULL, &imp_show_dhcpip, NULL, "DHCP info" },
  #if KS
-@@ -858,6 +874,12 @@ static void check_interrupts (UNIT *uptr)
+@@ -856,8 +872,23 @@ static void check_interrupts (UNIT *uptr)
+         else
+             set_interrupt_mpx(DEVNUM, imp_data.pia, imp_mpx_lvl);
      }
-     if (uptr->STATUS & IMPOD)
-        set_interrupt_mpx(DEVNUM, imp_data.pia >> 3, imp_mpx_lvl + 1);
+-    if (uptr->STATUS & IMPOD)
+-       set_interrupt_mpx(DEVNUM, imp_data.pia >> 3, imp_mpx_lvl + 1);
++    if (uptr->STATUS & IMPOD) {
++       /* TENEX's BBN IMP driver assigns ONE PI channel (via CONO ODPIEN -> pia
++          bits 0-2) and sets the separate "output" PIA field (bits 3-5) to 0, i.e.
++          it expects output-done to interrupt on the SAME channel as input.  Use
++          the output PIA if the monitor set one, else fall back to the input PIA so
++          the output-done interrupt actually fires and impsvx can dispatch it. */
++       int opia = (imp_data.pia >> 3) & 7;
++       if (opia == 0)
++           opia = imp_data.pia & 7;
++       set_interrupt_mpx(DEVNUM, opia, imp_mpx_lvl + 1);
++    }
 +    sim_debug(DEBUG_IRQ, &imp_dev,
 +        "IMP chkint STATUS=%06o pia=%03o in=%o out=%o (ID=%d OD=%d RDY=%d)\n",
 +        (uint32)uptr->STATUS, imp_data.pia, imp_data.pia & 7,
@@ -358,7 +371,7 @@ index f97aec5..610df2d 100644
  }
  
  t_stat imp_devio(uint32 dev, uint64 *data)
-@@ -910,6 +932,13 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -910,6 +941,13 @@ t_stat imp_devio(uint32 dev, uint64 *data)
                   uptr->STATUS &= ~(IMPO32|IMPLHW|IMPOD);
                   if (*data & IMP_O32)
                       uptr->STATUS |= IMPO32;
@@ -372,7 +385,7 @@ index f97aec5..610df2d 100644
               }
               if (*data & IMP_IDPIEN) {
                   imp_data.pia &= ~070;
-@@ -943,6 +972,12 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -943,6 +981,12 @@ t_stat imp_devio(uint32 dev, uint64 *data)
                   uptr->STATUS &= ~IMPID;
                   uptr->ILEN = 0;
               }
@@ -385,7 +398,7 @@ index f97aec5..610df2d 100644
               check_interrupts(uptr);
               break;
          }
-@@ -1213,8 +1248,12 @@ t_stat imp_srv(UNIT * uptr)
+@@ -1213,8 +1257,12 @@ t_stat imp_srv(UNIT * uptr)
          check_interrupts (uptr);
      }
  #endif
@@ -400,7 +413,7 @@ index f97aec5..610df2d 100644
      return SCPE_OK;
  }
  
-@@ -1296,6 +1335,14 @@ t_stat imp_eth_srv(UNIT * uptr)
+@@ -1296,6 +1344,14 @@ t_stat imp_eth_srv(UNIT * uptr)
  {
      sim_clock_coschedule(uptr, 1000);              /* continue poll */
  
@@ -415,7 +428,7 @@ index f97aec5..610df2d 100644
      imp_timer_task(&imp_data);
      if (uptr->ILEN == 0 && (uptr->STATUS & (IMPIB|IMPID)) == 0)
          imp_packet_in(&imp_data);
-@@ -1608,6 +1655,112 @@ imp_packet_in(struct imp_device *imp)
+@@ -1608,6 +1664,112 @@ imp_packet_in(struct imp_device *imp)
     }
  }
  
@@ -528,7 +541,7 @@ index f97aec5..610df2d 100644
  void
  imp_send_packet (struct imp_device *imp, int len)
  {
-@@ -1619,6 +1772,12 @@ imp_send_packet (struct imp_device *imp, int len)
+@@ -1619,6 +1781,12 @@ imp_send_packet (struct imp_device *imp, int len)
      int        lk;
      int        mt;
  
@@ -541,7 +554,7 @@ index f97aec5..610df2d 100644
      lk = 0;
      n = len;
      switch (imp->sbuffer[0] & 0xF) {
-@@ -3103,6 +3262,8 @@ t_stat imp_reset (DEVICE *dptr)
+@@ -3103,6 +3271,8 @@ t_stat imp_reset (DEVICE *dptr)
          /* Clear ARP table. */
          memset(imp_data.arp_table, 0, sizeof(imp_data.arp_table));
          imp_data.dhcp_state = DHCP_STATE_OFF;
@@ -550,7 +563,7 @@ index f97aec5..610df2d 100644
      }
      /* Clear queues. */
      imp_data.sendq = NULL;
-@@ -3146,6 +3307,30 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
+@@ -3146,6 +3316,30 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
                     break;
      }
  #endif
@@ -581,7 +594,7 @@ index f97aec5..610df2d 100644
      if (!(uptr->flags & UNIT_DHCP) && imp_data.ip == 0)
        return sim_messagef (SCPE_NOATT, "%s: An IP Address must be specified when DHCP is disabled\n",
                 imp_dev.name);
-@@ -3229,6 +3414,18 @@ t_stat imp_detach(UNIT* uptr)
+@@ -3229,6 +3423,18 @@ t_stat imp_detach(UNIT* uptr)
  {
  
      if (uptr->flags & UNIT_ATT) {

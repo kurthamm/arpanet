@@ -1,10 +1,62 @@
 # Host #69 BBN-TENEX — authentic ARPANET IMP bring-up: session handoff
 
-**Date:** 2026-06-24  ·  **Branch:** `host69-tenex-ncp-imp`  ·  **Author:** Kurt Hamm + Claude
+**Date:** 2026-06-25 (updated)  ·  **Branch:** `host69-tenex-ncp-imp`  ·  **Author:** Kurt Hamm + Claude
 
 This documents the work to give the BBN-TENEX simulator (host #69) an authentic
 1822 host interface so it can join the lab's 1972 ARPANET and serve `@L 69`.
 Read this first in any future session, then the memory files it links.
+
+---
+
+## 0. START HERE (next session) — exact state + next steps
+
+**Status:** the host↔IMP 1822 handshake is ~85% working. TENEX's monitor boots, runs its
+full IMP bring-up, receives the IMP's NOP, and assigns PI channel 5 (`pia=5`). The LAST
+step — host69 sending its own NOP back to imp05 — stalls on a **BBN-IMP device-fidelity
+mismatch** in rcornwell's `TYPE_BBN` emulation (CONI/CONO/PIA bit layout + the output
+FINO/IMPLHW/IMPOD state machine don't match what TENEX 1.31 drives). `imp05 received` = 0.
+
+**Two concrete remaining mismatches (the work):**
+1. The monitor's IMP service `impsvx` (PC 131077) dispatches **input-done on CONI bit `010`**
+   (131101 `consz 550,10`), but the emulator surfaces input-done at bit `020000` (`IMP_IDONE`).
+   Output-done (bit `04000`) DOES match. Reconcile the BBN CONI bits to the impsvx mask reads
+   at PC 131077 / 131101 / 131103 / 131105 / 131106 (use those as the register spec).
+2. The output never reaches `imp_send_packet`: `imp_srv` (kx10_imp.c ~1223-1240, KI `#else`
+   path) sends only when `IMPLHW` is set, but TENEX's CONO order (CONO 320 FINO *before* the
+   DATO) isn't leaving IMPLHW/IMPOD in the state that triggers the send. Trace the
+   FINO(0100)/STROUT(0200)/IMPLHW/IMPOD interaction vs TENEX's 136610-136640 output loop.
+
+**BEST next move (recommended):** get the authoritative **BBN IMP host-interface spec** (BBN
+Report 1822 / the KA10–KI10 "BBN IMP interface" CONI/CONO bit definitions) and map the bits
+exactly, instead of inferring from the TENEX binary. Then the two mismatches above are
+mechanical fixes. Avoid blind bit-guessing — each cycle is ~5 min build+boot and risks
+regressing the working parts.
+
+**Reproduce in ~4 min:**
+```
+cd mini/host69-bbn-tenex/kit-cache/rcornwell-sims && make pdp10-ki   # if you edited source
+cd mini/host69-bbn-tenex && ./run-h69-bootpark.sh                    # boots host69 -> parks on 2323
+# in mini/: run imp05 standalone AFTER host69 binds 21052:
+cd mini && nohup ./h316ov ./imp05.local.simh > host69-bbn-tenex/logs/imp05-standalone.log 2>&1 </dev/null &
+# connect to release `go` + give it a console:
+bash -c 'exec 3<>/dev/tcp/127.0.0.1/2323; cat <&3 & printf "\r\n" >&3; sleep 600'
+```
+Watch `logs/host69-bootpark.log` for `BBNCONO` (pia decode), `chkint` (IRQ channel),
+`IMP ncp recv/send`; success = `HI2 ... received` lines in `logs/imp05-standalone.log`.
+Driver: `runtime/build-tenex-bootpark-ncp.do` (boot to bare monitor + IMP debug + park 2323;
+it also `examine`s neton/imprdy at NO EXEC). NOTE the driver's `deposit 70204` neton-force is
+a leftover no-op (neton is already set) — harmless, can remove.
+
+**Emulator state:** `kit-cache/rcornwell-sims` HEAD `877cde5` (EXPERIMENTAL single-PI-channel
+output, UNPROVEN — proven-good baseline is `a438d50`). The 4 prior fixes (disk fflush/IOERR,
+scp.c console timeout, kx10_cpu.c pager, kx10_tym.c div0) are uncommitted working-tree mods —
+a rebuild preserves them; do NOT `git checkout` them. Patch: `patches/rcornwell-ncp-imp.patch`
+(655 lines, from base `9510a91`).
+
+**Lab process state at handoff:** imp05 may be running standalone (pid varies) with hi2; a
+host69 `pdp10-ki` may be parked on 2323. `kill $(pgrep -x pdp10-ki)` and re-run as above for a
+clean start. imp05's noc instance is STOPPED (noc per-IMP PTY restart crashes a peerless hi2);
+imp05 standalone is the working approach (start it AFTER host69 binds 21052).
 
 ---
 
