@@ -1,0 +1,24 @@
+; Isolated single-host IMP for host69 BBN-TENEX ncp bring-up test.
+; ONLY hi2 (host #69) on the production ports 21051/21052 -- no modem links and
+; no hi1, so it cannot touch the live ARPANET and cannot crash on a missing
+; BBN-NCC peer.  Matches the bootpark driver's host69 attach (21052:...:21051).
+set debug stdout
+do impconfig.simh
+set imp num=5
+do impcode.simh
+
+set mi1 disabled
+set mi2 disabled
+set mi3 disabled
+set mi4 disabled
+set mi5 disabled
+set hi1 disabled
+set hi3 disabled
+set hi4 disabled
+
+set hi2 enabled
+set hi2 debug
+attach -u hi2 21051:127.0.0.1:21052
+; Host 1 = BBN-TENEX (host #69)
+
+go

@@ -10,27 +10,103 @@ Read this first in any future session, then the memory files it links.
 
 ## 0. START HERE (next session) — exact state + next steps
 
+> **2026-06-25 LATE UPDATE — live bring-up reached `RDY=1`; blocker is now NO-SYSJOB.**
+> Verified end-to-end on a STABLE running TENEX (fast installed-boot, see below):
+> - Emulator fixes committed (rcornwell `33f226e` + a follow-up): TENEX-faithful
+>   CONI/CONO bit layout; **inbound UDP poll re-armed with `sim_activate`** (the
+>   `sim_clock_coschedule` poll silently stops after boot); **surface IMP-ready on a
+>   live UDP link** (the H316 IMP's ready Nop is a one-shot startup burst, missed if
+>   the host wasn't booted yet). Patch `patches/rcornwell-ncp-imp.patch` (763 lines).
+> - **INBOUND LINK VALIDATED (2026-06-25 late):** with `UDP` debug on, host69
+>   receives the IMP's real 1822 NCP burst cleanly — `link 0 - packet received
+>   sequence=0..5`, ZERO magic/sequence drops, `host69rx=6`, `RDY=1`. The poll fix
+>   (sim_activate) makes this reliable; receive works regardless of IMP-start order.
+>   So IMP→host over the authentic 1822-over-UDP wire is PROVEN. (Earlier "0 received"
+>   was just checking before the burst arrived.)
+> - **OUTBOUND still blocked (the wall):** even with the IMP ready at boot, TENEX
+>   never runs `IMPRSS`, so `TENEXCONO=0`/`pia=0` and it sends no host Nops. The boot
+>   device-init bring-up (137143, which would assign the channel) doesn't complete,
+>   and the fork path `IMPSTB`→`IMPRSS` is gated. `CHKNET` (clears `NETTCH`) IS called
+>   by job-0's `CHKR`, so NETTCH alone isn't it — `IMPRDY` state and/or job-0 not
+>   advancing point back at needing **SYSJOB** (the net job). Provisioning SYSJOB is
+>   the unified next step for BOTH link-completion and login. Caveat: the forced
+>   IMP-ready may set IMPRDY=-1 (premature "up") and should likely be REMOVED so the
+>   real handshake drives IMPRDY — test that with SYSJOB present. Also the sim
+>   occasionally exits after a couple min at `!` ("KI DIED") — console/idle stability
+>   to revisit.
+> - (superseded sub-line) TENEX now reads CONI as **ready (`RDY=1`)**. But it still does NOT assign
+>   the PI channels (`TENEXCONO`=0, `pia=0`). Per `impdv.mac`, `IMPSTB` calls `IMPRSS`
+>   only when `IMPRDY==0 && NETON && NETTCH<=0`; it's stuck because `IMPRDY` is already
+>   `-1` (device-init thought the link up) and/or `NETTCH>0` (an unreported net
+>   state-change). Clearing that needs the network job/logger to run = **SYSJOB**.
+>   `sysjob.sav` is in the kit (`kit-cache/imsss/files/system/sysjob.sav.3`); the
+>   install driver never installs/starts it. THAT is the next step (see [[host69-tenex-authentic-goal]]).
+> - **Inbound receive caveat (unsolved):** even with the poll fix, host69's tmxr-UDP
+>   received 0 datagrams from a freshly-restarted IMP (sockets correct, `Recv-Q=0`);
+>   that's why IMP-ready had to be forced. Investigate tmxr UDP delivery / start the
+>   IMP BEFORE host69 so host69's tmxr connects to a live peer.
+>
+> **FAST ITERATION (big win — no more 18-min reinstall):** the installed disk now
+> boots in ~1 min via `runtime/build-tenex-bootinstalled-ncp.do` (SYSLOD no-clobber).
+> One-shot harness: `reboot-test.sh` (cleans only host69 procs, boots, drains the
+> 2323 console with `scratchpad/pyconsole.py`, restarts the IMP, watches for
+> `TENEXCONO`; self-reports to `logs/reboot-test.out`). LAUNCH DETACHED:
+> `setsid bash reboot-test.sh &` — inline/`run_in_background` ki launches get
+> SIGTERM'd at the 2-min tool timeout; a setsid/detached script survives.
+> Do NOT `reset-disk.sh` (it wipes the installed system; full reinstall driver is
+> `build-tenex-live-ncp-nodumper.do`).
+>
+> **2026-06-25 UPDATE — the diagnosis below this box SUPERSEDES the older framing.**
+> The prior "fix one input-done bit; output-done already matches; pia=5" story was WRONG
+> on multiple counts (verified against the real driver source). Read this box first.
+
+**Authoritative source found:** the real TENEX IMP driver `impdv.mac` is IN THE KIT —
+`kit-cache/build-tenex/install/monitor/impdv.mac;3` (the source THIS monitor was built
+from). It is the definitive CONI/CONO spec; do NOT infer bits from the disassembly or a
+generic 1822 doc. `IMPCHN==5` is in `…/install/monitor/params.mac;5`.
+
+**What was actually wrong + FIXED (committed, rebuilt, verified live):**
+rcornwell's `TYPE_BBN` CONI/CONO bit layout wholesale-mismatched this TENEX (upstream
+master has the same wrong bits — it was never validated against TENEX). Per `impdv.mac`:
+input-ready=`010`(IMPINB), output-ready=`0200`(IMPOUB), end-input=`04000`(IMPEIB),
+imp-ready-line=`020000`(1B22), power=`0200000`(1B19), out-chan field=`0160`; and TENEX
+drives transfers with BLKI/BLKO+PI pacing (IMPION/IMPOON channel assign, IMPEOB=send),
+NOT the emulator's STRIN/STROUT/FINO model. Rewrote the ncp CONI/CONO to match, gated on
+`UNIT_NCP` (committed rcornwell `33f226e`; patch `patches/rcornwell-ncp-imp.patch`
+regenerated, 749 lines). **Verified live:** with the missing `020000` ready-line bit now
+emitted, CONI reads `220000` (power+ready) and `IMPR` LATCHES against imp05 hi2 — the old
+binary stalled at `pia=0` exactly because that bit was absent.
+
+**THE REAL REMAINING BLOCKER (correctly located now):** it is NOT the emulator. The bare
+`go 100`/NO-EXEC bootpark monitor never brings up NCP because the NCP background fork is
+spawned by `IMPBEG` (`impdv.mac:767`), which is `CALL`ed only from `RUNDD`
+(`swpmon.mac:849`, `IFDEF IMPCHN <CALL IMPBEG>`) during FULL system startup. No fork →
+`IMPSTT`→`IMPRSS` never runs → no channel assign, no NOPs (`TENEXCONO`=0 in bootpark).
+This is the same "NO SYSJOB / network job" wall as [[host69-tenex-authentic-goal]].
+
+**NEXT STEP (in progress at handoff):** boot a FULLY-installed live TENEX so RUNDD spawns
+the fork. Driver `runtime/build-tenex-live-ncp-nodumper.do` (install → live `!` EXEC,
+skips flaky DUMPER, parks on 2323); runner `run-h69-live.sh`. With imp05/imp69 present,
+watch `logs/host69-live.log` for `TENEXCONO` (channel assign) and the IMP log for a
+message FROM host69 (= host→IMP NOP = success). Isolated test IMP: `mini/imp69-hi2only.simh`
+(hi2 only on 21051/21052, no hi1 to crash). See memory [[host69-tenex-imp-bitmap]].
+
+**Also verify once packets flow (handoff missed):** `mini/imp05.local.simh` hi2 has NO
+`set convert`; `mini/pdp-hosts` says PDP-10 IMP links need convert mode (1822 long↔short
+leader).
+
+---
+### (historical, superseded) original §0 framing
+The text below was the prior session's hypothesis; kept for context but corrected above.
+
 **Status:** the host↔IMP 1822 handshake is ~85% working. TENEX's monitor boots, runs its
 full IMP bring-up, receives the IMP's NOP, and assigns PI channel 5 (`pia=5`). The LAST
 step — host69 sending its own NOP back to imp05 — stalls on a **BBN-IMP device-fidelity
-mismatch** in rcornwell's `TYPE_BBN` emulation (CONI/CONO/PIA bit layout + the output
-FINO/IMPLHW/IMPOD state machine don't match what TENEX 1.31 drives). `imp05 received` = 0.
+mismatch** in rcornwell's `TYPE_BBN` emulation.
 
-**Two concrete remaining mismatches (the work):**
-1. The monitor's IMP service `impsvx` (PC 131077) dispatches **input-done on CONI bit `010`**
-   (131101 `consz 550,10`), but the emulator surfaces input-done at bit `020000` (`IMP_IDONE`).
-   Output-done (bit `04000`) DOES match. Reconcile the BBN CONI bits to the impsvx mask reads
-   at PC 131077 / 131101 / 131103 / 131105 / 131106 (use those as the register spec).
-2. The output never reaches `imp_send_packet`: `imp_srv` (kx10_imp.c ~1223-1240, KI `#else`
-   path) sends only when `IMPLHW` is set, but TENEX's CONO order (CONO 320 FINO *before* the
-   DATO) isn't leaving IMPLHW/IMPOD in the state that triggers the send. Trace the
-   FINO(0100)/STROUT(0200)/IMPLHW/IMPOD interaction vs TENEX's 136610-136640 output loop.
-
-**BEST next move (recommended):** get the authoritative **BBN IMP host-interface spec** (BBN
-Report 1822 / the KA10–KI10 "BBN IMP interface" CONI/CONO bit definitions) and map the bits
-exactly, instead of inferring from the TENEX binary. Then the two mismatches above are
-mechanical fixes. Avoid blind bit-guessing — each cycle is ~5 min build+boot and risks
-regressing the working parts.
+**BEST next move (recommended):** get the authoritative **BBN IMP host-interface spec** and
+map the bits exactly. (Superseded: the authoritative source is `impdv.mac` in the kit, and
+the bits are already mapped + fixed; the blocker is the NCP fork / full boot.)
 
 **Reproduce in ~4 min:**
 ```

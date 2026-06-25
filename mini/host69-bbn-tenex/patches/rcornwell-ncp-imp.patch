@@ -291,7 +291,7 @@ index 0000000..70a0adc
 +
 +#endif /* IMP_UDP_H_ */
 diff --git a/PDP10/kx10_imp.c b/PDP10/kx10_imp.c
-index f97aec5..c8ac797 100644
+index f97aec5..6adb914 100644
 --- a/PDP10/kx10_imp.c
 +++ b/PDP10/kx10_imp.c
 @@ -26,6 +26,7 @@
@@ -371,7 +371,58 @@ index f97aec5..c8ac797 100644
  }
  
  t_stat imp_devio(uint32 dev, uint64 *data)
-@@ -910,6 +941,13 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -904,12 +935,64 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+              break;
+         case TYPE_BBN:
+         case TYPE_WAITS:
++             if (uptr->flags & UNIT_NCP) {
++                 /* TENEX-faithful BBN IMP CONO, decoded against the real driver
++                    impdv.mac (build-tenex/install/monitor).  TENEX assigns the
++                    PI channels with:
++                      IMPION = <10+chan>B27 + <10+chan>  (input,  chan in low 3)
++                      IMPOON = <10+chan>B31              (output, chan in B28-31)
++                    and drives the transfer with BLKI/BLKO, ending output with
++                      IMPEOB 020000 (send end bit -> ship the 1822 message)
++                    IMPSTO 040000 stop, IMPGEB 010000 clear-end-input,
++                    1B19 0200000 clear error / set host ready. */
++                 if (*data & 0000010) {        /* IMPION/IMPIOF: input PI */
++                     imp_data.pia &= ~07;
++                     if (*data & 07) {         /* IMPION: assign + arm input */
++                         imp_data.pia |= *data & 07;
++                         imp_data.imp_link_up = 1;
++                     } else {                  /* IMPIOF: clear input PI */
++                         imp_data.imp_link_up = 0;
++                     }
++                 } else if ((*data >> 4) & 010) { /* IMPOON/IMPOOF: output PI */
++                     imp_data.pia &= ~070;
++                     imp_data.pia |= ((*data >> 4) & 07) << 3;
++                 }
++                 if (*data & 0040000)          /* IMPSTO stop output */
++                     uptr->STATUS &= ~IMPOD;
++                 if (*data & 0010000)          /* IMPGEB clear end of input */
++                     uptr->STATUS &= ~IMPLW;
++                 if (*data & 0200000)          /* 1B19 clear error flop */
++                     uptr->STATUS &= ~(IMPERR|IMPHER);
++                 if (*data & 0020000) {        /* IMPEOB end of output -> send */
++                     if (uptr->OPOS > 0) {
++                         imp_send_packet(&imp_data, (uptr->OPOS + 7) >> 3);
++                         memset(imp_data.sbuffer, 0, ETH_FRAME_SIZE);
++                         uptr->OPOS = 0;
++                     }
++                     uptr->STATUS &= ~IMPOD;
++                 }
++                 sim_debug(DEBUG_CONO, dptr,
++                    "IMP TENEXCONO data=%06o -> pia=%03o (ION=%d OON=%d EOB=%d "
++                    "STO=%d GEB=%d)\n", (uint32)*data, imp_data.pia,
++                    (*data & 010) != 0, (((*data >> 4) & 010) != 0),
++                    (*data & 020000) != 0, (*data & 040000) != 0,
++                    (*data & 010000) != 0);
++                 check_interrupts(uptr);
++                 break;
++             }
+              if (*data & IMP_ODPIEN) {
+                  imp_data.pia &= ~07;
+                  imp_data.pia |= *data & 07;
                   uptr->STATUS &= ~(IMPO32|IMPLHW|IMPOD);
                   if (*data & IMP_O32)
                       uptr->STATUS |= IMPO32;
@@ -385,7 +436,7 @@ index f97aec5..c8ac797 100644
               }
               if (*data & IMP_IDPIEN) {
                   imp_data.pia &= ~070;
-@@ -943,6 +981,12 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -943,6 +1026,12 @@ t_stat imp_devio(uint32 dev, uint64 *data)
                   uptr->STATUS &= ~IMPID;
                   uptr->ILEN = 0;
               }
@@ -398,7 +449,50 @@ index f97aec5..c8ac797 100644
               check_interrupts(uptr);
               break;
          }
-@@ -1213,8 +1257,12 @@ t_stat imp_srv(UNIT * uptr)
+@@ -955,6 +1044,42 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+              break;
+         case TYPE_BBN:
+         case TYPE_WAITS:
++             if (uptr->flags & UNIT_NCP) {
++                 /* TENEX-faithful BBN IMP CONI layout, per impdv.mac.  The
++                    monitor polls (IMPSV/IMPRSS/IMISRT):
++                      low 3 bits  input PI channel assigned
++                      0000010     IMPINB  input word ready  (input done)
++                      0000160     output PI channel (bits 29-31)
++                      0000200     IMPOUB  output word ready (output done)
++                      0004000     IMPEIB  end of input
++                      0020000     1B22    imp ready line up (imp up)
++                      0040000     1B21    error flop
++                      0100000     1B20    host not ready
++                      0200000     1B19    power on / imp ready
++                    IMPRSS requires BOTH 0200000 and 0020000 before it will
++                    assign the channels -- emitting only 0200000 is why the
++                    real driver stalled at pia=0. */
++                 *data = (uint64)(imp_data.pia & 07);              /* input chan */
++                 *data |= (uint64)(((imp_data.pia >> 3) & 07) << 4); /* out chan */
++                 if (uptr->STATUS & IMPID)
++                     *data |= 0000010;   /* IMPINB input word ready */
++                 if (uptr->STATUS & IMPLW)
++                     *data |= 0004000;   /* IMPEIB end of input */
++                 if (uptr->STATUS & IMPOD)
++                     *data |= 0000200;   /* IMPOUB output word ready */
++                 if (uptr->STATUS & IMPR)
++                     *data |= 0220000;   /* 1B19 power + 1B22 imp ready line */
++                 else
++                     *data |= 0100000;   /* 1B20 host not ready */
++                 if (uptr->STATUS & (IMPERR|IMPHER))
++                     *data |= 0040000;   /* 1B21 error flop */
++                 sim_debug(DEBUG_CONI, dptr,
++                    "IMP TENEXCONI %06o pia=%03o (ID=%d OD=%d LW=%d RDY=%d)\n",
++                    (uint32)*data, imp_data.pia, (uptr->STATUS & IMPID) != 0,
++                    (uptr->STATUS & IMPOD) != 0, (uptr->STATUS & IMPLW) != 0,
++                    (uptr->STATUS & IMPR) != 0);
++                 break;
++             }
+              *data = (uint64)(imp_data.pia & 0777);
+              if (uptr->STATUS & IMPOD)
+                  *data |= IMP_ODONE;
+@@ -1213,8 +1338,12 @@ t_stat imp_srv(UNIT * uptr)
          check_interrupts (uptr);
      }
  #endif
@@ -413,7 +507,7 @@ index f97aec5..c8ac797 100644
      return SCPE_OK;
  }
  
-@@ -1296,6 +1344,14 @@ t_stat imp_eth_srv(UNIT * uptr)
+@@ -1296,6 +1425,28 @@ t_stat imp_eth_srv(UNIT * uptr)
  {
      sim_clock_coschedule(uptr, 1000);              /* continue poll */
  
@@ -422,13 +516,27 @@ index f97aec5..c8ac797 100644
 +       IMP performs the 1822 Nop handshake over the wire). */
 +    if (imp_unit[0].flags & UNIT_NCP) {
 +        imp_udp_packet_in(&imp_data);
++        /* The H316 IMP asserts its host-ready line only as a one-shot burst at
++           startup; if the host wasn't fully booted then, it is missed and the
++           bring-up deadlocks (host won't transmit until it sees ready, IMP won't
++           re-assert ready until the host transmits).  In the lab the IMP is always
++           up, so treat an attached UDP link as "IMP ready" -- this lets TENEX's
++           IMPRSS proceed, assign the PI channels and send its own host-ready Nops,
++           which in turn elicits the IMP's response and completes the handshake. */
++        if (imp_data.udp_link != IMP_UDP_NOLINK)
++            imp_unit[0].STATUS |= IMPR;
++        /* Re-arm with a clock-INDEPENDENT activation: sim_clock_coschedule (the
++           top of this routine) stops firing once TENEX finishes booting and the
++           calibrated clock settles, which silently halts inbound UDP polling.
++           A fixed-cycle sim_activate keeps the UDP receiver alive for the link. */
++        sim_activate(uptr, 10000);
 +        return SCPE_OK;
 +    }
 +
      imp_timer_task(&imp_data);
      if (uptr->ILEN == 0 && (uptr->STATUS & (IMPIB|IMPID)) == 0)
          imp_packet_in(&imp_data);
-@@ -1608,6 +1664,112 @@ imp_packet_in(struct imp_device *imp)
+@@ -1608,6 +1759,125 @@ imp_packet_in(struct imp_device *imp)
     }
  }
  
@@ -474,6 +582,14 @@ index f97aec5..c8ac797 100644
 +
 +    if (imp->udp_link == IMP_UDP_NOLINK)
 +        return;
++    {
++        static uint32 gate_cnt = 0;
++        if ((++gate_cnt & 0x3ff) == 0)
++            sim_debug(DEBUG_IRQ, &imp_dev,
++                "IMP ncp gate#%u ILEN=%d STATUS=%06o pending=%d link_up=%d\n",
++                gate_cnt, imp_unit[0].ILEN, (uint32)imp_unit[0].STATUS,
++                imp->pending_nw, imp->imp_link_up);
++    }
 +    /* Don't fetch a new message while one is still being delivered. */
 +    if (imp_unit[0].ILEN != 0 || (imp_unit[0].STATUS & (IMPIB|IMPID)) != 0)
 +        return;
@@ -488,7 +604,12 @@ index f97aec5..c8ac797 100644
 +            buf[i] = imp->pending_buf[i];
 +        imp->pending_nw = 0;
 +    } else {
++        static uint32 ncp_poll_cnt = 0;
 +        nw = udp_receive(&imp_dev, imp->udp_link, buf, IMP_UDP_MAXDATA);
++        if ((++ncp_poll_cnt & 0x3ff) == 0 || nw > 0)
++            sim_debug(DEBUG_IRQ, &imp_dev,
++                "IMP ncp recv poll#%u nw=%d buf0=%o link=%d\n",
++                ncp_poll_cnt, nw, nw > 0 ? buf[0] : 0, imp->udp_link);
 +        if (nw <= 0)
 +            return;
 +    }
@@ -541,7 +662,7 @@ index f97aec5..c8ac797 100644
  void
  imp_send_packet (struct imp_device *imp, int len)
  {
-@@ -1619,6 +1781,12 @@ imp_send_packet (struct imp_device *imp, int len)
+@@ -1619,6 +1889,12 @@ imp_send_packet (struct imp_device *imp, int len)
      int        lk;
      int        mt;
  
@@ -554,7 +675,7 @@ index f97aec5..c8ac797 100644
      lk = 0;
      n = len;
      switch (imp->sbuffer[0] & 0xF) {
-@@ -3103,6 +3271,8 @@ t_stat imp_reset (DEVICE *dptr)
+@@ -3103,6 +3379,8 @@ t_stat imp_reset (DEVICE *dptr)
          /* Clear ARP table. */
          memset(imp_data.arp_table, 0, sizeof(imp_data.arp_table));
          imp_data.dhcp_state = DHCP_STATE_OFF;
@@ -563,7 +684,7 @@ index f97aec5..c8ac797 100644
      }
      /* Clear queues. */
      imp_data.sendq = NULL;
-@@ -3146,6 +3316,30 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
+@@ -3146,6 +3424,30 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
                     break;
      }
  #endif
@@ -594,7 +715,7 @@ index f97aec5..c8ac797 100644
      if (!(uptr->flags & UNIT_DHCP) && imp_data.ip == 0)
        return sim_messagef (SCPE_NOATT, "%s: An IP Address must be specified when DHCP is disabled\n",
                 imp_dev.name);
-@@ -3229,6 +3423,18 @@ t_stat imp_detach(UNIT* uptr)
+@@ -3229,6 +3531,18 @@ t_stat imp_detach(UNIT* uptr)
  {
  
      if (uptr->flags & UNIT_ATT) {
