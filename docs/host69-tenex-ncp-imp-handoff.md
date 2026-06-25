@@ -10,6 +10,14 @@ Read this first in any future session, then the memory files it links.
 
 ## 0. START HERE (next session) — exact state + next steps
 
+> **PATCH NOTE (2026-06-25):** `patches/rcornwell-ncp-imp.patch` is now the COMPLETE
+> emulator delta from base `9510a91` (apply with `git apply` in the rcornwell-sims
+> checkout) — it captures BOTH the ncp/IMP work AND the base working-tree fixes
+> (scp.c console-timeout, kx10_disk.c fflush/IOERR, kx10_cpu.c pager, kx10_tym.c,
+> kx10_cty.c, kx10_dt.c). It's ~968K because cpu/dt also carry CRLF/whitespace noise;
+> the real fixes are small. So the working binary is fully reproducible from this one
+> patch — nothing critical lives only in the (gitignored) build tree anymore.
+
 > **2026-06-25 LATE UPDATE — live bring-up reached `RDY=1`; blocker is now NO-SYSJOB.**
 > Verified end-to-end on a STABLE running TENEX (fast installed-boot, see below):
 > - Emulator fixes committed (rcornwell `33f226e` + a follow-up): TENEX-faithful
