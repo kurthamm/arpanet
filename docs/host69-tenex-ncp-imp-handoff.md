@@ -78,17 +78,38 @@ attach -u imp 21052:localhost:21051   ->  "attached …, NCP, BBN"  (no pcap err
 Current built binary: `…/rcornwell-sims/BIN/pdp10-ki` (Jun-24 22:17, with gate). Backups:
 `pdp10-ki.bak-preudp-*`, `.bak-pregate-*`, `.orig-20260620`.
 
-## 5. The remaining gap: host→IMP (TENEX's monitor sending NOPs)
+## 5. The remaining gap — NARROWED to a BBN-IMP CONI/CONO bit mismatch (2026-06-25)
 
-IMP→host is proven. **host→IMP — TENEX's monitor initiating the 1822 NOP handshake — has
-NOT been observed (IMP `received` count = 0 in every run).** Two intertwined reasons:
+A long deep-dive (via `kit-cache/build-tenex/tenex.dis`, the full monitor disassembly)
+moved this from "host→IMP never happens" to "the monitor runs its entire IMP bring-up and
+is one bit-layout fix from completing the handshake." Findings:
 
-1. **It requires a fully-booted live TENEX monitor with the IMP present at boot.** TENEX
-   inits its IMP host interface once at `go 100`; if the IMP isn't responsive then, it does
-   not appear to retry (starting the H316 IMP late produced no handshake).
-2. **Whether the monitor brings up NCP at all over this link is the genuinely-unproven OS
-   question** (see [[host69-tenex-authentic-goal]] "OPEN UNKNOWN"). The bare install-stage
-   monitor (NO EXEC / NO SYSJOB) may not run the host-interface handshake.
+- **The monitor DOES start its network at boot.** `netini` (436652) runs in the device-init
+  sequence (147050-61, alongside mtaini/lptini/…); it sets `neton`. Confirmed live:
+  `neton`=-1, `imprdy`=-1, `dbugsw`=0. The earlier "bare monitor doesn't start NCP"
+  conclusion was WRONG — an emulator input gate was masking the bring-up.
+- **With the fixed `pdp10-ki` the monitor runs the IMP bring-up** (TENEX 137143-137175):
+  `CONO 200000` → `DATI` → `CONO 050000`(STRIN) → `CONO 320` → `setom imprdy` → output
+  `DATO`; receives the IMP's NOP; runs the input handler `CONO 206415` to assign **PI
+  channel 5** (`pia=5`); input-done goes pending.
+- **What we changed in `kx10_imp.c` to get here** (committed rcornwell `a438d50`; patch
+  `patches/rcornwell-ncp-imp.patch` regenerated): always surface IMP-ready (IMPR) from
+  inbound `PFLG_READY`; **arm input on CONO ODPIEN** (the channel-setup, after the monitor
+  confirms IMP_IDONE clear) not on STRIN; **hold** a received 1822 message until the host
+  arms input (the H316 IMP sends its startup NOPs once). Plus `BBNCONO`/`chkint` debug.
+- **THE REMAINING BLOCKER:** rcornwell's `TYPE_BBN` CONI/CONO bit layout does not fully match
+  TENEX's real BBN interface. The monitor's IMP service (`impsvx`, 131077) dispatches
+  input-done on **CONI bit 010**, but the emulator sets input-done at bit **020000**
+  (`IMP_IDONE`); output-done (bit 04000) DOES match. So with input-done pending the monitor
+  never services it → never sends its own NOP → `imp05 received` still 0. **NEXT = reconcile
+  the BBN IMP CONI/CONO/PIA bit assignments to what TENEX polls** (use the BBNCONO/chkint
+  debug + the impsvx mask reads at 131077/131101/131103/131105/131106 as the spec). That is
+  the last mile.
+
+### (historical, superseded) original framing of the gap
+IMP→host is proven. host→IMP had not been observed; we suspected the bare monitor never ran
+NCP. The deep-dive above showed it DOES run NCP — the blocker is emulator bit-fidelity, not
+TENEX OS startup.
 
 ## 6. Boot-harness findings (the time sink — read before re-trying)
 
@@ -157,6 +178,20 @@ Full plan + exact edit locations in [[host69-production-cutover]]. Summary:
 
 ## 10. One-line status
 
-**IMP↔host communication: SOLVED, proven on the wire, committed.** host→IMP handshake +
-production cutover: staged and held, gated on a clean full-install boot with the IMP present
-and the open TENEX-NCP-startup question.
+**IMP↔host link SOLVED + proven both directions; TENEX's monitor now runs its full IMP
+bring-up and assigns PI channel 5 — the host→IMP NOP send is blocked only by a residual
+BBN-IMP CONI/CONO bit-layout mismatch (input-done dispatched on CONI bit 010, emulator sets
+020000).** Fix that bit reconciliation and `@L 69` should come up. Production cutover (imp05
+hi2 is already enabled via `mini/imp05.local.simh`; website edits) is held until then.
+
+### Reproduce the current state
+1. `mini/imp05.local.simh` (hi2 on 21051/21052) is the imp05 override; run imp05 standalone
+   (`./h316ov ./imp05.local.simh` from `mini/`) — noc's per-IMP PTY restart crashes a
+   peerless hi2, so standalone is reliable. Start it AFTER host69 binds 21052.
+2. `mini/host69-bbn-tenex/run-h69-bootpark.sh` boots host69 to the bare monitor with IMP
+   debug, parks on telnet 2323 (driver `runtime/build-tenex-bootpark-ncp.do`). Connect to
+   2323 to release `go`. Watch `logs/host69-bootpark.log` (BBNCONO/chkint/ncp recv/send) and
+   `logs/imp05-standalone.log` (HI2 received = host→IMP success).
+3. Emulator source: `kit-cache/rcornwell-sims` (rebuild `make pdp10-ki`). The 4 prior fixes
+   (disk fflush/IOERR, scp console timeout, cpu pager, tym div0) are working-tree mods; the
+   ncp+handshake work is committed (`a438d50`) and in `patches/rcornwell-ncp-imp.patch`.
