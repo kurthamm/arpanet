@@ -50,6 +50,32 @@ on-disk FAIL/MACRO assembles the v11 source — itself a real test.)
 bitsavers `/bits/BBN/Tenex/` = source only; PDP-10/tenex GitHub = source; SAILDART = WAITS .DMP
 binaries (wrong platform for TENEX); no community BBN-TENEX disk image ships built cusps.
 
+## 6. TOPS-20 V3A bootstrap ATTEMPTED (2026-06-27) — booted, but doesn't break the circularity
+- Built `pdp10-kl` (`make pdp10-kl` in rcornwell-sims), decompressed `t20v3/dsk/kla_psv3_0.rp06`,
+  took the WHOLE lab down for CPU (load was 8-15 on 4 vCPU running KL + KI + 36 IMPs — re-oversubscribed;
+  `arpanet-noc.service` is the systemd supervisor that respawns IMPs, must `systemctl stop` it).
+- **TOPS-20 V3A BOOTS** (`boot-drive.ini` here = run_a.ini + telnet console; at the `BOOT>` prompt
+  type `MONITR`). Reached "TOPS-20 Monitor 3A(2013)", SYSJOB up, `@` login prompt on tty line (telnet
+  2021 — needs CR after carrier; CTY=telnet 2324 is SYSJOB/PTYCON-owned).
+- BLOCKED two ways: (a) OPERATOR password unknown (tried OPERATOR/DEC/TOPS20/FILES/SYSTEM — all
+  "?Incorrect password"); (b) more fundamentally, **TOPS-20 is a DEC system shipping MACRO, not the
+  Stanford FAIL** — so it can't self-assemble the FAIL v11 source either (MACRO ≠ FAIL operator
+  dialect). build-tenex's TOPS-20 bootstrap brought IN a (v10, incomplete) FAIL binary; it did not
+  produce a complete FAIL from TOPS-20's own tools.
+- Tooling gotchas learned: launch emulators with `setsid ... </dev/null &` (nohup gets SIGTERM'd);
+  NEVER `pkill -f <pattern>` where the pattern is in your own command line (it self-kills → exit 144,
+  which masked everything for a while); use `ps|grep '[x]'|awk|kill` instead.
+
+## CONCLUSION (definitive)
+Authentic NETSER login is blocked behind an **unbroken bootstrap circularity**: it needs a complete
+FAIL (with `'`/`^`/`?`/`__`/IFAVL/`()`), the only complete FAIL is v11 *source* (SAILDART), building
+it needs a complete FAIL, and no complete runnable FAIL binary exists anywhere (on-box, bitsavers,
+SAILDART-is-WAITS-binaries, TOPS-20-is-MACRO). This is a genuine open problem in PDP-10/TENEX
+preservation — the reconstruction never solved or attempted it. The realistic routes are now
+OFF-box: (1) someone solves the FAIL-v11 bootstrap upstream / publishes a runnable complete FAIL;
+(2) an original SUMEX/BBN `<SUBSYS>` dump containing a built NETSER.SAV or complete FAIL surfaces.
+Everything else on host69 (stable TENEX on ARPANET, transport, link, herald, ENTFLG, snapshot) is solved.
+
 ## Bottom line
 Authentic `@L 69` login needs NETSER, which needs a complete FAIL. The fully-capable FAIL exists
 only as source (SAILDART v11). The realistic route is the **TOPS-20 V3A bootstrap** of FAIL v11
