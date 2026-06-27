@@ -4,6 +4,39 @@
 This is the read-first doc for resuming the ONE open blocker. Companion docs:
 `NETLIT-STATUS.md` (NETSER-lite build/run), `lab-fix/README.md` (the noc routing fix).
 
+## 🔔 2026-06-27 UPDATE — HOST-READY SOLVED; blocker moved to the NCP layer
+The "⛔ OPEN BLOCKER" section below (1822 host-ready not reproducible) is **RESOLVED**.
+Everything below this block is now HISTORICAL context. Current state:
+
+- **Bring-up = `bash netser-build/scripts/run-loginbuild.sh`** (telnet console on 2323 +
+  console-daemon + DC/TYM drainers + imp attached `21052:127.0.0.1:21051`). Verified stable:
+  pdp10-ki stays alive 10+ min (no crash), TENEX resumes to `!`, comes up
+  `***** NETWORK ON, IMP ON 200120`. host69 BINDS UDP 21052; imp05 hi2 up on 21051 (both
+  ESTAB). Did NOT need to restart imp05.
+- **Host-ready completes (proven):** `NCP=ncp1 ./ncp-ping 69` gives NEITHER "Host is not up"
+  (down host, cf. 99) NOR "IMP cannot be reached" (cf. 40) — imp05 classifies host 69 as UP,
+  which it can only do while receiving 1822 host-ready. (tcpdump on lo needs root = N/A; the
+  IMP's own up/down classification is the authoritative substitute.)
+- **DO NOT use the stdio/`set console notelnet` inspect harness — it SEGFAULTS the simulator**
+  right after `go`, EVEN with all media (dt0/dt1/mta0) faithfully attached (proven; the only
+  delta from loginbuild was console mode). Use the loginbuild **telnet** console (2323) and
+  break to `sim>` over that connection (WRU `^\`) for read-only inspection. NO IMP debug.
+
+### New blocker = NCP/application layer (+ a periodic IMP bug)
+- `ncp-ping 69` → tool hangs, host69 console silent. `@L 69` (= `NCP=ncp1 ./ncp-telnet 69`)
+  → tool prints `NCP open error.` then hangs, host69 console silent. Neither gives
+  "Open refused". So host 69's NCP/ICP does not service an incoming connection.
+- **Periodic IMPBUG (likely root cause):** the running snapshot throws
+  `***IMPBUG <n> AT 132445 ... (FAILED TO GTJFN/OPEN BUGTABLE FILE)` exactly ONCE PER SIM
+  MINUTE (all at :06s), code climbing +25/min (25,50,…225), fixed PC **132445** (IMP code
+  region; IMPBEG ~131331). NON-FATAL (TENEX keeps running), INDEPENDENT of any ncp-ping/@L
+  attempt. The GTJFN/BUGTABLE failure is secondary (minimal-boot disk has no BUGTABLE to log
+  into); the real event is the periodic fault at 132445.
+- **Next:** identify the once-a-minute IMP routine that faults at 132445 (research `impdv.mac`
+  in the kit) and/or break to `sim>` over 2323 (read-only, NO imp debug) to examine 132445 +
+  NCP/IMP state. The `@L 69` GROUND RULE below still holds (stays disabled until login works).
+
+
 ## ⛔ GROUND RULE
 `@L 69` (public ARPANET login to host 69) **remains DISABLED and must stay disabled** until
 real EXEC/login AND a stable, reproducible host-ready path are captured. The tracked NCP route
