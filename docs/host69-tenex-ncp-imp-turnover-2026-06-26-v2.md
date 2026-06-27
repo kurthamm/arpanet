@@ -82,3 +82,16 @@ Validated: `DAYTIME` → `THURSDAY, JUNE 22, 1972`; `SYSTAT` → UP, jobs listed
    this is finishing the upstream build-tenex bootstrap, a substantial TENEX-from-source
    effort.
 4. Production cutover (imp05 + website) per `host69-production-cutover.md`.
+
+## 2026-06-27 UPDATE — NETSER build attempt (droplet upgraded to 4 vCPU)
+Kurt's "oversubscribed server caused issues all along" hypothesis CONFIRMED: at 4 vCPU the
+snapshot restores cleanly first try, no clock-calib death. Drove the from-source NETSER build
+(step 3) — see memory `host69-netser-build-attempt.md` for full detail. SOLVED: getting the
+toolchain onto the live disk (make a TENEX DECtape with `install/tools/tendmp`, attach as dt1,
+`MOUNT DTA1:` + `COPY DTA1:X.SAV <SUBSYS>X.SAV`; NOT DUMPER-LOAD which BUGHLTs 140046, NOT
+GET/SSAVE of foreign saves which corrupts the EXEC). FAIL runs once PA1050 (real one =
+`imsss/.../pa1050.sav.20`) is on disk. **BLOCKED: NETSER won't assemble** — STALLM's
+arg-count macros break under both on-box FAILs (build-tenex fail dies PAGE 5; imsss fail dies
+PAGE 8 in KLPROC/SGNOFF). Needs the exact historical FAIL or a prebuilt NETSER (neither on
+box; web search empty). Cheapest untested alternative: enable route `05:1:69` + `ENTFLG=-1`
+(addr 57174) and probe whether the monitor serves socket-1 login without NETSER.
