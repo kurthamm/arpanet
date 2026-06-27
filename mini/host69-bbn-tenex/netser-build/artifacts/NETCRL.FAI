@@ -1,0 +1,127 @@
+	TITLE NETLIT
+; NETSER-lite MILESTONE 1a: open a LISTEN on the network LOGIN socket
+; (socket 1) and print the raw GDSTS status word once a second, so when a
+; remote does an at-sign-L 69 we watch the state walk LSNG to RFCR.
+; NO STALLM, NO macros, NO FAIL-v11 features, NO multiline string literals.
+; All strings are labeled single-line ASCIZ; CRLF is an explicit BYTE.
+; Run FOREGROUND so PSOUT and NOUT land on the controlling terminal.
+
+; ---- TENEX JSYS opdefs (numbers from build-tenex mon stenex.mac DEFJS) ----
+	OPDEF GTJFN [104B8+20]
+	OPDEF RLJFN [104B8+23]
+	OPDEF OPENF [104B8+21]
+	OPDEF CLOSF [104B8+22]
+	OPDEF PSOUT [104B8+76]
+	OPDEF NOUT  [104B8+224]
+	OPDEF MTOPR [104B8+77]
+	OPDEF GDSTS [104B8+145]
+	OPDEF DISMS [104B8+167]
+	OPDEF HALTF [104B8+170]
+
+	PRIOU__101		; .PRIOU primary output designator
+	P__17
+	A__1
+	B__2
+	C__3
+	D__4
+
+START:	MOVE P,[IOWD PDLEN,PDLST]
+
+	HRROI A,MSG1
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+
+; ---- GTJFN on the network login socket ----
+	MOVSI A,400001
+	HRROI B,FNAME
+	GTJFN
+	 JRST GJERR
+	MOVEM A,SOCKJ
+	HRROI A,MSG2
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+
+; ---- OPENF: start listening ----
+	MOVE A,SOCKJ
+	MOVE B,[XWD 400000,100000]
+	OPENF
+	 JRST OPERR
+	HRROI A,MSG3
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+
+; ---- MTOPR fn 24: listen-config (from NETSER MKICPF) ----
+	MOVE A,SOCKJ
+	MOVEI B,24
+	MOVSI C,777723
+	MTOPR
+	 JFCL
+
+; ---- observe loop: print GDSTS status word each second ----
+WATCH:	MOVE A,SOCKJ
+	GDSTS
+	MOVEM B,GST2
+	MOVEM C,GST3
+	MOVEM D,GST4
+	HRROI A,MSTS
+	PSOUT
+	MOVEI A,PRIOU
+	MOVE B,GST2
+	MOVEI C,12
+	NOUT
+	 JFCL
+	HRROI A,MHOST
+	PSOUT
+	MOVEI A,PRIOU
+	MOVE B,GST3
+	MOVEI C,12
+	NOUT
+	 JFCL
+	HRROI A,MSKT
+	PSOUT
+	MOVEI A,PRIOU
+	MOVE B,GST4
+	MOVEI C,12
+	NOUT
+	 JFCL
+	HRROI A,CRLF
+	PSOUT
+	MOVEI A,2000
+	DISMS
+	JRST WATCH
+
+GJERR:	HRROI A,EGJ
+	PSOUT
+	HALTF
+	JRST START
+
+OPERR:	HRROI A,EOP
+	PSOUT
+	MOVE A,SOCKJ
+	RLJFN
+	 JFCL
+	HALTF
+	JRST START
+
+; ---- strings: all single-line ASCIZ, no embedded newlines ----
+FNAME:	ASCIZ /NET:1#./
+MSG1:	ASCIZ /NETLIT OPENING LISTEN SOCKET 1/
+MSG2:	ASCIZ /GTJFN OK/
+MSG3:	ASCIZ /OPENF OK LISTENING/
+MSTS:	ASCIZ /STS=/
+MHOST:	ASCIZ / HOST=/
+MSKT:	ASCIZ / SKT=/
+EGJ:	ASCIZ /GTJFN FAILED/
+EOP:	ASCIZ /OPENF FAILED/
+CRLF:	BYTE (7) 15,12,0
+
+	PDLEN__40
+PDLST:	BLOCK PDLEN
+SOCKJ:	0
+GST2:	0
+GST3:	0
+GST4:	0
+	END START
