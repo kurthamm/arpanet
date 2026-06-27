@@ -64,6 +64,9 @@ SET CPU HISTORY=65000
 SET CONSOLE DEBUG=STDERR
 SET WDT DEBUG=LIGHTS
 
-#set throttle 15%
+; 2026-06-27: the real fix for the peerless-HI race was making noc-server.py start
+; each NCP daemon when ITS IMP reaches RUNNING (event-driven), not a global fixed
+; NCP_START_DELAY timer -- so IMP boot speed no longer matters and the throttle is
+; back at its original value. (Briefly cut to 6% while diagnosing; reverted.)
 set throttle 15%
 
