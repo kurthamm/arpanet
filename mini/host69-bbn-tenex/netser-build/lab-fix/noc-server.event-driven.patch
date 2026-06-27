@@ -1,0 +1,72 @@
+109a110,118
+>         # Event-driven NCP startup: the instant THIS IMP reaches RUNNING, start
+>         # the NCP daemon(s) that connect to it. Replaces the old fixed 35s global
+>         # NCP_START_DELAY, which raced the IMP boot speed -- on the faster upgraded
+>         # host the IMPs reached RUNNING well before 35s, so their host interfaces
+>         # sat peerless and errored. Per-IMP/event-driven is CPU-speed independent.
+>         # _start_ncps_for_imp() is idempotent, so re-firing is harmless.
+>         if new_state == ProcessState.RUNNING and not self._shutting_down:
+>             self._start_ncps_for_imp(imp.config.number)
+> 
+186a196,223
+>     def _start_ncps_for_imp(self, imp_number: int):
+>         """Start the NCP daemon(s) for one IMP, the moment that IMP is RUNNING.
+> 
+>         Idempotent: NCPs already STARTING/RUNNING are left alone, so this is safe
+>         to call from both the per-IMP RUNNING event and the fallback sweep without
+>         ever spawning a duplicate ncpdov.
+>         """
+>         for config in self._ncp_configs:
+>             if config.imp != imp_number:
+>                 continue
+>             existing = self.ncps.get(config.full_host)
+>             if existing is not None:
+>                 if existing.state in (ProcessState.STARTING, ProcessState.RUNNING):
+>                     continue
+>                 ncp = existing
+>             else:
+>                 ncp = NCPController(
+>                     config=config,
+>                     process_manager=self.process_manager,
+>                     on_state_change=self._on_ncp_state_change,
+>                 )
+>                 self.ncps[config.full_host] = ncp
+>             self.logger.info(
+>                 f"IMP {imp_number:02d} RUNNING: starting NCP "
+>                 f"{config.host_str} ({config.hostname})"
+>             )
+>             ncp.start()
+> 
+188c225
+<         """Schedule NCP start shortly after IMPs begin booting.
+---
+>         """Schedule a fallback NCP-startup sweep.
+190,192c227,231
+<         The H316 host interfaces expect their host/NCP UDP peers to appear
+<         quickly. Waiting for every IMP to reach RUNNING can leave HI ports
+<         peerless long enough to trigger unrecoverable host-interface errors.
+---
+>         NCP daemons are normally started event-driven -- the instant *their* IMP
+>         reaches RUNNING (see _on_imp_state_change -> _start_ncps_for_imp). That is
+>         CPU-speed independent and replaces the old fixed NCP_START_DELAY race.
+>         This fixed-delay sweep is only a backstop in case an IMP's RUNNING event
+>         is missed; it is idempotent, so it never duplicates a running daemon.
+194,195c233,247
+<         self.logger.info(f"Waiting {self.NCP_START_DELAY}s for IMPs to initialize...")
+<         self.loop.call_later(self.NCP_START_DELAY, self._start_ncps)
+---
+>         self.logger.info(
+>             f"NCP startup is event-driven (per-IMP RUNNING); "
+>             f"fallback sweep in {self.NCP_START_DELAY}s"
+>         )
+>         self.loop.call_later(self.NCP_START_DELAY, self._fallback_start_ncps)
+> 
+>     def _fallback_start_ncps(self):
+>         """Backstop: start NCPs for any IMP that is RUNNING but whose NCP never
+>         started (e.g. a missed event). Idempotent; only sweeps RUNNING IMPs."""
+>         if self._shutting_down:
+>             return
+>         for imp_config in self._imp_configs:
+>             imp = self.imps.get(imp_config.number)
+>             if imp is not None and imp.state == ProcessState.RUNNING:
+>                 self._start_ncps_for_imp(imp_config.number)
