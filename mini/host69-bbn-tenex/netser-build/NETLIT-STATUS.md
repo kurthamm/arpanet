@@ -115,20 +115,34 @@ All paths relative to `mini/host69-bbn-tenex/`. Helper scripts in `netser-build/
 
 ---
 
-## ★ CURRENT BLOCKER (next thing to fix) — lab NCP connectivity
+## ★ LAB ROUTING — was broken by my stop/start, now FIXED  (full writeup: `lab-fix/README.md`)
 
-`ncp-ping 69` AND ping to hosts 1/2/3/40 all TIME OUT; `ss` shows **no listener on the 2105x
-host-ports** and **no host69↔imp05 (21051/21052) socket**, despite 37 IMPs running and
-`arpanet-noc` active. So the host-connection layer is down lab-wide (teardown fallout).
-**This must be restored before the `@L 69` test is meaningful** — the earlier `ncp-telnet 69`
-"hang instead of Open refused" was just unreachability, NOT a received RFC.
+My `systemctl stop/start arpanet-noc` (to free CPU for the TOPS-20 detour) broke lab-wide
+routing. **Root cause:** the noc's hardcoded `NCP_START_DELAY=35s` was tuned for the slow
+2-vCPU box; the upgraded faster box boots IMPs before 35s, so their host-interfaces sat
+peerless and errored (NOT load — "it worked on half the power" proves that). **Fix:** made
+NCP startup **event-driven** in `mini/noc-server.py` — start each NCP the instant *its* IMP
+reaches RUNNING (idempotent, old timer kept as a backstop). Verified: 18/18 HIs up at full
+speed, mesh `ncp-ping` replies, no duplicate daemons. Committed (arpanet repo working tree +
+copy/patch in `lab-fix/`). Throttle reverted to 15%.
 
-Investigation TODO (research the repo, don't guess):
-- Why isn't imp05 `hi2` listening on 21051? (running imp05 = pid using `imp05.local.simh`.)
-  Is the running imp05 the one `arpanet-noc` supervises, or a stray from `run-loginbuild.sh`?
-- Does `hostctl.sh` bring host lines up? Read it. Does `arpanet-health.sh` show the gap?
-- Confirm `ncp31` config path to host 69 (memory: route `05:1:69` is *commented*; the physical
-  hi2 link carried it before — so the hi2 link being down is the likely root).
+## ★ CURRENT BLOCKER — host69 not yet reachable (the 1822 handshake)
+
+Lab routes between NCP-daemon hosts now, but **host69 itself is unreachable**: it boots
+(operator `!`, NETWORK ON), host69↔imp05 **hi2 UDP link is ESTAB** (`21052↔21051`, both via
+`imp05.local.simh` which the noc DOES use — line 79 prefers `.local`), yet the mesh says
+**"Host is not up"** → the **1822 host-IMP "host ready" handshake isn't completing**, so imp05
+never advertises a route to host 69. Restarting host69/imp05 in various orders (thrashing)
+hasn't reliably landed it.
+
+Next (discuss, don't thrash):
+- Canonical host69 bring-up? host69 is the real BBN-TENEX (NOT an noc NCP daemon — `05:1:69`
+  correctly commented in the NCPS list), launched ad-hoc via `scripts/run-loginbuild.sh`.
+  Is there repo host-lifecycle tooling / a documented order that lands the 1822 handshake?
+- A prior session got "Open refused" from `@L 69` → host69 WAS reachable before; reproduce
+  that wiring.
+- Inspect host69 console NCP/IMP state: is it asserting host-ready / exchanging 1822 with
+  imp05 hi2, or stuck on the snapshot-time IMP?
 
 ---
 
