@@ -342,3 +342,34 @@ never returns to 1.**
 **Next test:** trace the host's IMP input-arm path (the CONO/DATAI/BLKI our fork keys off) and
 correlate with `IMISRT` in the monitor — is TENEX issuing the re-arm at all (→ candidate 1) or
 issuing it and being missed (→ candidate 2)?
+
+---
+
+## NEXT SESSION — START HERE (handoff)
+
+Continue from branch `host69-tenex-ncp-imp` @ **`cece74d`**. This is a **focused live-debug
+session**, not a quick follow-on — start fresh.
+
+**Settled (do NOT revisit unless new evidence contradicts):** NETLIT is correct and listening on
+socket 1; byte size ruled out (NETLIT=32 == lab ICP `snd.size=32`); host-ready lands; `@L 69`
+sends an RFC that reaches host69's IMP. Failure is localized to **IMP input delivery**: TENEX
+arms input initially (handles early host-ready/NOP traffic) then **stops re-arming**, so the
+emulator holds the RFC with `imp_link_up=0`; `RECSTR` never runs; NETLIT never reaches RFCR;
+ncp31 hangs.
+
+**The one narrow question:** is TENEX failing to *issue* the input-arm, or is the emulator failing
+to *detect* it?
+
+**Task — trace the IMP input-arm path end-to-end:**
+1. In TENEX: does `IMISRT` / `STRIN` / the input-arm `CONO`/`BLKI` run *after* the initial traffic?
+2. In the emulator: identify exactly what condition sets `imp_link_up=1`.
+3. Decide: TENEX stops issuing the arm, or issues it and the emulator misses it.
+4. Capture **one** controlled `@L 69` only after the trace is active. (SIMH debug-to-file is
+   block-buffered — `kill -TERM` the ki to flush the log.)
+
+**Candidate outcomes:** (1) TENEX doesn't re-arm → TENEX-side stale NCP/IMP state, likely the 25
+stuck-RFNM/output-queue conns starving the IMP service; (2) TENEX re-arms but emulator misses it →
+emulator-fork input-arm-detection bug.
+
+Harness: `netser-build/investigation-2026-06-28/launchers/launch-trace.sh` (2323 telnet console,
+brings host69 to host-ready). Leave the lab clean when done.
