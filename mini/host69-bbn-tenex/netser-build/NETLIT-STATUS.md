@@ -1,5 +1,38 @@
 # NETSER-lite (NETLIT) — Status & Handoff
 
+## ★★ MILESTONE 1b PROGRESS (2026-06-28, session 3) — accept works; bare BOUT insufficient
+
+Built **`netser-lite-1b.fai`** (accept-and-send shim) on-box and tested end-to-end. Reproducible
+on-box assembler loop scripted in **`build-netlit.sh`** (FAIL via DTA1 build tape -> DTA0 .REL ->
+`tendmp -x` -> rebuild `login.dta`). Test = `NCP=ncp31 ./ncp-telnet -o 69` against the running shim.
+
+**Confirmed (instrumented console):**
+- NETLIT detects the RFC (GDSTS foreign host appears, `HOST=31`).
+- Explicit **`MTOPR fn 20` (NETACP) accepts: state RFCR(4) -> OPND(7)** — verified by GDSTS before
+  vs after (`STS` state nibble 4 -> 7). The first BOUT does NOT auto-accept (it blocks); the
+  explicit MTOPR is required. *(This validated the accept primitive.)*
+- BUT the first **`BOUT` still blocks even at OPND**, and the client always reports
+  `Timed out completing RFC` -> `Open refused`.
+
+**Why bare accept+BOUT is not enough:** the lab `ncp-telnet` does the **standard ARPANET ICP** —
+it sends `RTS` to socket 1, gets the RFNM, then waits for host69 to **complete the connection** by
+sending back the **ICP data-socket number** over socket 1 and opening the data connections. A raw
+text BOUT on the contact socket never gives the client that, so the client never completes the RFC
+and never allocates buffer -> host69's BOUT blocks (no send allocation) and the client refuses.
+
+**Conclusion:** the next required step is the **real ICP** (NETSER `DOICP` skeleton): after
+MTOPR-accept, `BOUT` the local data-socket number on socket 1, `CLOSF` it, `GTJFN`/`OPENF` send+recv
+data sockets `NET:<lcl>.<fhost>-<fskt+2>;T` (send `103000,,100000`, recv `100000,,200000`), then
+SOUT the herald on the send JFN. The "smallest possible proof" got us through accept; data flow
+needs the socket-swap. Source/build artifacts committed; runtime `.do`s are gitignored (rebuild via
+`build-netlit.sh` + `launch-trace.sh`).
+
+**Infra notes:** the IMP output-done fix (`37744c0`) is required (host69 mute otherwise). Use literal
+console commands over the FIFO (a `bash -c "...\$1..."` indirection silently sends only the CR).
+Re-`START`ing NETLIT after a stuck BOUT gives `OPENF FAILED` (socket 1 still held) — relaunch host69.
+
+---
+
 **Date:** 2026-06-27  **Branch:** `host69-tenex-ncp-imp`
 **Goal:** authentic 1972 experience — a visitor types `@L 69` over the simulated ARPANET,
 reaches host69 (BBN-TENEX / SUMEX-AIM 1.31.82), gets a herald, logs in. The missing piece

@@ -1,0 +1,201 @@
+	TITLE NETLIT
+; NETSER-lite MILESTONE 1b: smallest proof that host69 can send text to an
+; ARPANET client through the NCP path.  Listen on the LOGIN socket (socket 1);
+; when an RFC arrives (foreign host appears in GDSTS), EXPLICITLY accept it with
+; MTOPR fn 20 (NETACP: RFCR -> OPND, sends the STR), then write a test line on
+; the SAME JFN.  Heavily instrumented on the console so each step is visible.
+; No DOICP, no paired data sockets, no PTY/login -- that ceremony comes later.
+; Primitive FAIL only: OPDEF, __ defines, plain instrs, single-line ASCIZ/BYTE.
+
+; ---- TENEX JSYS opdefs (numbers from build-tenex mon stenex.mac DEFJS) ----
+	OPDEF GTJFN [104B8+20]
+	OPDEF RLJFN [104B8+23]
+	OPDEF OPENF [104B8+21]
+	OPDEF CLOSF [104B8+22]
+	OPDEF PSOUT [104B8+76]
+	OPDEF NOUT  [104B8+224]
+	OPDEF MTOPR [104B8+77]
+	OPDEF GDSTS [104B8+145]
+	OPDEF BOUT  [104B8+51]
+	OPDEF DISMS [104B8+167]
+	OPDEF HALTF [104B8+170]
+
+	PRIOU__101		; .PRIOU primary output designator
+	P__17
+	A__1
+	B__2
+	C__3
+	D__4
+
+START:	MOVE P,[IOWD PDLEN,PDLST]
+
+	HRROI A,MSG1
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+
+; ---- GTJFN on the network login socket ----
+	MOVSI A,400001
+	HRROI B,FNAME
+	GTJFN
+	 JRST GJERR
+	MOVEM A,SOCKJ
+	HRROI A,MSG2
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+
+; ---- OPENF: start listening (mode 400000,,100000 = OF%WR, write) ----
+	MOVE A,SOCKJ
+	MOVE B,[XWD 400000,100000]
+	OPENF
+	 JRST OPERR
+	HRROI A,MSG3
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+
+; ---- MTOPR fn 24: listen-config (from NETSER MKICPF) ----
+	MOVE A,SOCKJ
+	MOVEI B,24
+	MOVSI C,777723
+	MTOPR
+	 JFCL
+
+; ---- watch GDSTS until a foreign host appears (RFC arrived) ----
+WATCH:	PUSHJ P,PSTAT		; GDSTS + print STS=/HOST=
+	MOVE 5,GST3		; foreign-host field
+	CAIN 5,777		; 777 = still listening (any host)
+	 JRST WSLP
+	JUMPE 5,WSLP		; 0 = nobody yet / died
+	JRST DOSEND		; real foreign host -> RFC has arrived
+WSLP:	MOVEI A,2000
+	DISMS
+	JRST WATCH
+
+; ---- RFC arrived: accept then send ----
+DOSEND:	HRROI A,MR1		; RFC RECEIVED
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	HRROI A,MR2		; NETACP START
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	MOVE A,SOCKJ		; MTOPR fn 20 = accept (RFCR -> OPND)
+	MOVEI B,20
+	MTOPR
+	 JFCL
+	HRROI A,MR3		; NETACP DONE
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	HRROI A,MR4		; STATE AFTER NETACP =
+	PSOUT
+	PUSHJ P,PSTAT		; expect HOST=31, state OPND
+	MOVEI A,1000		; brief pause to let the allocate arrive
+	DISMS
+
+	HRROI A,MR5		; BOUT START
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	MOVE 6,[POINT 7,TLINE]
+SLOOP:	ILDB 2,6		; next char of the test line into AC2
+	JUMPE 2,SCRLF
+	MOVE 1,SOCKJ
+	BOUT			; write one byte to the network JFN
+	JRST SLOOP
+SCRLF:	MOVE 1,SOCKJ
+	MOVEI 2,15		; CR
+	BOUT
+	MOVE 1,SOCKJ
+	MOVEI 2,12		; LF
+	BOUT
+	HRROI A,MR6		; BOUT DONE
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	HRROI A,MR7		; STATE AFTER BOUT =
+	PSOUT
+	PUSHJ P,PSTAT
+
+	HRROI A,MR8		; CLOSE START
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	MOVE A,SOCKJ
+	CLOSF
+	 JFCL
+	HRROI A,MR9		; CLOSE DONE
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	HALTF
+	JRST START
+
+; ---- subroutine: GDSTS on SOCKJ + print "STS=<b> HOST=<c>" ----
+PSTAT:	MOVE A,SOCKJ
+	GDSTS
+	MOVEM B,GST2
+	MOVEM C,GST3
+	MOVEM D,GST4
+	HRROI A,MSTS
+	PSOUT
+	MOVEI A,PRIOU
+	MOVE B,GST2
+	MOVEI C,12
+	NOUT
+	 JFCL
+	HRROI A,MHOST
+	PSOUT
+	MOVEI A,PRIOU
+	MOVE B,GST3
+	MOVEI C,12
+	NOUT
+	 JFCL
+	HRROI A,CRLF
+	PSOUT
+	POPJ P,
+
+GJERR:	HRROI A,EGJ
+	PSOUT
+	HALTF
+	JRST START
+
+OPERR:	HRROI A,EOP
+	PSOUT
+	MOVE A,SOCKJ
+	RLJFN
+	 JFCL
+	HALTF
+	JRST START
+
+; ---- strings: all single-line ASCIZ, no embedded newlines ----
+FNAME:	ASCIZ /NET:1#./
+MSG1:	ASCIZ /NETLIT 1B OPENING LISTEN SOCKET 1/
+MSG2:	ASCIZ /GTJFN OK/
+MSG3:	ASCIZ /OPENF OK LISTENING/
+MR1:	ASCIZ /RFC RECEIVED/
+MR2:	ASCIZ /NETACP START/
+MR3:	ASCIZ /NETACP DONE/
+MR4:	ASCIZ /STATE AFTER NETACP /
+MR5:	ASCIZ /BOUT START/
+MR6:	ASCIZ /BOUT DONE/
+MR7:	ASCIZ /STATE AFTER BOUT /
+MR8:	ASCIZ /CLOSE START/
+MR9:	ASCIZ /CLOSE DONE/
+MSTS:	ASCIZ /STS=/
+MHOST:	ASCIZ / HOST=/
+TLINE:	ASCIZ /BBN-TENEX NETLIT TEST/
+EGJ:	ASCIZ /GTJFN FAILED/
+EOP:	ASCIZ /OPENF FAILED/
+CRLF:	BYTE (7) 15,12,0
+
+	PDLEN__40
+PDLST:	BLOCK PDLEN
+SOCKJ:	0
+GST2:	0
+GST3:	0
+GST4:	0
+	END START
