@@ -281,3 +281,33 @@ listen-socket matching / ICP-receive path. Open questions:
 - If the stale state *is* causal and unrepairable at runtime, the remaining path is a genuinely
   **clean/quiescent snapshot** — but note that's chicken-and-egg (the only snapshot is the
   poisoned one; recycle won't clear it; fresh boot is upstream-broken).
+
+### 10.1 `netwrk.mac` source audit (2026-06-28) — byte-size RULED OUT; NETLIT confirmed correct
+
+Read the NCP source (`kit-cache/build-tenex/install/monitor/netwrk.mac;1`, 2097 lines):
+
+- **NCP state machine** (transition table 1363-1368): a listening socket on *received-RFC*
+  advances `LSNG → RFCR` (line 1365) — exactly what NETLIT needs. Per-socket state is
+  `NETSTS(UNIT)`, state field `PFSM = POINT 4,NETSTS(UNIT),3`. States
+  `FREE/CLZD/PNDG(2)/LSNG(3)/RFCR(4)/RFCS(6)/OPND(7)`.
+- **The reject path** is `RRFB` = "received RFC with non-matching byte size" (def 1286; set in
+  `RECSTR`, netwrk.mac:1900). `RECSTR` (1888) compares the **listener's** byte size
+  (`PBPBYT = POINT 6,NETSTS(UNIT),17`) vs the **incoming RFC's**; mismatch → `RRFB` (reject +
+  CLS), match → `RRFC` → `RFCR`. An RRFB would leave NETLIT in LSNG *and* bounce a CLS to ncp31
+  — matching both symptoms — so it was the prime suspect.
+- **But byte size MATCHES → RRFB is NOT the cause.** OPENF byte size = AC2 **bits 0-5**
+  (`jsys.mac:165,185`). NETLIT/`MKICPF` OPENF `400000,,100000` → bits 0-5 = `100000`b = **32**.
+  The lab ICP client sends **32** (`mini/src/ncpd-ovREUSE/src/ncp.c:772`). 32 == 32.
+- **`HSTCHK` (1795) is "always OK if listen"** — the foreign-host check doesn't block it either.
+
+**Conclusion:** NETLIT's socket params are correct (byte size, gender, contact socket all match
+the real `NETSER` `MKICPF` and the incoming ICP). The break is **not** NETLIT and **not**
+byte-size — it's the **RFC delivery/processing path**: either the emulator-fork's held-message
+redeliver (the RFC arrives `link_up=0`, gets held; the redeliver was built for the startup NOP —
+`netser-build/emulator-fork/`), or the monitor's NCP control-message input not running `RECSTR`
+on the delivered RFC.
+
+**Decisive live test (next):** `launch-trace.sh` → NETLIT listening; break to `sim>` (2323
+telnet console); dump the `NETSTS` connection table; fire one `@L 69`; break + diff `NETSTS` —
+does a connection entry appear / change state (did `RECSTR` run) and land on NETLIT's socket-1
+listen, or is the RFC never delivered/processed?
