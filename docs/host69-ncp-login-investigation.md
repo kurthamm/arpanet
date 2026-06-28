@@ -343,33 +343,60 @@ never returns to 1.**
 correlate with `IMISRT` in the monitor — is TENEX issuing the re-arm at all (→ candidate 1) or
 issuing it and being missed (→ candidate 2)?
 
+### 10.3 SOLVED (2026-06-28) — IMP input re-arm deadlock fixed (TWO 1822-fidelity emulator bugs)
+
+The narrow question is **answered: candidate 2 (emulator), not TENEX-side stale state.** TENEX
+issues the arm correctly; the *hardware-interface model* (`kx10_imp.c`, rcornwell's recreation of
+the 1822 host-IMP interface — NOT authentic IMP software, so faithful corrections are legitimate)
+dropped it. Two distinct faults, both fixed toward real 1822 behavior (the authentic 1972
+`impdv.mac` is untouched):
+
+1. **Bodiless NOP/ready frames ate the arm.** `imp_udp_packet_in()` set `imp_link_up=0` *before*
+   the `nb==0` check, so a bare host-ready keepalive (`nw=1`) silently consumed the host's armed
+   input buffer with no input-done interrupt. Fix: consume the arm only when a real body is
+   delivered.
+2. **End-of-input was collapsed into input-word-ready (the killer).** Real 1822 raises EOI
+   (`IMPEIB`) as a **separate** interrupt; TENEX's `IMPSV` dispatch (impdv.mac:397-405) runs
+   `IMPEIN` — which clears `IMIB` and re-arms via `IMISRT` — **only** on an interrupt with
+   `IMPINB` clear + `IMPEIB` set. The model cleared `IMPLW` on the `DATAI` that read the last data
+   word and never interrupted on `IMPLW` alone, so `IMPEIN` never ran, input was never re-armed,
+   and (because `IMIB` stayed set) the process-level restart at impdv.mac:1166 also never fired.
+   Fix (scoped to `UNIT_NCP`): `DATAI` clears only `IMPID` (leaves `IMPLW` until `CONO IMPGEB` in
+   `IMPEIN`); `check_interrupts` raises the standalone EOI interrupt on `IMPLW`.
+
+**Verified live** (`launch-trace.sh` + NETLIT + one `@L 69`): RFC delivered word-by-word →
+`STATUS=102010` (last word + EOI) → `102000` (last word read, **IMPLW preserved**) → `IMPEIN`
+runs (`CONO IMPGEB 014010`) → input **re-armed** (`CONO IMPION 206415`); `link_up` stays 1; **zero
+held RFCs** all run. Fix committed in the `rcornwell-sims` fork repo (`e7c64e7`); gitignored, so
+also mirrored to `investigation-2026-06-28/emulator-patch/kx10_imp.c.patched`. **TODO: land it in
+tracked `src/sims/PDP10/kx10_imp.c` + regenerate the emulator-fork bundle/patch.**
+
 ---
 
 ## NEXT SESSION — START HERE (handoff)
 
-Continue from branch `host69-tenex-ncp-imp` @ **`cece74d`**. This is a **focused live-debug
-session**, not a quick follow-on — start fresh.
+Continue from branch `host69-tenex-ncp-imp`. The IMP input-delivery layer is **SOLVED** (§10.3):
+the `@L 69` RFC now reaches *and is delivered into* TENEX, which re-arms input. **Rebuild the
+emulator first** (`cd kit-cache/rcornwell-sims && make pdp10-ki`, fork repo @ `e7c64e7`) — the
+binary carries the fix; a clean clone needs the rebuild.
 
-**Settled (do NOT revisit unless new evidence contradicts):** NETLIT is correct and listening on
-socket 1; byte size ruled out (NETLIT=32 == lab ICP `snd.size=32`); host-ready lands; `@L 69`
-sends an RFC that reaches host69's IMP. Failure is localized to **IMP input delivery**: TENEX
-arms input initially (handles early host-ready/NOP traffic) then **stops re-arming**, so the
-emulator holds the RFC with `imp_link_up=0`; `RECSTR` never runs; NETLIT never reaches RFCR;
-ncp31 hangs.
+**The blocker has moved UP one layer to NCP→listen-socket dispatch** (the original §10 / §10.1
+question, now genuinely reachable). The RFC is delivered to the IMP driver's input queue and TENEX
+re-arms, **but NETLIT's `GDSTS` stays idle (LSNG, `STS=12926844928 SKT=-2`)** — the NCP is not
+advancing NETLIT's socket-1 listen to `RFCR`.
 
-**The one narrow question:** is TENEX failing to *issue* the input-arm, or is the emulator failing
-to *detect* it?
+**Next question:** does `RECSTR`/the NCP control-input loop (`netwrk.mac`) dequeue the delivered
+RFC and try to match socket 1, or does the queued input never get NCP-serviced? Candidates:
+- NCP input loop stalled / job-0 service not draining `IMPIBI` (the 25 stuck RFNM conns may be
+  starving NCP *process-level* service, even though IMP *interrupt-level* input now works).
+- RECSTR runs but mis-dispatches (re-check the §10.1 match path now that delivery is real).
+- The foreground unprivileged NETLIT isn't the socket the monitor hands the RFC to.
 
-**Task — trace the IMP input-arm path end-to-end:**
-1. In TENEX: does `IMISRT` / `STRIN` / the input-arm `CONO`/`BLKI` run *after* the initial traffic?
-2. In the emulator: identify exactly what condition sets `imp_link_up=1`.
-3. Decide: TENEX stops issuing the arm, or issues it and the emulator misses it.
-4. Capture **one** controlled `@L 69` only after the trace is active. (SIMH debug-to-file is
-   block-buffered — `kill -TERM` the ki to flush the log.)
-
-**Candidate outcomes:** (1) TENEX doesn't re-arm → TENEX-side stale NCP/IMP state, likely the 25
-stuck-RFNM/output-queue conns starving the IMP service; (2) TENEX re-arms but emulator misses it →
-emulator-fork input-arm-detection bug.
+**Settled (do NOT revisit):** NETLIT correct + listening on socket 1; byte size = 32 both sides;
+host-ready lands; RFC reaches host69's IMP **and is now delivered**; TENEX arms + re-arms input.
 
 Harness: `netser-build/investigation-2026-06-28/launchers/launch-trace.sh` (2323 telnet console,
-brings host69 to host-ready). Leave the lab clean when done.
+brings host69 to host-ready ~75s). NETLIT load: `MOUNT DTA1:` → `copyfile.sh LOADER.SAV <SUBSYS>`
+→ `copyfile.sh PA1050.SAV <SUBSYS>` → `LOADER` → `DTA1:NETLIT` → `\033G` (then a CR to flush the
+stray `G`) → `START`. Trace flush: `kill -TERM` the ki. Leave the lab clean (host69 down, imp05
+up).

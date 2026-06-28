@@ -28894,7 +28894,7 @@ index 29874c4..06ac1e2 100644
  /* Unit service
  
 diff --git a/PDP10/kx10_imp.c b/PDP10/kx10_imp.c
-index f97aec5..1f44f07 100644
+index f97aec5..d51b085 100644
 --- a/PDP10/kx10_imp.c
 +++ b/PDP10/kx10_imp.c
 @@ -26,6 +26,7 @@
@@ -28970,12 +28970,20 @@ index f97aec5..1f44f07 100644
      {0}
  };
  
-@@ -856,8 +880,23 @@ static void check_interrupts (UNIT *uptr)
+@@ -855,9 +879,33 @@ static void check_interrupts (UNIT *uptr)
+             set_interrupt(DEVNUM, imp_data.pia);
          else
              set_interrupt_mpx(DEVNUM, imp_data.pia, imp_mpx_lvl);
-     }
--    if (uptr->STATUS & IMPOD)
--       set_interrupt_mpx(DEVNUM, imp_data.pia >> 3, imp_mpx_lvl + 1);
++    } else if ((uptr->flags & UNIT_NCP) && (uptr->STATUS & IMPLW)) {
++        /* End-of-input is a SEPARATE 1822 interrupt from input-word-ready.  TENEX's
++           PI dispatch (impdv.mac IMPSV) runs IMPEIN -- which clears IMIB and re-arms
++           input via IMISRT -- only on an interrupt where IMPINB(=IMPID) is CLEAR and
++           IMPEIB(=IMPLW) is SET.  Once the host has read the last data word (IMPID
++           cleared) but the end-of-input latch (IMPLW) still stands, raise that
++           standalone interrupt; otherwise IMPEIN never runs, input is never re-armed,
++           and the next RFC is held forever. */
++        set_interrupt(DEVNUM, imp_data.pia);
++    }
 +    if (uptr->STATUS & IMPOD) {
 +       /* TENEX's BBN IMP driver assigns ONE PI channel (via CONO ODPIEN -> pia
 +          bits 0-2) and sets the separate "output" PIA field (bits 3-5) to 0, i.e.
@@ -28986,7 +28994,9 @@ index f97aec5..1f44f07 100644
 +       if (opia == 0)
 +           opia = imp_data.pia & 7;
 +       set_interrupt_mpx(DEVNUM, opia, imp_mpx_lvl + 1);
-+    }
+     }
+-    if (uptr->STATUS & IMPOD)
+-       set_interrupt_mpx(DEVNUM, imp_data.pia >> 3, imp_mpx_lvl + 1);
 +    sim_debug(DEBUG_IRQ, &imp_dev,
 +        "IMP chkint STATUS=%06o pia=%03o in=%o out=%o (ID=%d OD=%d RDY=%d)\n",
 +        (uint32)uptr->STATUS, imp_data.pia, imp_data.pia & 7,
@@ -28996,7 +29006,7 @@ index f97aec5..1f44f07 100644
  }
  
  t_stat imp_devio(uint32 dev, uint64 *data)
-@@ -904,12 +943,73 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -904,12 +952,73 @@ t_stat imp_devio(uint32 dev, uint64 *data)
               break;
          case TYPE_BBN:
          case TYPE_WAITS:
@@ -29070,7 +29080,7 @@ index f97aec5..1f44f07 100644
               }
               if (*data & IMP_IDPIEN) {
                   imp_data.pia &= ~070;
-@@ -943,6 +1043,12 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -943,6 +1052,12 @@ t_stat imp_devio(uint32 dev, uint64 *data)
                   uptr->STATUS &= ~IMPID;
                   uptr->ILEN = 0;
               }
@@ -29083,7 +29093,7 @@ index f97aec5..1f44f07 100644
               check_interrupts(uptr);
               break;
          }
-@@ -955,6 +1061,72 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -955,6 +1070,72 @@ t_stat imp_devio(uint32 dev, uint64 *data)
               break;
          case TYPE_BBN:
          case TYPE_WAITS:
@@ -29156,7 +29166,22 @@ index f97aec5..1f44f07 100644
               *data = (uint64)(imp_data.pia & 0777);
               if (uptr->STATUS & IMPOD)
                   *data |= IMP_ODONE;
-@@ -1213,8 +1385,12 @@ t_stat imp_srv(UNIT * uptr)
+@@ -982,7 +1163,13 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+         break;
+     case DATAI:
+         *data = imp_data.ibuf;
+-        uptr->STATUS &= ~(IMPID|IMPLW);
++        if (uptr->flags & UNIT_NCP)
++            /* Reading a data word clears only input-word-ready (IMPID).  Leave the
++               end-of-input latch (IMPLW) set so TENEX takes a separate end-of-input
++               interrupt and runs IMPEIN; IMPLW is cleared there by CONO IMPGEB. */
++            uptr->STATUS &= ~IMPID;
++        else
++            uptr->STATUS &= ~(IMPID|IMPLW);
+         sim_debug(DEBUG_DATAIO, dptr, "IMP %03o DATI %012llo %08x PC=%o\n",
+                  dev, *data, (uint32)(*data >> 4), PC);
+         if (uptr->ILEN != 0)
+@@ -1213,8 +1400,12 @@ t_stat imp_srv(UNIT * uptr)
          check_interrupts (uptr);
      }
  #endif
@@ -29171,7 +29196,7 @@ index f97aec5..1f44f07 100644
      return SCPE_OK;
  }
  
-@@ -1296,6 +1472,28 @@ t_stat imp_eth_srv(UNIT * uptr)
+@@ -1296,6 +1487,28 @@ t_stat imp_eth_srv(UNIT * uptr)
  {
      sim_clock_coschedule(uptr, 1000);              /* continue poll */
  
@@ -29200,7 +29225,7 @@ index f97aec5..1f44f07 100644
      imp_timer_task(&imp_data);
      if (uptr->ILEN == 0 && (uptr->STATUS & (IMPIB|IMPID)) == 0)
          imp_packet_in(&imp_data);
-@@ -1608,6 +1806,125 @@ imp_packet_in(struct imp_device *imp)
+@@ -1608,6 +1821,133 @@ imp_packet_in(struct imp_device *imp)
     }
  }
  
@@ -29302,7 +29327,6 @@ index f97aec5..1f44f07 100644
 +        check_interrupts(&imp_unit[0]);
 +        return;
 +    }
-+    imp->imp_link_up = 0;       /* consume the arm; monitor must STRIN again */
 +    /* Unpack the message words (after the flags word) into rbuffer bytes. */
 +    nb = 0;
 +    for (i = 1; i < nw; i++) {
@@ -29311,10 +29335,19 @@ index f97aec5..1f44f07 100644
 +    }
 +    sim_debug(DEBUG_DETAIL, &imp_dev, "IMP ncp recv %d words (%d msg bytes) flags=%o\n",
 +              nw, nb, buf[0]);
-+    if (nb == 0) {              /* ready-status datagram only, no message body */
++    if (nb == 0) {              /* ready-status datagram only, no message body:
++                                   surface the ready line but do NOT consume the
++                                   host's armed input buffer.  A bare 1822 line-
++                                   ready / NOP keepalive is not a host-input message;
++                                   eating the arm here left imp_link_up stuck at 0
++                                   (TENEX got no input-done, never ran IMPEIN, never
++                                   re-armed via IMISRT), so the next real ICP RFC was
++                                   held in pending_buf forever and NETLIT never saw
++                                   it.  Keep the arm so the held RFC delivers next. */
 +        check_interrupts(&imp_unit[0]);
 +        return;
 +    }
++    imp->imp_link_up = 0;       /* consume the arm; monitor must STRIN again */
 +    imp_unit[0].STATUS |= IMPIB;
 +    imp_unit[0].IPOS = 0;
 +    imp_unit[0].ILEN = nb * 8;
@@ -29326,7 +29359,7 @@ index f97aec5..1f44f07 100644
  void
  imp_send_packet (struct imp_device *imp, int len)
  {
-@@ -1619,6 +1936,12 @@ imp_send_packet (struct imp_device *imp, int len)
+@@ -1619,6 +1959,12 @@ imp_send_packet (struct imp_device *imp, int len)
      int        lk;
      int        mt;
  
@@ -29339,7 +29372,7 @@ index f97aec5..1f44f07 100644
      lk = 0;
      n = len;
      switch (imp->sbuffer[0] & 0xF) {
-@@ -3103,6 +3426,9 @@ t_stat imp_reset (DEVICE *dptr)
+@@ -3103,6 +3449,9 @@ t_stat imp_reset (DEVICE *dptr)
          /* Clear ARP table. */
          memset(imp_data.arp_table, 0, sizeof(imp_data.arp_table));
          imp_data.dhcp_state = DHCP_STATE_OFF;
@@ -29349,7 +29382,7 @@ index f97aec5..1f44f07 100644
      }
      /* Clear queues. */
      imp_data.sendq = NULL;
-@@ -3146,6 +3472,31 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
+@@ -3146,6 +3495,31 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
                     break;
      }
  #endif
@@ -29381,7 +29414,7 @@ index f97aec5..1f44f07 100644
      if (!(uptr->flags & UNIT_DHCP) && imp_data.ip == 0)
        return sim_messagef (SCPE_NOATT, "%s: An IP Address must be specified when DHCP is disabled\n",
                 imp_dev.name);
-@@ -3229,6 +3580,18 @@ t_stat imp_detach(UNIT* uptr)
+@@ -3229,6 +3603,18 @@ t_stat imp_detach(UNIT* uptr)
  {
  
      if (uptr->flags & UNIT_ATT) {

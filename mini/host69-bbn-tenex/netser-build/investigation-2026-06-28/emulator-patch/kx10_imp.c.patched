@@ -879,6 +879,15 @@ static void check_interrupts (UNIT *uptr)
             set_interrupt(DEVNUM, imp_data.pia);
         else
             set_interrupt_mpx(DEVNUM, imp_data.pia, imp_mpx_lvl);
+    } else if ((uptr->flags & UNIT_NCP) && (uptr->STATUS & IMPLW)) {
+        /* End-of-input is a SEPARATE 1822 interrupt from input-word-ready.  TENEX's
+           PI dispatch (impdv.mac IMPSV) runs IMPEIN -- which clears IMIB and re-arms
+           input via IMISRT -- only on an interrupt where IMPINB(=IMPID) is CLEAR and
+           IMPEIB(=IMPLW) is SET.  Once the host has read the last data word (IMPID
+           cleared) but the end-of-input latch (IMPLW) still stands, raise that
+           standalone interrupt; otherwise IMPEIN never runs, input is never re-armed,
+           and the next RFC is held forever. */
+        set_interrupt(DEVNUM, imp_data.pia);
     }
     if (uptr->STATUS & IMPOD) {
        /* TENEX's BBN IMP driver assigns ONE PI channel (via CONO ODPIEN -> pia
@@ -1154,7 +1163,13 @@ t_stat imp_devio(uint32 dev, uint64 *data)
         break;
     case DATAI:
         *data = imp_data.ibuf;
-        uptr->STATUS &= ~(IMPID|IMPLW);
+        if (uptr->flags & UNIT_NCP)
+            /* Reading a data word clears only input-word-ready (IMPID).  Leave the
+               end-of-input latch (IMPLW) set so TENEX takes a separate end-of-input
+               interrupt and runs IMPEIN; IMPLW is cleared there by CONO IMPGEB. */
+            uptr->STATUS &= ~IMPID;
+        else
+            uptr->STATUS &= ~(IMPID|IMPLW);
         sim_debug(DEBUG_DATAIO, dptr, "IMP %03o DATI %012llo %08x PC=%o\n",
                  dev, *data, (uint32)(*data >> 4), PC);
         if (uptr->ILEN != 0)
@@ -1904,7 +1919,6 @@ imp_udp_packet_in(struct imp_device *imp)
         check_interrupts(&imp_unit[0]);
         return;
     }
-    imp->imp_link_up = 0;       /* consume the arm; monitor must STRIN again */
     /* Unpack the message words (after the flags word) into rbuffer bytes. */
     nb = 0;
     for (i = 1; i < nw; i++) {
@@ -1913,10 +1927,19 @@ imp_udp_packet_in(struct imp_device *imp)
     }
     sim_debug(DEBUG_DETAIL, &imp_dev, "IMP ncp recv %d words (%d msg bytes) flags=%o\n",
               nw, nb, buf[0]);
-    if (nb == 0) {              /* ready-status datagram only, no message body */
+    if (nb == 0) {              /* ready-status datagram only, no message body:
+                                   surface the ready line but do NOT consume the
+                                   host's armed input buffer.  A bare 1822 line-
+                                   ready / NOP keepalive is not a host-input message;
+                                   eating the arm here left imp_link_up stuck at 0
+                                   (TENEX got no input-done, never ran IMPEIN, never
+                                   re-armed via IMISRT), so the next real ICP RFC was
+                                   held in pending_buf forever and NETLIT never saw
+                                   it.  Keep the arm so the held RFC delivers next. */
         check_interrupts(&imp_unit[0]);
         return;
     }
+    imp->imp_link_up = 0;       /* consume the arm; monitor must STRIN again */
     imp_unit[0].STATUS |= IMPIB;
     imp_unit[0].IPOS = 0;
     imp_unit[0].ILEN = nb * 8;
