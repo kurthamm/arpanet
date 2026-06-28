@@ -311,3 +311,34 @@ on the delivered RFC.
 telnet console); dump the `NETSTS` connection table; fire one `@L 69`; break + diff `NETSTS` —
 does a connection entry appear / change state (did `RECSTR` run) and land on NETLIT's socket-1
 listen, or is the RFC never delivered/processed?
+
+### 10.2 LIVE RESULT (2026-06-28) — the RFC is never DELIVERED: TENEX stops re-arming IMP input
+
+Ran `launch-trace.sh` (host69 up, host-ready re-asserted — `ncp-ping 69` hangs, the
+host-ready-landed signature), fired one `@L 69`, then stopped the ki to flush the (block-buffered)
+`DEBUG_IRQ` recv trace. Result:
+
+- **The RFC arrives:** `IMP ncp recv poll#10841 nw=6 buf0=2 link=0` (a 6-word message = the ICP
+  RFC/STR), then `poll#10842 nw=1` (a host-ready NOP).
+- **`link=0` on ALL 14 recv-polls** — `imp_link_up` is **never 1**. `chkint` shows `RDY=1`
+  (host-ready up), `pia=055` (our single-PI-channel assignment), steady-state `ID=0 OD=0`. Early
+  in the run there WERE input-dones (`ID=1`, `STATUS=102010/002010`); then it settled to
+  `ID=0 link=0` and never re-armed.
+
+**The break is delivery, upstream of the NCP:** TENEX arms IMP input initially (handles the
+host-ready NOP traffic) **then stops re-arming**. An RFC arriving after arming stops is **held in
+the emulator's `pending_buf` and never delivered** → `RECSTR` never runs → NETLIT (correctly
+listening) never sees it → ncp31 hangs. Not NETLIT, not byte size, not RFC matching — **`imp_link_up`
+never returns to 1.**
+
+**New frontier — why does TENEX stop re-arming IMP input?** Two candidates:
+1. **TENEX-side IMP-service stall** — the 25 stuck RFNM connections (`RFNCHK` "MESSAGE STUCK IN
+   OUTPUT QUEUE" metronome) may starve the shared IMP service so it never re-posts an input
+   receive (`IMISRT`/`STRIN`). This would make the 25-stuck-conn snapshot the *root* cause, not a
+   cosmetic side effect — looping back to the "need a quiescent snapshot" problem.
+2. **Emulator-fork arm-detection bug** — our fork sets `imp_link_up=1` on detecting the host's
+   input-arm (CONO/BLKI). If TENEX re-arms but our detection misses it, `link_up` stays 0.
+
+**Next test:** trace the host's IMP input-arm path (the CONO/DATAI/BLKI our fork keys off) and
+correlate with `IMISRT` in the monitor — is TENEX issuing the re-arm at all (→ candidate 1) or
+issuing it and being missed (→ candidate 2)?
