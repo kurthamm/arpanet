@@ -1,3 +1,4 @@
+ec6b0b81843415681f7f63c1b0830f086d46c9d1  2026-06-28  host69 TENEX ncp: NCP-dispatch trace instrumentation (RFC -> RECSTR path)
 e7c64e7a86fd5645f53f1ea60e19e067d5dab923  2026-06-28  host69 TENEX ncp: fix IMP input re-arm deadlock (two 1822-fidelity bugs)
 842109e8b1106729267063139954579caeda1294  2026-06-28  host69 ncp: FORCEDOWN lever + current working state (preservation snapshot)
 a483514b9d95269d7f493bd60709d7063810e704  2026-06-25  host69 TENEX ncp: diagnostic instrumentation (recv poll + gate state)

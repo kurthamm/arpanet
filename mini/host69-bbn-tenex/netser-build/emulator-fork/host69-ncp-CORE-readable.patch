@@ -257,10 +257,10 @@ index 0000000..0b1c9cf
 +  return pktlen;
 +}
 diff --git a/PDP10/kx10_cpu.c b/PDP10/kx10_cpu.c
-index 2d51230..39653d3 100644
+index 2d51230..0bfcd3a 100644
 --- a/PDP10/kx10_cpu.c
 +++ b/PDP10/kx10_cpu.c
-@@ -143,6 +143,13 @@ uint8   IND;                                  /* Indirect flag */
+@@ -143,6 +143,39 @@ uint8   IND;                                  /* Indirect flag */
  t_addr  AS;                                   /* Address switches */
  int     BYF5;                                 /* Flag for second half of LDB/DPB instruction */
  int     uuo_cycle;                            /* Uuo cycle in progress */
@@ -271,10 +271,36 @@ index 2d51230..39653d3 100644
 +t_addr  crdir_maxpc = 0;                        /* max monitor PC seen inside CRDIR */
 +t_addr  crdir_ring[32];                        /* last monitor PCs inside CRDIR */
 +int     crdir_ring_i = 0;
++/* NCP-dispatch trace: cumulative (sampling-immune) execution counters for the
++   monitor PCs on the delivered-RFC -> NCP path (addrs from tenex.dis).  Read
++   out via the IMP CONI probe.  136411 = IMPEIN 'hrlm a,@impibi' (RFC queued to
++   NCP input queue, interrupt level); 137437 = 'aos impncl' (process-level
++   dispatcher created a control connection for the message); 441110 = recstr
++   (NCP RFC -> listen-socket matcher). */
++unsigned long ncp_q_impibi = 0;    /* PC 0136411 hits: RFC queued to NCP input */
++unsigned long ncp_aos_impncl = 0;  /* PC 0137437 hits: control connection created */
++unsigned long ncp_recstr = 0;      /* PC 0441110 hits: NCP RFC->listen matcher ran */
++/* IMPEIN discard-branch discriminators (mutually exclusive paths that bypass the
++   queue at 136411): which one does the delivered RFC take? */
++unsigned long ncp_e_nobuf = 0;     /* PC 0136371: IMIB<=0  -> IMPEI2 (no buffer) */
++unsigned long ncp_e_flush = 0;     /* PC 0136373: flushing -> IMPEI3 */
++unsigned long ncp_e_nomsg = 0;     /* PC 0136377: IMIDSP==IMIN0/IMIN00 -> IMPEI2 */
++unsigned long ncp_e_irreg = 0;     /* PC 0136433: IMPEI4 (dead-host/irregular) */
++/* IMPCNP control-message host-table gates (why RECSTR may not be dispatched). */
++unsigned long ncp_badhost = 0;     /* PC 0133021: sender in IMPBHT -> flush whole ctl msg */
++unsigned long ncp_forcerst = 0;    /* PC 0133046: sender not up (IMPHRT) -> force IMSRST not RECSTR */
++unsigned long ncp_imsrst = 0;      /* PC 0133611: IMSRST ran (host69 sent an RST back) */
++unsigned long ncp_dispatch = 0;    /* PC 0133052: IMPCNP 'pushj p,(e)' dispatched a control command */
++unsigned long ncp_recrts = 0;      /* PC 0441206: RECRTS (received RTS = ICP request) ran */
++unsigned long ncp_reccls = 0;      /* PC 0441057: RECCLS (received CLS) ran */
++unsigned long ncp_disp_handler = 0;/* AC7 (handler addr) captured at the 133052 dispatch */
++unsigned long ncp_im8rst = 0;      /* PC 0133241: IM8RST handler (host-host RST received) */
++unsigned long ncp_im8rrp = 0;      /* PC 0133244: IM8RRP handler (host-host RRP received) */
++unsigned long ncp_im8nop = 0;      /* PC 0133072: IM8NOP handler */
  int     SC;                                   /* Shift count */
  int     SCAD;                                 /* Shift count extension */
  int     FE;                                   /* Exponent */
-@@ -1630,6 +1637,7 @@ t_stat dev_apr(uint32 dev, uint64 *data) {
+@@ -1630,6 +1663,7 @@ t_stat dev_apr(uint32 dev, uint64 *data) {
  #if KA
  
  #if BBN
@@ -282,7 +308,7 @@ index 2d51230..39653d3 100644
  t_stat dev_pag(uint32 dev, uint64 *data) {
      uint64 res = 0;
      int    i;
-@@ -1687,6 +1695,18 @@ t_stat dev_pag(uint32 dev, uint64 *data) {
+@@ -1687,6 +1721,18 @@ t_stat dev_pag(uint32 dev, uint64 *data) {
          break;
  
      case DATAO:
@@ -301,7 +327,7 @@ index 2d51230..39653d3 100644
         break;
  
      case DATAI:
-@@ -3268,7 +3288,7 @@ int Mem_read(int flag, int cur_context, int fetch, int mod) {
+@@ -3268,7 +3314,7 @@ int Mem_read(int flag, int cur_context, int fetch, int mod) {
                  if (fetch == 0 && hst_lnt) {
                      hst[hst_p].mb = MB;
                  }
@@ -310,7 +336,7 @@ index 2d51230..39653d3 100644
                  return 0;
              }
          }
-@@ -3718,9 +3738,9 @@ int page_lookup_bbn(t_addr addr, int flag, t_addr *loc, int wr, int cur_context,
+@@ -3718,9 +3764,9 @@ int page_lookup_bbn(t_addr addr, int flag, t_addr *loc, int wr, int cur_context,
                   uf = 1;
               if (xct_flag & 004 && wr == 0)
                   uf = 1;
@@ -322,7 +348,7 @@ index 2d51230..39653d3 100644
                   uf = 1;
           }
      }
-@@ -3951,6 +3971,7 @@ int Mem_read_bbn(int flag, int cur_context, int fetch, int mod) {
+@@ -3951,6 +3997,7 @@ int Mem_read_bbn(int flag, int cur_context, int fetch, int mod) {
   */
  int Mem_write_bbn(int flag, int cur_context) {
      t_addr addr;
@@ -330,7 +356,7 @@ index 2d51230..39653d3 100644
  
      /* If not doing any special access, just access register */
      if (AB < 020 && ((xct_flag == 0 || cur_context || (FLAGS & USER) != 0))) {
-@@ -3958,6 +3979,13 @@ int Mem_write_bbn(int flag, int cur_context) {
+@@ -3958,6 +4005,13 @@ int Mem_write_bbn(int flag, int cur_context) {
          UPDATE_MI(AB);
          return 0;
      }
@@ -344,10 +370,31 @@ index 2d51230..39653d3 100644
      if (modify) {
          if (sim_brk_summ && sim_brk_test(last_addr, SWMASK('W')))
              watch_stop = 1;
-@@ -4593,6 +4621,25 @@ if ((reason = build_dev_tab ()) != SCPE_OK)            /* build, chk dib_tab */
+@@ -4593,6 +4647,46 @@ if ((reason = build_dev_tab ()) != SCPE_OK)            /* build, chk dib_tab */
      }
  
      if (f_inst_fetch) {
++        if ((FLAGS & USER) == 0) {   /* exec-mode (monitor) only: NCP-path PC counters */
++            switch (PC & RMASK) {
++            case 0136411: ncp_q_impibi++;   break;
++            case 0137437: ncp_aos_impncl++; break;
++            case 0441110: ncp_recstr++;     break;
++            case 0136371: ncp_e_nobuf++;    break;
++            case 0136373: ncp_e_flush++;    break;
++            case 0136377: ncp_e_nomsg++;    break;
++            case 0136433: ncp_e_irreg++;    break;
++            case 0133021: ncp_badhost++;    break;
++            case 0133046: ncp_forcerst++;   break;
++            case 0133611: ncp_imsrst++;     break;
++            case 0133052: ncp_dispatch++;
++                          ncp_disp_handler = (unsigned long)(FM[fm_sel | 7] & RMASK); break;
++            case 0133241: ncp_im8rst++;     break;  /* IM8RST handler (host-host RST) */
++            case 0133244: ncp_im8rrp++;     break;  /* IM8RRP handler (host-host RRP) */
++            case 0133072: ncp_im8nop++;     break;  /* IM8NOP handler */
++            case 0441206: ncp_recrts++;     break;
++            case 0441057: ncp_reccls++;     break;
++            }
++        }
 +        if (crdir_wait) {
 +            if (FLAGS & USER) {   /* first user fetch after CRDIR JSYS = its return */
 +                fprintf(stderr, "[CRDIR] RET pc=%llo call+%lld icount=%d minpc=%llo maxpc=%llo AC1=%llo\r\n",
@@ -370,7 +417,7 @@ index 2d51230..39653d3 100644
  #if !(KI|KL)
  fetch:
  #endif
-@@ -5021,6 +5068,13 @@ muuo:
+@@ -5021,6 +5115,13 @@ muuo:
      case 0102: case 0103:
  #endif
      case 0104:  /* JSYS */
@@ -384,7 +431,7 @@ index 2d51230..39653d3 100644
      case 0106:
      case 0107:
  #if !(KL_ITS | KS_ITS)
-@@ -6368,6 +6422,12 @@ dpnorm:
+@@ -6368,6 +6469,12 @@ dpnorm:
      case 0104: /* TENEX JSYS */
  #if BBN
                if (QBBN) {
@@ -397,7 +444,7 @@ index 2d51230..39653d3 100644
                     BR = ((uint64)(FLAGS) << 23) | ((PC + !pi_cycle) & RMASK);
                     if (AB < 01000) {
                        AB += 01000;
-@@ -6387,6 +6447,7 @@ dpnorm:
+@@ -6387,6 +6494,7 @@ dpnorm:
                         goto last;
                     }
                     PC = AR & RMASK;
@@ -405,7 +452,7 @@ index 2d51230..39653d3 100644
                     break;
                }
  #endif
-@@ -8806,7 +8867,6 @@ jrstf:
+@@ -8806,7 +8914,6 @@ jrstf:
                break;
  
      case 0256: /* XCT */
@@ -413,7 +460,7 @@ index 2d51230..39653d3 100644
                f_load_pc = 0;
                f_pc_inh = 1;
                xct_flag = 0;
-@@ -12040,6 +12100,7 @@ last:
+@@ -12040,6 +12147,7 @@ last:
          page_fault = 0;
          AB = 070 + maoff;
          f_pc_inh = 1;
@@ -422,7 +469,7 @@ index 2d51230..39653d3 100644
          goto fetch;
      }
 diff --git a/PDP10/kx10_imp.c b/PDP10/kx10_imp.c
-index f97aec5..d51b085 100644
+index f97aec5..90341aa 100644
 --- a/PDP10/kx10_imp.c
 +++ b/PDP10/kx10_imp.c
 @@ -26,6 +26,7 @@
@@ -621,7 +668,7 @@ index f97aec5..d51b085 100644
               check_interrupts(uptr);
               break;
          }
-@@ -955,6 +1070,72 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -955,6 +1070,108 @@ t_stat imp_devio(uint32 dev, uint64 *data)
               break;
          case TYPE_BBN:
          case TYPE_WAITS:
@@ -689,12 +736,48 @@ index f97aec5..d51b085 100644
 +                         pm[0]=cm[0];pm[1]=cm[1];pm[2]=cm[2];pm[3]=cm[3];pm[4]=cm[4];
 +                     }
 +                 }
++                 {  /* NCP-dispatch probe: after a delivered RFC is queued by IMPEIN,
++                       does process-level service drain it and run RECSTR?  Watch the
++                       IMP->NCP input handoff state (impdv.mac/netwrk.mac symbols from
++                       tenex.dis).  impflg = "request job-0 service" counter (AOS'd by
++                       IMPEIN); impibi/impibo = IMP input buffer in/out queue ptrs
++                       (IMPEIN appends to impibi, job-0 drains via impibo); impnfi =
++                       free input bufs; impncl = #control-input conns. */
++                     extern uint64 M[];
++                     extern unsigned long ncp_q_impibi, ncp_aos_impncl, ncp_recstr;
++                     extern unsigned long ncp_e_nobuf, ncp_e_flush, ncp_e_nomsg, ncp_e_irreg;
++                     extern unsigned long ncp_badhost, ncp_forcerst, ncp_imsrst;
++                     extern unsigned long ncp_dispatch, ncp_recrts, ncp_reccls, ncp_disp_handler;
++                     extern unsigned long ncp_im8rst, ncp_im8rrp, ncp_im8nop;
++                     static uint64 qm[5];
++                     static unsigned long cm[13];
++                     uint64 qc[5];
++                     unsigned long cc[13];
++                     int i;
++                     qc[0]=M[070216]; qc[1]=M[070321]; qc[2]=M[070322];
++                     qc[3]=M[070227]; qc[4]=M[070336];
++                     cc[0]=ncp_q_impibi; cc[1]=ncp_aos_impncl; cc[2]=ncp_recstr;
++                     cc[3]=ncp_e_nobuf; cc[4]=ncp_e_flush; cc[5]=ncp_e_nomsg; cc[6]=ncp_e_irreg;
++                     cc[7]=ncp_badhost; cc[8]=ncp_forcerst; cc[9]=ncp_imsrst;
++                     cc[10]=ncp_dispatch; cc[11]=ncp_recrts; cc[12]=ncp_reccls;
++                     {
++                         int chg = (qc[0]!=qm[0]||qc[1]!=qm[1]||qc[2]!=qm[2]||qc[3]!=qm[3]||qc[4]!=qm[4]);
++                         for (i=0;i<13;i++) if (cc[i]!=cm[i]) chg=1;
++                         if (chg) {
++                             sim_debug(DEBUG_CONI, dptr,
++                                "    [NCP] RFCq=%lu ctlconn=%lu | dispatch=%lu RECSTR=%lu RECRTS=%lu RECCLS=%lu | IM8: rst=%lu rrp=%lu nop=%lu | forcerst=%lu imsrst=%lu\n",
++                                cc[0],cc[1],cc[10],cc[2],cc[11],cc[12],ncp_im8rst,ncp_im8rrp,ncp_im8nop,cc[8],cc[9]);
++                             qm[0]=qc[0];qm[1]=qc[1];qm[2]=qc[2];qm[3]=qc[3];qm[4]=qc[4];
++                             for (i=0;i<13;i++) cm[i]=cc[i];
++                         }
++                     }
++                 }
 +                 break;
 +             }
               *data = (uint64)(imp_data.pia & 0777);
               if (uptr->STATUS & IMPOD)
                   *data |= IMP_ODONE;
-@@ -982,6 +1163,12 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -982,6 +1199,12 @@ t_stat imp_devio(uint32 dev, uint64 *data)
          break;
      case DATAI:
          *data = imp_data.ibuf;
@@ -707,7 +790,7 @@ index f97aec5..d51b085 100644
              uptr->STATUS &= ~(IMPID|IMPLW);
          sim_debug(DEBUG_DATAIO, dptr, "IMP %03o DATI %012llo %08x PC=%o\n",
                   dev, *data, (uint32)(*data >> 4), PC);
-@@ -1213,8 +1400,12 @@ t_stat imp_srv(UNIT * uptr)
+@@ -1213,8 +1436,12 @@ t_stat imp_srv(UNIT * uptr)
          check_interrupts (uptr);
      }
  #endif
@@ -721,7 +804,7 @@ index f97aec5..d51b085 100644
      return SCPE_OK;
  }
  
-@@ -1296,6 +1487,28 @@ t_stat imp_eth_srv(UNIT * uptr)
+@@ -1296,6 +1523,28 @@ t_stat imp_eth_srv(UNIT * uptr)
  {
      sim_clock_coschedule(uptr, 1000);              /* continue poll */
  
@@ -750,7 +833,7 @@ index f97aec5..d51b085 100644
      imp_timer_task(&imp_data);
      if (uptr->ILEN == 0 && (uptr->STATUS & (IMPIB|IMPID)) == 0)
          imp_packet_in(&imp_data);
-@@ -1608,6 +1821,133 @@ imp_packet_in(struct imp_device *imp)
+@@ -1608,6 +1857,133 @@ imp_packet_in(struct imp_device *imp)
     }
  }
  
@@ -884,7 +967,7 @@ index f97aec5..d51b085 100644
  void
  imp_send_packet (struct imp_device *imp, int len)
  {
-@@ -1619,6 +1959,12 @@ imp_send_packet (struct imp_device *imp, int len)
+@@ -1619,6 +1995,12 @@ imp_send_packet (struct imp_device *imp, int len)
      int        lk;
      int        mt;
  
@@ -897,7 +980,7 @@ index f97aec5..d51b085 100644
      lk = 0;
      n = len;
      switch (imp->sbuffer[0] & 0xF) {
-@@ -3103,6 +3449,9 @@ t_stat imp_reset (DEVICE *dptr)
+@@ -3103,6 +3485,9 @@ t_stat imp_reset (DEVICE *dptr)
          /* Clear ARP table. */
          memset(imp_data.arp_table, 0, sizeof(imp_data.arp_table));
          imp_data.dhcp_state = DHCP_STATE_OFF;
@@ -907,7 +990,7 @@ index f97aec5..d51b085 100644
      }
      /* Clear queues. */
      imp_data.sendq = NULL;
-@@ -3146,6 +3495,31 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
+@@ -3146,6 +3531,31 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
                     break;
      }
  #endif
@@ -939,7 +1022,7 @@ index f97aec5..d51b085 100644
      if (!(uptr->flags & UNIT_DHCP) && imp_data.ip == 0)
        return sim_messagef (SCPE_NOATT, "%s: An IP Address must be specified when DHCP is disabled\n",
                 imp_dev.name);
-@@ -3229,6 +3603,18 @@ t_stat imp_detach(UNIT* uptr)
+@@ -3229,6 +3639,18 @@ t_stat imp_detach(UNIT* uptr)
  {
  
      if (uptr->flags & UNIT_ATT) {

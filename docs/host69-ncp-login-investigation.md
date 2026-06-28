@@ -371,11 +371,53 @@ held RFCs** all run. Fix committed in the `rcornwell-sims` fork repo (`e7c64e7`)
 also mirrored to `investigation-2026-06-28/emulator-patch/kx10_imp.c.patched`. **TODO: land it in
 tracked `src/sims/PDP10/kx10_imp.c` + regenerate the emulator-fork bundle/patch.**
 
+### 10.4 NCP dispatch traced end-to-end (2026-06-28) — RFC delivered; blocker = host-host RST/RRP handshake
+
+With the IMP input layer fixed (§10.3), instrumented the **monitor-internal** RFC→`RECSTR` path
+with **sampling-immune cumulative PC-execution counters** (CPU fetch-loop counters surfaced via the
+IMP CONI `[NCP]` probe; addresses from `tenex.dis`). Diagnostic instrumentation committed in the
+fork repo (`ec6b0b8`). Findings, in order:
+
+1. **An `IMPRSS`-set flush count silently ate the RFC.** `IMPRSS` (IMP bring-up, impdv.mac:4328)
+   sets `IMPFLS=-2` to flush the first 2 inbound messages. The harness **FORCEDOWN host-ready
+   re-assert re-runs `IMPRSS`**, re-arming that flush — so the one `@L 69` RFC took `IMPEIN`'s
+   flush branch (counter `flush=1`) and was discarded before reaching the NCP. **Bypassed** with
+   `deposit 70360 0` (clear `IMPFLS`) after the FORCEDOWN cycle in `trace-rfc.do`. ⚠️ *Production
+   note: any host-ready method that runs `IMPRSS` re-arms this; clear `IMPFLS` or send 2 warm-up
+   msgs.*
+2. **With the flush cleared, the RFC flows into the NCP:** queued to the input queue (`RFCq=1`,
+   `impibi`→a real buffer), drained at process level, and a **control connection is created**
+   (`ctlconn=1`, `impncl` 0→1→0). The IMP/driver layer is fully working.
+3. **`IMPCNP` dispatches exactly one control command (`dispatch=1`) — but it is a host-host
+   `RST`/`RRP`, not the connection `RTS`.** Counters: `RECSTR=0 RECRTS=0 RECCLS=0`, while
+   `IM8RST(133241)=1` → `RECRST` (+ fall-through to `IM8RRP` host-status update). Host-table gates
+   are clear (`badhost=0 forcerst=0`). The lab client (`ncpd-ovREUSE/ncp.c`) sends an **RTS** to
+   initiate ICP — but that RTS **never reaches host69's NCP**; the only inbound control message is
+   the reset handshake. host69 meanwhile sent **48 RSTs** (`imsrst=48`).
+
+**Conclusion:** the break has moved below the connection logic to the **NCP host-host reset
+(RST/RRP) protocol**. host69 keeps (re)sending RST and processes an inbound RST, but the host-host
+link with the lab never settles into "up" in the direction that lets the lab deliver the connection
+RTS. NETLIT (correct, listening) and `RECSTR`/`RECRTS` are downstream of a handshake that isn't
+completing. This is plausibly where the stale snapshot state (the 25 conns / reset bookkeeping)
+finally bites — but now at the host-host-protocol layer, precisely located.
+
+**Next:** trace the RST/RRP exchange. Why does host69 send 48 RSTs and not converge? Look at
+`RECRST` (netwrk, called from `IM8RST`@133242) and the host-status table (`HSTSTS`@070440 region) —
+does host69 ever mark the lab host fully "up" (both reset directions exchanged)? And does the lab's
+`ncpdov` see host69 as up so it proceeds to send the connection RTS? Candidate root: host69's
+host-host reset state for the lab neighbor is stale/wedged from the snapshot (RST loop), so the
+connection RTS is never sent/accepted. Decisive instrument: count `RECRST` + dump `HSTSTS` for the
+lab host before/after `@L 69`; correlate with whether the lab daemon emits the ICP RTS.
+
 ---
 
 ## NEXT SESSION — START HERE (handoff)
 
-Continue from branch `host69-tenex-ncp-imp`. The IMP input-delivery layer is **SOLVED** (§10.3):
+Continue from branch `host69-tenex-ncp-imp`. The IMP input-delivery layer is **SOLVED** (§10.3),
+the RFC now reaches the NCP, and the blocker is localized to the **host-host RST/RRP handshake**
+(§10.4 — read it). The IMPFLS flush + the host-table gates are settled; NETLIT and RECSTR are
+downstream of the reset handshake and not the current problem.
 the `@L 69` RFC now reaches *and is delivered into* TENEX, which re-arms input. **Rebuild the
 emulator first** (`cd kit-cache/rcornwell-sims && make pdp10-ki`, fork repo @ `e7c64e7`) — the
 binary carries the fix; a clean clone needs the rebuild.

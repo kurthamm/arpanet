@@ -15,12 +15,13 @@ lever. Design rationale and the full investigation: `docs/host69-ncp-login-inves
 
 ## Base & provenance
 - **Base:** rcornwell/sims commit **`9510a91`** ("KA10: Fixed DP seek done…", 2026-03-08).
-- **Our 9 commits on top** (the journey) — see `COMMITS.txt`. Summary, oldest→newest:
+- **Our 10 commits on top** (the journey) — see `COMMITS.txt`. Summary, oldest→newest:
   `fa21f3b` add 1822-over-UDP `set imp ncp` → `9eaf68f` gate inbound input until host drives →
   `a438d50` drive the host↔IMP 1822 handshake → `877cde5` single-PI-channel output-done →
   `33f226e` TENEX-faithful BBN CONI/CONO → `2ee4d76` keep UDP polling + surface IMP-ready →
   `a483514` recv/gate diagnostics → `842109e` FORCEDOWN lever (preservation snapshot) →
-  `e7c64e7` fix IMP input re-arm deadlock (NOP-eats-arm + EOI/word-ready collapse).
+  `e7c64e7` fix IMP input re-arm deadlock (NOP-eats-arm + EOI/word-ready collapse) →
+  `ec6b0b8` NCP-dispatch trace instrumentation (RFC → RECSTR path counters).
 
 ## Files changed (signal vs noise)
 - **`PDP10/kx10_imp.c`** (+371) — the NCP host-interface core. **The signal.**
@@ -32,7 +33,7 @@ lever. Design rationale and the full investigation: `docs/host69-ncp-login-inves
   `kx10_disk.c`, `scp.c`, `makefile` — small supporting changes.
 
 ## Artifacts here
-- **`rcornwell-sims-host69-ncp.bundle`** — *primary, complete*: all 9 commits with history/messages.
+- **`rcornwell-sims-host69-ncp.bundle`** — *primary, complete*: all 10 commits with history/messages.
 - `host69-ncp-1822-over-udp.FULL.patch` — complete applyable diff (bloated by the cpu whitespace).
 - `host69-ncp-CORE-readable.patch` — human-readable: imp device + udp header + cpu real lines (`-w`).
 - `COMMITS.txt` — the commit log.
@@ -43,7 +44,7 @@ git clone https://github.com/rcornwell/sims && cd sims
 git checkout 9510a91
 # preferred — restore our exact commits with history:
 git bundle unbundle /path/to/rcornwell-sims-host69-ncp.bundle
-git checkout e7c64e7        # our HEAD
+git checkout ec6b0b8        # our HEAD
 # OR apply the flat patch instead of the bundle:
 #   git checkout 9510a91 && git apply /path/to/host69-ncp-1822-over-udp.FULL.patch
 make pdp10-ki               # needs SDL2/pcap/zlib/edit; sanity check must print "Good Registers"
