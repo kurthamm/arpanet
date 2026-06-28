@@ -61,9 +61,21 @@ bug that stopped ITS from answering network logins). The work spans two lines: t
 | **#65 UCLA** | **OS/360 MVT** (Hercules) + `ccn_frontdoor.py` | **no dir** | no | **built new** |
 | **#69 BBN** | **BBN-TENEX** (SIMH PDP-10 KI) | **no dir** (not even planned) | no | **building** — host-ready solved; login blocked at NCP RFC dispatch (`docs/host69-ncp-login-investigation.md`) |
 
-Authenticity also varies by **network seam**: ITS and TENEX speak their *own* period NCP
-natively; WAITS (`waitsconnect`) and OS/360 (`ccn_frontdoor.py`) run authentic OSes but attach
-to the ARPANET via *modern* bridges/shims; the ~18 stubs run no real OS at all.
+### Network seam — how each host actually reaches visitors (the honesty that matters)
+Running a real OS is *not* the same as being an authentic ARPANET host. By integration method:
+- **Native period NCP** (the host's own OS speaks 1822/NCP on its IMP — the authentic path):
+  **ITS** (#6/70/134/198/126) and **BBN-TENEX** (#69, *in progress* — the host69 effort).
+- **NCP bridge** (a Linux NCP daemon stands in for the host's network stack): **WAITS** (#11)
+  via `waitsconnect`.
+- **Terminal / front-door bridge** (real OS, but reached through the web terminal or a shim —
+  **not** a native ARPANET NCP host): **Sigma 7 / CP-V** (#1) via `local-host-terminal.py`
+  (its own README: *"not attached to IMP #1 as a working NCP host yet"*); **Multics** (#6) via
+  the TCP-6180 terminal; **OS/360 MVT** (#65) via `ccn_frontdoor.py` + `s3270`.
+- **No real OS** — the ~18 `ncpdov` map stubs.
+
+So our work splits cleanly: ITS we **activated as native NCP**; TENEX we're **making native NCP**
+now; Sigma/Multics/OS-360 are **authentic OSes wired in via bridges**, with native-NCP attach
+still future work. Don't let "it runs `@L 1`" be read as "it's an authentic NCP host."
 
 ### Subsystems & engineering we added
 - **ITS network logins** (Civitae `feature/its-ncp-debug`): `pdp10-ka-fixed` (KAIMP interrupt
@@ -99,12 +111,18 @@ to the ARPANET via *modern* bridges/shims; the ~18 stubs run no real OS at all.
 
 ---
 
-## Backfill TODO (giving each added effort a real notebook)
-- [ ] `journal/host01-sigma/` — CP-V bring-up notes (currently only ctl script + kit).
-- [ ] `journal/host06-multics/` — DPS8M integration.
-- [ ] `journal/host11-waits/` — WAITS + PARRY restoration (have `docs/host11-*.md` to fold in).
-- [ ] `journal/host65-ucla-ccn/` — status/goal (least documented).
-- [x] `journal/host69-bbn-tenex/` — done (`docs/host69-ncp-login-investigation.md` + artifacts).
-- [ ] `journal/its-network-login/` — the `feature/its-ncp-debug` story + the Civitae WIP diff.
-- [ ] Vault + `PROVENANCE.md` for the runtime packs/snapshots/tapes (DO droplet + Civitae).
-- [ ] Land `kx10_imp.c` patches (host-ready gate + FORCEDOWN) in tracked `src/sims/`.
+## Per-effort notebooks (status)
+- [x] **host69-bbn-tenex** — `docs/host69-ncp-login-investigation.md` + `netser-build/investigation-2026-06-28/` artifacts.
+- [x] **its-network-login** — `docs/journal/its-network-login.md` (the activation story for #70/134/198/126).
+- [x] **host06-multics** — `mini/host06-multics/README.md` (was undocumented).
+- [x] **host01-sigma** — `mini/host01-sigma/README.md` (honest: CP-V via terminal bridge, not yet native NCP).
+- [x] **host65-ucla-ccn** — `mini/host65-ucla-ccn/README.md` (OS/360 MVT via front-door bridge).
+- [x] **host11-waits/PARRY** — `docs/host11-ap-lab.md`, `docs/host11-parry-restoration.md`.
+
+## Remaining catch-up TODO
+- [ ] Land the `kx10_imp.c` patches (host-ready 1B22 gate + FORCEDOWN) in tracked `src/sims/`
+      — currently only in the gitignored build cache + the host69 artifacts.
+- [ ] Vault + `PROVENANCE.md` for the runtime packs/snapshots/tapes (droplet + Civitae) — the
+      irreplaceable configured disk images that are too large for git.
+- [ ] Resume the host69 NCP frontier: incoming RFC reaches host69 but isn't dispatched to the
+      listen socket (`netwrk.mac`) — see the host69 notebook.
