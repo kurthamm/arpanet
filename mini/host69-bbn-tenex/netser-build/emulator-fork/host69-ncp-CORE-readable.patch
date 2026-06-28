@@ -1,5 +1,5 @@
 diff --git a/PDP10/kx10_imp.c b/PDP10/kx10_imp.c
-index f97aec5..0f22473 100644
+index f97aec5..320ecf4 100644
 --- a/PDP10/kx10_imp.c
 +++ b/PDP10/kx10_imp.c
 @@ -26,6 +26,7 @@
@@ -111,7 +111,7 @@ index f97aec5..0f22473 100644
  }
  
  t_stat imp_devio(uint32 dev, uint64 *data)
-@@ -904,12 +952,73 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -904,12 +952,83 @@ t_stat imp_devio(uint32 dev, uint64 *data)
               break;
          case TYPE_BBN:
          case TYPE_WAITS:
@@ -158,7 +158,17 @@ index f97aec5..0f22473 100644
 +                         memset(imp_data.sbuffer, 0, ETH_FRAME_SIZE);
 +                         uptr->OPOS = 0;
 +                     }
-+                     uptr->STATUS &= ~IMPOD;
++                     /* 1822-fidelity: shipping the end bit COMPLETES the message, and the
++                        real BBN interface raises output-done once more so the driver's
++                        IMODN end-of-message step (CONO I.EOM -> set IMODSP=IMODN2, then wait
++                        for the next output-done) can run IMODN2 to start the next queued
++                        message or, if none, stop output and clear the software IMPOB flag.
++                        Clearing IMPOD here (the old behavior) stranded the driver: it issued
++                        the end bit, armed IMODN2, and never got the completion interrupt, so
++                        IMPOB stayed set forever and EVERY subsequent host->IMP message (the
++                        host-ready NOPs, all RSTs, and the connection RRP) was never sent.
++                        Output-side analog of the input re-arm fix (e7c64e7). */
++                     uptr->STATUS |= IMPOD;
 +                 }
 +                 sim_debug(DEBUG_CONO, dptr,
 +                    "IMP TENEXCONO data=%06o -> pia=%03o (ION=%d OON=%d EOB=%d "
@@ -185,7 +195,7 @@ index f97aec5..0f22473 100644
               }
               if (*data & IMP_IDPIEN) {
                   imp_data.pia &= ~070;
-@@ -943,6 +1052,12 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -943,6 +1062,12 @@ t_stat imp_devio(uint32 dev, uint64 *data)
                   uptr->STATUS &= ~IMPID;
                   uptr->ILEN = 0;
               }
@@ -198,7 +208,7 @@ index f97aec5..0f22473 100644
               check_interrupts(uptr);
               break;
          }
-@@ -955,6 +1070,129 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -955,6 +1080,129 @@ t_stat imp_devio(uint32 dev, uint64 *data)
               break;
          case TYPE_BBN:
          case TYPE_WAITS:
@@ -328,7 +338,7 @@ index f97aec5..0f22473 100644
               *data = (uint64)(imp_data.pia & 0777);
               if (uptr->STATUS & IMPOD)
                   *data |= IMP_ODONE;
-@@ -982,6 +1220,12 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -982,6 +1230,12 @@ t_stat imp_devio(uint32 dev, uint64 *data)
          break;
      case DATAI:
          *data = imp_data.ibuf;
@@ -341,7 +351,7 @@ index f97aec5..0f22473 100644
              uptr->STATUS &= ~(IMPID|IMPLW);
          sim_debug(DEBUG_DATAIO, dptr, "IMP %03o DATI %012llo %08x PC=%o\n",
                   dev, *data, (uint32)(*data >> 4), PC);
-@@ -1213,8 +1457,12 @@ t_stat imp_srv(UNIT * uptr)
+@@ -1213,8 +1467,12 @@ t_stat imp_srv(UNIT * uptr)
          check_interrupts (uptr);
      }
  #endif
@@ -355,7 +365,7 @@ index f97aec5..0f22473 100644
      return SCPE_OK;
  }
  
-@@ -1296,6 +1544,28 @@ t_stat imp_eth_srv(UNIT * uptr)
+@@ -1296,6 +1554,28 @@ t_stat imp_eth_srv(UNIT * uptr)
  {
      sim_clock_coschedule(uptr, 1000);              /* continue poll */
  
@@ -384,7 +394,7 @@ index f97aec5..0f22473 100644
      imp_timer_task(&imp_data);
      if (uptr->ILEN == 0 && (uptr->STATUS & (IMPIB|IMPID)) == 0)
          imp_packet_in(&imp_data);
-@@ -1608,6 +1878,133 @@ imp_packet_in(struct imp_device *imp)
+@@ -1608,6 +1888,133 @@ imp_packet_in(struct imp_device *imp)
     }
  }
  
@@ -518,7 +528,7 @@ index f97aec5..0f22473 100644
  void
  imp_send_packet (struct imp_device *imp, int len)
  {
-@@ -1619,6 +2016,12 @@ imp_send_packet (struct imp_device *imp, int len)
+@@ -1619,6 +2026,12 @@ imp_send_packet (struct imp_device *imp, int len)
      int        lk;
      int        mt;
  
@@ -531,7 +541,7 @@ index f97aec5..0f22473 100644
      lk = 0;
      n = len;
      switch (imp->sbuffer[0] & 0xF) {
-@@ -3103,6 +3506,9 @@ t_stat imp_reset (DEVICE *dptr)
+@@ -3103,6 +3516,9 @@ t_stat imp_reset (DEVICE *dptr)
          /* Clear ARP table. */
          memset(imp_data.arp_table, 0, sizeof(imp_data.arp_table));
          imp_data.dhcp_state = DHCP_STATE_OFF;
@@ -541,7 +551,7 @@ index f97aec5..0f22473 100644
      }
      /* Clear queues. */
      imp_data.sendq = NULL;
-@@ -3146,6 +3552,31 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
+@@ -3146,6 +3562,31 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
                     break;
      }
  #endif
@@ -573,7 +583,7 @@ index f97aec5..0f22473 100644
      if (!(uptr->flags & UNIT_DHCP) && imp_data.ip == 0)
        return sim_messagef (SCPE_NOATT, "%s: An IP Address must be specified when DHCP is disabled\n",
                 imp_dev.name);
-@@ -3229,6 +3660,18 @@ t_stat imp_detach(UNIT* uptr)
+@@ -3229,6 +3670,18 @@ t_stat imp_detach(UNIT* uptr)
  {
  
      if (uptr->flags & UNIT_ATT) {

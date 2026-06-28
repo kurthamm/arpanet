@@ -482,6 +482,44 @@ so `IMODN` advances and clears `IMPOB`. Candidate sites: the `CONO IMPEOB` handl
 (kx10_imp.c:1438 — which *does* `STATUS |= IMPOD; check_interrupts`). Validate by re-firing one
 `@L 69` and confirming the lab logs `received RRP from 105` then `Send ICP RTS`.
 
+### 10.7 SOLVED (2026-06-28, session 2) — output-done fix lands; `@L 69` reaches host69's login listener (LSNG→RFCR)
+
+**The emulator fix (committed, fork `37744c0`).** In the TENEX NCP `CONO IMPEOB` handler
+(`PDP10/kx10_imp.c` ~998) changed the post-ship `uptr->STATUS &= ~IMPOD;` to
+**`uptr->STATUS |= IMPOD;`**. The `check_interrupts(uptr)` already at the end of the CONO handler
+then raises the completion output-done. Rationale, confirmed against `impdv.mac`: the driver's output
+ISR `IMODN` ships a message with `CONO I.EOM` (end bit), arms `IMODSP=IMODN2`, and **waits for one
+more output-done interrupt** to run `IMODN2` (start next queued msg, or stop output and clear the
+software `IMPOB`). The old handler cleared `IMPOD` and never re-raised it, so `IMODN2` never ran and
+`IMPOB` stayed set forever (the bring-up traced exactly: `OON`→word→`EOB`/`packet sent sequence=1`,
+then **no further output-done**). This is the output-side analog of the §10.3 input re-arm fix.
+
+**Verified end-to-end (one clean `@L 69`):**
+- host69 output drains: `impob` 0, `nopcnt` 3→0, host69 now transmits (the host-ready NOPs, RSTs, and
+  the answering RRP all go out).
+- **RST/RRP converges:** the lab advances from `type 12/RST → Timed out waiting for RRP` to **`type
+  1/RTS`** (it received host69's RRP, marked host69 alive, and sent the connection RTS). host69
+  receives it: `[NCP] RECRTS≥2`.
+- **The RFC reaches host69's login listener.** With NETLIT listening on socket 1 and the client fired
+  as **`NCP=ncp31 ./ncp-telnet -o 69`** (the `-o`/`OLD_TELNET` flag = contact **socket 1**, the
+  authentic 1972 TENEX logger socket; the default is `NEW_TELNET`=socket 23, which does NOT match
+  NETLIT, `telnet.c:14,597`), **NETLIT's `GDSTS` walked `LSNG` → `RFCR`**: from `HOST=511 SKT=-2`
+  (listening, any host) to **`HOST=31 SKT=1002`** (RFC received from host 31 = CCA/ncp31, peer socket
+  1002). This is precisely the success state NETLIT (NETSER-lite milestone 1a) was built to
+  demonstrate — the `@L 69` now traverses the **entire** NCP stack to host69's BBN-TENEX login socket.
+
+**What "Open refused" at the client still means (expected, not a host69 bug):** NETLIT is a *minimal
+observer* — it opens the listen and watches the state walk, but does **not** send the answering STR /
+complete the ICP / serve a login herald. So the client's `Timed out completing RFC` is by design.
+Completing an authentic login (herald → `@LOGIN`) requires the real **NETSER**, which is blocked on
+the FAIL/STALLM assembler wall (see `[[host69-netser-build-attempt]]`). The NCP transport is now
+proven; the remaining work is the login *server*, not the network path.
+
+**Two operational requirements discovered (pin these):**
+1. **Emulator fix `37744c0`** must be built in (output-done after EOB). Without it host69 is mute.
+2. **Client must contact socket 1** (`ncp-telnet -o`) to match the TENEX login socket; the default
+   socket 23 silently never matches the listener.
+
 ---
 
 ## NEXT SESSION — START HERE (handoff)
@@ -490,24 +528,25 @@ Continue from branch `host69-tenex-ncp-imp`. **Rebuild the emulator first**
 (`cd mini/host69-bbn-tenex/kit-cache/rcornwell-sims && make pdp10-ki`; fork repo HEAD `ec6b0b8` =
 fix `e7c64e7` + diagnostic counters) — the gitignored binary carries the fix + the NCP probe.
 
-**Status of the stack (do NOT re-litigate without new evidence):**
+**Status of the stack — the NCP transport path is now PROVEN end-to-end (§10.7):**
 - IMP/1822 **input** delivery — **solved** (§10.3, emulator fix `e7c64e7`).
 - NCP input re-arm — **solved** (§10.3).
+- IMP/1822 **output** — **SOLVED** (§10.7, emulator fix `37744c0`: raise `IMPOD` after the EOB ship).
+  host69 now transmits; this was the real blocker (the §10.4/§10.5 RST/RRP framing was a symptom).
 - IMPFLS bring-up flush — **understood + bypassed** (`deposit 70360 0` after the FORCEDOWN cycle; §10.4).
-- NETLIT — **exonerated**, listening correctly (LSNG); do **not** touch or rebuild it.
-- RECSTR / socket listener — downstream, **not reached yet**; do not debug it yet.
-- Lab-side RST/RRP and "host-host convergence" (§10.4/§10.5) — **symptom, not cause** (see §10.6).
-  Do NOT keep chasing the lab side or `HSTSTS`.
-- **CURRENT WALL (§10.6): host69's IMP OUTPUT channel is wedged after FORCEDOWN.** The TENEX software
-  flag `IMPOB` (`070330`) is stuck non-zero, so `IMPXOU` never starts a send → host69 transmits
-  nothing (no RRP, no RST) → lab times out waiting for RRP → `@L 69` refused. `IMPORD`=-1 (output
-  enabled), `IMPDRQ`=0. Root cause is an **emulator output-done handshake gap** in
-  `PDP10/kx10_imp.c`, the output-side analog of the §10.3 input fix.
+- RST/RRP host-host handshake — **converges** now that output works (host69 sends its RRP; lab sends RTS).
+- NETLIT socket listener — **reached and working**: `@L 69` walks `LSNG`→`RFCR` (RFC delivered to the
+  login socket), provided the client contacts **socket 1** (`ncp-telnet -o`, not the default socket 23).
 
-**Goal (brutally narrow):** make host69 actually TRANSMIT. Fix the emulator so the TENEX NCP output
-path raises output-done (`IMPOD`+interrupt) after `imp_send_packet`, so `IMODN` drains the queue and
-clears `IMPOB`. Then the queued RRP (and the 48 RSTs) go out, the lab logs `received RRP from 105`
-→ `Send ICP RTS`, and the ICP proceeds to `RECSTR`/socket-match/NETLIT. Verify with one `@L 69`.
+**Remaining work is the login SERVER, not the network path.** NETLIT only *observes* the RFC arriving;
+it does not complete the ICP or serve a herald. An authentic login (`@L 69` → BBN-TENEX herald →
+`@LOGIN`) needs real **NETSER**, blocked on the FAIL/STALLM assembler wall (`[[host69-netser-build-attempt]]`).
+
+**Reproduce the milestone:** rebuild with fork `37744c0`; `launch-trace.sh`; at host-ready load NETLIT
+(MOUNT DTA1: → copyfile LOADER.SAV/PA1050.SAV → `LOADER` → `DTA1:NETLIT` → `\033G` → CR → `START` →
+`OPENF OK LISTENING`); then `NCP=ncp31 ./ncp-telnet -o 69` and watch `logs/cty.log` GDSTS go
+`HOST=511 SKT=-2` (LSNG) → `HOST=31 SKT=1002` (RFCR). Pending production note: the IMPFLS-flush and
+FORCEDOWN host-ready hazards from §10.4 still apply to a real cutover.
 
 **Constraints:** one source only = **`ncp31 → host69`**. Do NOT use ncp1/ncp2/ncp35, repeated `@L`
 attempts, NETLIT rebuilds, or `set imp debug` beyond the proven instrumentation.
