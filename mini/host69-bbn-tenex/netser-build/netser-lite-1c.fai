@@ -172,6 +172,9 @@ DOICP:	HRROI A,MRF		; RFC RECEIVED
 	PSOUT
 	HRROI A,CRLF
 	PSOUT
+; let the herald drain to the client before tearing the connection down
+	MOVEI A,5000
+	DISMS
 ; close cleanly
 	MOVE A,SJFN
 	CLOSF

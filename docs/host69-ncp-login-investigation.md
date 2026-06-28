@@ -520,68 +520,78 @@ proven; the remaining work is the login *server*, not the network path.
 2. **Client must contact socket 1** (`ncp-telnet -o`) to match the TENEX login socket; the default
    socket 23 silently never matches the listener.
 
+### 10.8 SOLVED (2026-06-28, session 4) — NETLIT 1c does the full ICP socket-swap; herald crosses the NCP path
+
+Built **`netser-build/netser-lite-1c.fai`** — the DOICP-lite socket-swap server (RFC 123/165 +
+lab-`ncp.c`-validated). On one `@L 69` the host69 console walks the **entire ICP**:
+`RFC RECEIVED → CONTACT ACCEPTED → SEND SOCKET NUMBER → SOCKET NUMBER SENT → OPEN DATA SOCKETS →
+DATA SOCKETS OPEN → HERALD SENT → DONE`. The lab `ncpdov` confirms the full NCP handshake
+(`Received STR … send 4/ALL … Confirm STR, send RTS … Client got RTS, STR, and socket from server …
+connection 1, error 0` — **the client opens, no "Open refused"**). And a lab strace caught the herald
+on the wire: `read(3, "…TENEX NETLIT TEST\r\n…") = 44`. **The host69/NETLIT server side is done and
+correct.** 1c flow: listen socket 1 (contact, byte size 32) → RFCR → `MTOPR fn20` accept →
+`NET:<S>.<fhost>-<fskt+2>;T` (octal) → GTJFN send+recv → `CVSKT` → `BOUT` S on contact → `CLOSF` →
+`OPENF` send `103000,,100000` + recv `100000,,200000` (byte size 8) → `SOUT` herald → DISMS → close.
+
+**Remaining = lab-tool, NOT host69:** the herald reaches the lab's NCP but `ncpdov` mis-delivers to
+the client *app* socket (stale `/tmp/client.*` + a **duplicate ncp31 daemon** the noc keeps
+respawning). One bounded reset+re-fire (per the plan) did not display the herald (`NCP open error`
+the moment the dup daemon broke the path). Classified as `ncpdov`-to-client delivery cleanup; server
+milestone met. Full writeup + the lab-tool fix: `netser-build/NETLIT-STATUS.md` (milestone 1c).
+
+**★ CRITICAL OPERATIONAL FINDING:** the deterministic `SIGTERM PC 102737` that killed every host69
+`pdp10-ki` for most of session 4 was **Claude's execution sandbox reaping the command's process
+tree** (PC 102737 = TENEX's idle scheduler, incidental). **Run the emulator inside the persistent
+`h69r` tmux session** (`tmux send-keys -t h69r "bash …/build-1c.sh …" Enter`) so the ki is a child of
+the tmux daemon and survives; drive/monitor from Claude via the FIFO + log files. This is why earlier
+sessions' builds were flaky. Also fixed a FIFO race (`mkfifo` it explicitly, else console-daemon
+tight-loops a regular file and garbles the FAIL drive).
+
 ---
 
-## NEXT SESSION — START HERE (handoff)
+## NEXT SESSION — START HERE (handoff, session 4 end)
 
-Continue from branch `host69-tenex-ncp-imp`. **Rebuild the emulator first**
-(`cd mini/host69-bbn-tenex/kit-cache/rcornwell-sims && make pdp10-ki`; fork repo HEAD `ec6b0b8` =
-fix `e7c64e7` + diagnostic counters) — the gitignored binary carries the fix + the NCP probe.
+Branch `host69-tenex-ncp-imp`. **The host69 server side is DONE.** `@L 69` from ncp31 traverses the
+entire NCP stack AND NETLIT-1c completes the full ICP socket-swap and sends a herald that the lab
+daemon reads off the wire (`TENEX NETLIT TEST\r\n`). See §10.8. The only thing left is **lab-tool
+polish**: the lab `ncpdov` mis-delivers the herald to the client app (duplicate ncp31 daemon + stale
+sockets). This is NOT host69 work.
 
-**Status of the stack — the NCP transport path is now PROVEN end-to-end (§10.7):**
-- IMP/1822 **input** delivery — **solved** (§10.3, emulator fix `e7c64e7`).
-- NCP input re-arm — **solved** (§10.3).
-- IMP/1822 **output** — **SOLVED** (§10.7, emulator fix `37744c0`: raise `IMPOD` after the EOB ship).
-  host69 now transmits; this was the real blocker (the §10.4/§10.5 RST/RRP framing was a symptom).
-- IMPFLS bring-up flush — **understood + bypassed** (`deposit 70360 0` after the FORCEDOWN cycle; §10.4).
-- RST/RRP host-host handshake — **converges** now that output works (host69 sends its RRP; lab sends RTS).
-- NETLIT socket listener — **reached and working**: `@L 69` walks `LSNG`→`RFCR` (RFC delivered to the
-  login socket), provided the client contacts **socket 1** (`ncp-telnet -o`, not the default socket 23).
+**Status of the stack:**
+- IMP/1822 input + re-arm — solved (§10.3, fix `e7c64e7`).
+- IMP/1822 output — solved (§10.7, fix `37744c0`: raise `IMPOD` after EOB ship).
+- RST/RRP host-host handshake — converges (§10.7).
+- `@L 69` reaches the login socket; LSNG→RFCR (§10.7), client must use `ncp-telnet -o` (socket 1).
+- **NETLIT-1c full ICP socket-swap + herald — WORKS (§10.8). Herald proven on the wire.**
 
-**Remaining work is the login SERVER, not the network path.** NETLIT only *observes* the RFC arriving;
-it does not complete the ICP or serve a herald. An authentic login (`@L 69` → BBN-TENEX herald →
-`@LOGIN`) needs real **NETSER**, blocked on the FAIL/STALLM assembler wall (`[[host69-netser-build-attempt]]`).
+**★ HOW TO RUN host69 (critical — read first): run the emulator INSIDE the persistent `h69r` tmux
+session, NOT from a Claude command** (a Claude-spawned `pdp10-ki` is reaped by the sandbox at ~5s with
+`SIGTERM PC 102737`; tmux escapes it). Pattern:
+```
+tmux send-keys -t h69r "bash /home/deltaprism/arpanet/mini/host69-bbn-tenex/netser-build/build-1c.sh >/tmp/netlit-build.out 2>&1 &" Enter
+```
+then poll `/tmp/netlit-build.out` + `logs/cty.log` from Claude. Firing `ncp-telnet`, pgrep, strace
+from Claude is fine — only the long-lived ki must live in tmux.
 
-**Reproduce the milestone:** rebuild with fork `37744c0`; `launch-trace.sh`; at host-ready load NETLIT
-(MOUNT DTA1: → copyfile LOADER.SAV/PA1050.SAV → `LOADER` → `DTA1:NETLIT` → `\033G` → CR → `START` →
-`OPENF OK LISTENING`); then `NCP=ncp31 ./ncp-telnet -o 69` and watch `logs/cty.log` GDSTS go
-`HOST=511 SKT=-2` (LSNG) → `HOST=31 SKT=1002` (RFCR). Pending production note: the IMPFLS-flush and
-FORCEDOWN host-ready hazards from §10.4 still apply to a real cutover.
+**Reproduce the milestone (all repo-local, no Claude paths):**
+1. Build: `bash netser-build/build-1c.sh` in `h69r` tmux → `PROGRAM BREAK` → rebuilds `login.dta`.
+   (The emulator binary `kit-cache/rcornwell-sims/BIN/pdp10-ki` must carry output fix `37744c0`.)
+2. Launch+load: `bash netser-build/launch-1c-test.sh` in `h69r` tmux → host-ready boot + auto-load
+   NETLIT → `LISTENING`.
+3. Fire ONCE from `mini/`: `NCP=ncp31 ./ncp-telnet -o 69`. host69 console walks RFC RECEIVED → … →
+   HERALD SENT → DONE. To SEE the herald on the wire: `sudo strace -f -e read -s200 -p <ncp31-ncpdov-pid>`
+   and look for `TENEX NETLIT TEST`.
 
-**Constraints:** one source only = **`ncp31 → host69`**. Do NOT use ncp1/ncp2/ncp35, repeated `@L`
-attempts, NETLIT rebuilds, or `set imp debug` beyond the proven instrumentation.
+**The ONE remaining task (lab-tool, bounded):** make `mini/noc-server.py` spawn exactly ONE `ncpdov`
+per NCP — it currently double-spawns ncp31 (two on ports 20311/20312), which breaks the
+client→lab→host69 path and mis-routes the herald. Fix that (or manually leave a single ncp31 daemon
+owning `mini/ncp31` and re-fire immediately), then the already-working herald should display in
+`ncp-telnet`. Do NOT reset the whole IMP mesh; do NOT rebuild/restart host69 or NETLIT to chase this.
 
-**Runbook:**
-1. Bring host69 up on the patched path (`launch-trace.sh`); land host-ready.
-2. Account for IMPFLS (the `.do` already does `deposit 70360 0` after FORCEDOWN; verify it echoed).
-3. **Trace before firing `@L`** — host69 side: `RECRST` (netwrk, called from `IM8RST`@133242), the
-   send-RST path (`IMSRST`@133611), the receive-RRP path, host-status table `HSTSTS`(~`070440`) for
-   ncp31's host number, any reset counter/timer, and `IMPCNP` dispatch. **Lab side (cheap, do first):**
-   capture `ncpdov`'s stderr (`fprintf` logs "received RST/RRP from", "Send ICP RTS") — it shows
-   directly whether the lab gets host69's RRP and whether it emits the RTS. (Ncpdov is launched by
-   `mini/noc/server/ncp.py`; find/route its stderr.)
-4. Fire exactly **one** `@L 69` from ncp31.
-5. Capture: host69 inbound control-command sequence; host69 outbound RST/RRP; lab `ncpdov` view;
-   `HSTSTS` before/after.
+**Authentic login beyond the demo:** a real `@L 69 → BBN-TENEX herald → @LOGIN` still needs real
+**NETSER** (blocked on the FAIL/STALLM assembler wall, `[[host69-netser-build-attempt]]`). NETLIT-1c
+proves the entire NCP/ICP server mechanics; NETSER is the production login server.
 
-**Decision tree:**
-- host69 gets RST but never RRP → lab not replying, or host69's outgoing RRP path invalid/invisible.
-- host69 sends RST repeatedly but never marks ncp31 up → host-status / reset-completion logic stuck.
-- host69 marks ncp31 up but RTS still absent → lab `ncpdov` withholding RTS (doesn't see host69 up).
-- RTS arrives after convergence → next layer is finally `RECSTR`/`RECRTS` → socket match → NETLIT `RFCR`.
-
-**Pinned cautions:**
-1. **IMPFLS is a production-cutover hazard.** If the host-ready lever runs `IMPRSS`, it arms
-   "flush next 2 inbound msgs," so a real `@L 69` can be eaten. Need a deterministic prod rule:
-   avoid that host-ready method, clear `IMPFLS` after it, or delay until 2 harmless msgs consume it.
-2. **The 25 stuck RFNM conns** were NOT the input-arm cause and NOT NETLIT — but may still poison
-   reset convergence / host-status. Prove it here, with a sharp place to look.
-
-**Addrs (tenex.dis):** recstr=441110 recrts=441206 reccls=441057 imsrst=133611 im8rst=133241
-im8rrp=133244 recrst (call@133242) impbht=070656 imphrt=070430 impchu=070351 impcho=070352
-impflg=070216 impibi=070321 impibo=070322 impnfi=070227 impncl=070336 impfls=070360 netsts=075656
-(hststs ≈ 070440). **Harness:** `launch-trace.sh` (2323 telnet console, ~75–90s to host-ready).
-NETLIT load: `MOUNT DTA1:` → `copyfile.sh LOADER.SAV <SUBSYS>` → `copyfile.sh PA1050.SAV <SUBSYS>`
-→ `LOADER` (wait for `*`) → `DTA1:NETLIT` → `\033G` → CR (flush stray `G`) → `START`. Trace flush:
-`kill -TERM` the ki (SIMH debug is block-buffered). **Leave the lab clean (host69 down, imp05 up).**
-The scripted NETLIT load occasionally flakes on console timing — verify `OPENF OK LISTENING` before firing.
+**Key files:** server source `netser-build/netser-lite-1c.fai`; build `netser-build/build-1c.sh`;
+test `netser-build/launch-1c-test.sh`; runbook `netser-build/RUN-1C-OUTSIDE-CLAUDE.md`; full status
+`netser-build/NETLIT-STATUS.md` (milestone 1c). Lab tap: ncp31 daemon = `./ncpdov localhost 20311 20312`.

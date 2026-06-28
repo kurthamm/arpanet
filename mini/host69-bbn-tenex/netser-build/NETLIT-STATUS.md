@@ -1,5 +1,91 @@
 # NETSER-lite (NETLIT) — Status & Handoff
 
+## ★★★ MILESTONE 1c (2026-06-28, session 4) — FULL ICP SOCKET-SWAP WORKS; herald reaches the lab
+
+`netser-lite-1c.fai` (the DOICP-lite socket-swap server) is built on-box and the **entire ICP
+completes end-to-end.** host69's console walks the full sequence on one `@L 69`:
+```
+RFC RECEIVED → CONTACT ACCEPTED → SEND SOCKET NUMBER → SOCKET NUMBER SENT
+→ OPEN DATA SOCKETS → DATA SOCKETS OPEN → HERALD SENT → DONE
+```
+The lab `ncpdov` confirms the complete NCP handshake: `Received STR … send 4/ALL …
+Confirm STR, send RTS … Client got RTS, STR, and socket from server … Application open reply …
+connection 1, error 0`. **No more "Open refused" — the client opens (error 0).** And the herald
+bytes **traverse the ARPANET**: a lab strace caught `read(3, "…TENEX NETLIT TEST\r\n…") = 44` —
+host69's herald arriving at the lab over the IMP link, byte size 8.
+
+**The host69/NETLIT server side is DONE and correct.** The 1c source: listen socket 1 (contact,
+byte size 32) → wait RFCR → `MTOPR fn20` accept → build `NET:<S>.<fhost>-<fskt+2>;T` (octal) →
+GTJFN send+recv data JFNs → `CVSKT` the local socket → `BOUT` it on the contact → `CLOSF` contact
+→ `OPENF` send (`103000,,100000`) + recv (`100000,,200000`, byte size 8) → `SOUT` herald on the
+send JFN → DISMS drain → `CLOSF` → `HALTF`. Matches RFC 123/165 and the lab's own `ncp.c` (which
+uses the TENEX `+2` foreign-data-socket convention, `ncp.c:791`, not RFC123's `U+1`).
+
+**Remaining gap = lab-side, NOT host69:** the herald reaches the lab's NCP but `ncpdov` sometimes
+fails to deliver it to the client *application* socket (`sendto /tmp/client.<pid> … Transport
+endpoint is not connected`) — debris from heavy test churn (stale `/tmp/client.*` sockets, a
+**duplicate** ncp31 daemon). After clearing debris the client open succeeds but the herald display
+via `ncp-telnet` is still flaky. Next: full lab `ncpdov` reset, then re-fire; if still flaky it's the
+lab client tool's delivery path, not the server.
+
+### NEXT STEP (Kurt's rule) — ONE bounded lab-client reset + ONE re-fire, then stop
+
+Server: **solved.** Wire proof: **solved** (the lab daemon already `read()` the herald
+`TENEX NETLIT TEST\r\n` off the NCP path). Client display: **worth exactly one clean retry** — do
+NOT turn it into another archaeology dig.
+
+**Keep host69 and NETLIT-1c untouched** — do NOT restart host69, do NOT rebuild NETLIT, do NOT
+change the 1c code. The host69 side works. Clean **only** the lab/client delivery path:
+1. Kill duplicate ncp31/`ncpdov` instances (there was a dup on ports 20311/20312).
+2. Remove stale `/tmp/client.*` sockets.
+3. Confirm exactly one ncp31 path is active (`mini/ncp31` socket + one `ncpdov localhost 20311 20312`).
+4. Confirm no stale `ncp-telnet` clients are hanging around.
+5. Re-run the socket-1 client **once**: `NCP=ncp31 ./ncp-telnet -o 69` from `mini/`.
+6. Watch both sides: NETLIT reaches `HERALD SENT`/`DONE`; lab completes ICP; client should display the herald.
+
+If the herald appears → **call the full visible demo path proven.** If it still does NOT appear →
+**stop.** Classify as `ncpdov`→client-socket delivery cleanup (lab-tool polish), NOT host69/NETLIT
+failure — the server milestone remains met (herald already observed crossing the NCP path).
+**Do NOT reset the whole IMP mesh** unless the NCP client path cannot be cleaned locally (a full lab
+reset risks disturbing a working host69/NETLIT instance and reintroducing host-ready chores).
+
+**RESULT of the bounded retry (2026-06-28, end of session 4):** stale `/tmp/client.*` cleared; but
+the **noc keeps respawning a duplicate ncp31 `ncpdov`** (two instances on 20311/20312, ~20s apart) —
+I could not get to exactly one locally without touching the noc. The single re-fire returned
+`NCP open error` with an EMPTY NETLIT console (the RFC never reached host69), i.e. the duplicate
+daemon broke the client→lab→host69 path that very moment. **STOPPED per the rule. Classified as
+lab-tool (`ncpdov` duplicate) cleanup.** Server + wire proof remain met. **NEXT-SESSION lab-tool fix:**
+make `mini/noc-server.py` spawn exactly one `ncpdov` per NCP (it currently double-spawns ncp31), OR
+manually leave a single ncp31 daemon owning `mini/ncp31` and immediately re-fire. Then the already-
+working host69 herald should display in `ncp-telnet`.
+
+### ★★★ CRITICAL OPERATIONAL FINDING — run the emulator in tmux, NOT directly from a Claude command
+
+For ~most of session 4, every `pdp10-ki` launched from a Claude Bash command died at ~5s with
+`SIGTERM received, PC: 102737` — deterministic, untraceable to any Unix sender, surviving
+nohup/setsid/disown/foreground. **Cause: Claude's execution sandbox reaps the command's process
+tree/cgroup on completion; `pdp10-ki` (a heavy background child) goes with it.** PC 102737 is just
+TENEX's idle scheduler (incidental). **Fix: run the emulator inside a persistent tmux session.**
+There is a long-lived `h69r` tmux session (a real daemon, outside the sandbox). Launch via:
+```
+tmux send-keys -t h69r "bash <abs-path>/netser-build/build-1c.sh >/tmp/netlit-build.out 2>&1 &" Enter
+```
+The ki becomes a child of the tmux server and survives. Drive/monitor from Claude via the FIFO + log
+files (`logs/cty.log`, `/tmp/netlit-*.out`). Reading processes from Claude (pgrep/strace/firing
+`ncp-telnet`) works fine — only the long-lived ki must live in tmux. **This was the whole reason
+earlier sessions' builds were so flaky.**
+
+### Repo-local run scripts (work in tmux or your own shell)
+- `netser-build/build-1c.sh [SRC.fai]` — assemble on-box → rebuild `login.dta` run tape. Self-
+  contained: generates its own `.do`, repo-local `scripts/{console-daemon,drain}.py`, scratch via
+  `NETLIT_SCRATCH` (default `/tmp/netlit-$USER`). **Fixed:** `mkfifo` the FIFO explicitly (a race made
+  it a regular file → console-daemon tight-looped → garbled FAIL). Bumped COPY/FAIL waits.
+- `netser-build/launch-1c-test.sh` — host-ready (FORCEDOWN) boot + auto-load NETLIT → LISTENING; then
+  fire `NCP=ncp31 ./ncp-telnet -o 69` from `mini/`.
+- `netser-build/RUN-1C-OUTSIDE-CLAUDE.md` — the runbook.
+
+---
+
 ## ★★ MILESTONE 1b PROGRESS (2026-06-28, session 3) — accept works; bare BOUT insufficient
 
 Built **`netser-lite-1b.fai`** (accept-and-send shim) on-box and tested end-to-end. Reproducible

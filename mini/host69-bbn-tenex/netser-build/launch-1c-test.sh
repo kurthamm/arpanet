@@ -51,7 +51,7 @@ go
 EOF
 
 echo "[T] launch host69 (host-ready path), scratch=$SCR"
-pkill -9 -x pdp10-ki 2>/dev/null; pkill -9 -f console-daemon 2>/dev/null; pkill -9 -f "$HELP/drain.py" 2>/dev/null; rm -f "$FIFO"
+pkill -9 -x pdp10-ki 2>/dev/null; pkill -9 -f console-daemon 2>/dev/null; pkill -9 -f "$HELP/drain.py" 2>/dev/null; rm -f "$FIFO"; mkfifo "$FIFO" 2>/dev/null || true
 for i in $(seq 1 60); do ss -tan 2>/dev/null | grep -qE ':(16945|16946|2323)\b' || break; sleep 1; done
 : > "$CLOG"; : > "$H/logs/run-1c.log"
 python3 "$HELP/drain.py" 16945 "$H/logs/dc16945.log" >/dev/null 2>&1 &

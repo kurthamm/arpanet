@@ -55,7 +55,7 @@ echo "[B] build tape: $("$TENDMP" -t "$LB/buildtape.dta" 2>&1 | grep -E 'XCR|FAI
 
 # --- launch the emulator + console ---
 echo "[B] launch host69 (build instance)"
-pkill -9 -x pdp10-ki 2>/dev/null; pkill -9 -f console-daemon 2>/dev/null; pkill -9 -f "$HELP/drain.py" 2>/dev/null; rm -f "$FIFO"
+pkill -9 -x pdp10-ki 2>/dev/null; pkill -9 -f console-daemon 2>/dev/null; pkill -9 -f "$HELP/drain.py" 2>/dev/null; rm -f "$FIFO"; mkfifo "$FIFO" 2>/dev/null || true
 for i in $(seq 1 60); do ss -tan 2>/dev/null | grep -qE ':(16945|16946|2323)\b' || break; sleep 1; done
 : > "$CLOG"; : > "$H/logs/build.log"
 python3 "$HELP/drain.py" 16945 "$H/logs/dc16945.log" >/dev/null 2>&1 &
@@ -80,12 +80,13 @@ done
 W(){ printf '%s\r' "$1" > "$FIFO"; sleep "${2:-3}"; }
 echo "[B] stage FAIL + PA1050, assemble"
 W "MOUNT DTA0:" 3; W "MOUNT DTA1:" 3
-W "COPY DTA1:FAIL.SAV <SUBSYS>FAIL.SAV" 5; W "" 3
-W "COPY DTA1:PA1050.SAV <SUBSYS>PA1050.SAV" 5; W "" 3
+W "COPY DTA1:FAIL.SAV <SUBSYS>FAIL.SAV" 6; W "" 5
+W "COPY DTA1:PA1050.SAV <SUBSYS>PA1050.SAV" 6; W "" 5
+W "" 3                                  # extra CR: flush any pending [New file] before FAIL
 pgrep -x pdp10-ki >/dev/null || { echo "[B] KI DIED during COPY"; exit 2; }
 : > "$CLOG"
-W "FAIL" 5
-W "DTA0:XCR_DTA1:XCR.FAI" 18
+W "FAIL" 6
+W "DTA0:XCR_DTA1:XCR.FAI" 20
 echo "[B] FAIL output:"; tail -6 "$CLOG"
 
 if grep -q "PROGRAM BREAK" "$CLOG"; then
