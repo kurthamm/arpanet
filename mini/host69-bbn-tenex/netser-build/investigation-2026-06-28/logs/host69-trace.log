@@ -1,0 +1,214 @@
+
+KI-10 simulator Open SIMH V4.1-0 Current        git commit id: a483514b+uncommitted-changes
+Memory size changed: CPU0 = 512KW
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/trace-rfc.do-5> restore -F /home/deltaprism/arpanet/mini/host69-bbn-tenex/snap/host69-live.state
+%SIM-INFO: MTA0: unit is read only
+%SIM-INFO: MTA0: Tape Image 'media/system.tap' scanned as SIMH format
+%SIM-INFO: DT0: unit is read only
+DT0: 18b/36b format, buffering file in memory
+%SIM-INFO: Listening on port 16945
+%SIM-INFO: Listening on port 16946
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/trace-rfc.do-12> attach -u dc 16945 speed=2400
+%SIM-INFO: Listening on port 16945
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/trace-rfc.do-13> attach -u tym 16946
+%SIM-INFO: Listening on port 16946
+DT0: 18b/36b format, buffering file in memory
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/trace-rfc.do-16> attach -r dt1  /home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/login-build/login.dta
+%SIM-INFO: DT1: unit is read only
+DT1: 18b/36b format, buffering file in memory
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/trace-rfc.do-17> attach -r mta0 /home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/login-build/login.tap
+%SIM-INFO: MTA0: unit is read only
+%SIM-INFO: MTA0: Tape Image '/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/login-build/login.tap' scanned as SIMH format
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/trace-rfc.do-19> set console telnet=2323,nomessage
+%SIM-INFO: Listening on port 2323
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/trace-rfc.do-19> set console telnet=2323,nomessage
+No settable parameters
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/trace-rfc.do-20> set debug stdout
+%SIM-INFO: Debug output to "STDOUT"
+Debug output to "STDOUT" at Sun Jun 28 00:52:12 2026
+KI-10 simulator Open SIMH V4.1-0 Current        git commit id: a483514b+uncommitted-changes
+=== SETTLE: imp up ===
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/trace-rfc.do-23> step 250000000
+%SIM-INFO: Waiting for console Telnet connection
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/trace-rfc.do-23> step 250000000
+%SIM-INFO: Running
+
+Step expired, PC: 115164
+=== FORCEDOWN cycle: re-assert host-ready ===
+
+Step expired, PC: 101150
+
+Step expired, PC: 105213
+=== enable DEBUG_IRQ recv trace ===
+=== resuming for NETLIT + one @L 69 ===
+DBG(9988966229)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(10108407915)> same as above (79 times)
+DBG(10109199039)> IMP IRQ: IMP ncp gate#5120 ILEN=0 STATUS=002000 pending=0 link_up=1
+DBG(10109199039)> IMP IRQ: IMP ncp recv poll#5120 nw=0 buf0=0 link=0
+DBG(10111146511)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(10206933038)> same as above (67 times)
+DBG(10209054001)> IMP IRQ: IMP ncp recv poll#5217 nw=7 buf0=2 link=0
+DBG(10209054001)> IMP IRQ: IMP chkint STATUS=002040 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(10209054101)> IMP IRQ: IMP chkint STATUS=002010 pia=055 in=5 out=5 (ID=1 OD=0 RDY=1)
+DBG(10209054249)> same as above (2 times)
+DBG(10209054259)> IMP IRQ: IMP chkint STATUS=002040 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(10209054359)> IMP IRQ: IMP chkint STATUS=002010 pia=055 in=5 out=5 (ID=1 OD=0 RDY=1)
+DBG(10209054362)> same as above (2 times)
+DBG(10209054372)> IMP IRQ: IMP chkint STATUS=002040 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(10209054472)> IMP IRQ: IMP chkint STATUS=102010 pia=055 in=5 out=5 (ID=1 OD=0 RDY=1)
+DBG(10209054516)> same as above (2 times)
+DBG(10209054538)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(10209054638)> IMP IRQ: IMP ncp recv poll#5218 nw=1 buf0=3 link=0
+DBG(10209054638)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(11120147704)> same as above (725 times)
+DBG(11120952312)> IMP IRQ: IMP ncp gate#6144 ILEN=0 STATUS=002000 pending=0 link_up=0
+DBG(11120952312)> IMP IRQ: IMP ncp recv poll#6144 nw=0 buf0=0 link=0
+DBG(11122942858)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(12032730632)> same as above (709 times)
+DBG(12034348365)> IMP IRQ: IMP ncp gate#7168 ILEN=0 STATUS=002000 pending=0 link_up=0
+DBG(12034348365)> IMP IRQ: IMP ncp recv poll#7168 nw=0 buf0=0 link=0
+DBG(12035249587)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(12246416576)> same as above (168 times)
+DBG(12249399614)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(13000626185)> same as above (556 times)
+DBG(13003652403)> IMP IRQ: IMP ncp gate#8192 ILEN=0 STATUS=002000 pending=0 link_up=0
+DBG(13003652403)> IMP IRQ: IMP ncp recv poll#8192 nw=0 buf0=0 link=0
+DBG(13003843346)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(13975035851)> same as above (688 times)
+DBG(13978503915)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(14034718649)> same as above (37 times)
+DBG(14035556371)> IMP IRQ: IMP ncp gate#9216 ILEN=0 STATUS=002000 pending=0 link_up=0
+DBG(14035556371)> IMP IRQ: IMP ncp recv poll#9216 nw=0 buf0=0 link=0
+DBG(14037614432)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(14940161696)> same as above (982 times)
+DBG(14941472414)> IMP IRQ: IMP ncp gate#10240 ILEN=0 STATUS=002000 pending=0 link_up=0
+DBG(14941472414)> IMP IRQ: IMP ncp recv poll#10240 nw=0 buf0=0 link=0
+DBG(14941993219)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(15512432917)> same as above (1370 times)
+DBG(15514640390)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(15778247096)> same as above (523 times)
+DBG(15779726052)> IMP IRQ: IMP ncp gate#11264 ILEN=0 STATUS=002000 pending=0 link_up=0
+DBG(15779726052)> IMP IRQ: IMP ncp recv poll#11264 nw=0 buf0=0 link=0
+DBG(15780646154)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(16716480168)> same as above (800 times)
+DBG(16719650047)> IMP IRQ: IMP ncp gate#12288 ILEN=0 STATUS=002000 pending=0 link_up=0
+DBG(16719650047)> IMP IRQ: IMP ncp recv poll#12288 nw=0 buf0=0 link=0
+DBG(16719799288)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(17098611334)> same as above (289 times)
+DBG(17101168108)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(17475789044)> same as above (290 times)
+DBG(17478834487)> IMP IRQ: IMP ncp recv poll#13083 nw=6 buf0=2 link=0
+DBG(17478834487)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(17478984500)> same as above (2 times)
+DBG(17479939002)> IMP IRQ: IMP ncp recv poll#13084 nw=1 buf0=3 link=0
+DBG(17479939002)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(17624075227)> same as above (62 times)
+DBG(17632556204)> IMP IRQ: IMP ncp gate#13312 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(17632556204)> IMP IRQ: IMP ncp recv poll#13312 nw=0 buf0=0 link=0
+DBG(17632972990)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(18485567832)> same as above (722 times)
+DBG(18486684628)> IMP IRQ: IMP ncp gate#14336 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(18486684628)> IMP IRQ: IMP ncp recv poll#14336 nw=0 buf0=0 link=0
+DBG(18487854899)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(18620497932)> same as above (97 times)
+DBG(18623127481)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(19457497552)> same as above (638 times)
+DBG(19459843878)> IMP IRQ: IMP ncp gate#15360 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(19459843878)> IMP IRQ: IMP ncp recv poll#15360 nw=0 buf0=0 link=0
+DBG(19460372893)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(20321388783)> same as above (621 times)
+DBG(20324837937)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(20462998445)> same as above (97 times)
+DBG(20463335090)> IMP IRQ: IMP ncp gate#16384 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(20463335090)> IMP IRQ: IMP ncp recv poll#16384 nw=0 buf0=0 link=0
+DBG(20465888795)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(21404013249)> same as above (711 times)
+DBG(21406332836)> IMP IRQ: IMP ncp gate#17408 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(21406332836)> IMP IRQ: IMP ncp recv poll#17408 nw=0 buf0=0 link=0
+DBG(21406347171)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(21989003173)> same as above (427 times)
+DBG(21992338595)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(22404716148)> same as above (291 times)
+DBG(22405171016)> IMP IRQ: IMP ncp gate#18432 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(22405171016)> IMP IRQ: IMP ncp recv poll#18432 nw=0 buf0=0 link=0
+DBG(22406758562)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(23420025705)> same as above (738 times)
+DBG(23421421272)> IMP IRQ: IMP ncp gate#19456 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(23421421272)> IMP IRQ: IMP ncp recv poll#19456 nw=0 buf0=0 link=0
+DBG(23422499992)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(23771389739)> same as above (227 times)
+DBG(23775110662)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(24414713140)> same as above (409 times)
+DBG(24425341513)> IMP IRQ: IMP ncp gate#20480 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(24425341513)> IMP IRQ: IMP ncp recv poll#20480 nw=0 buf0=0 link=0
+DBG(24428861315)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(25309705484)> same as above (704 times)
+DBG(25310769952)> IMP IRQ: IMP ncp gate#21504 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(25310769952)> IMP IRQ: IMP ncp recv poll#21504 nw=0 buf0=0 link=0
+DBG(25312662276)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(25358454413)> same as above (36 times)
+DBG(25360965239)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(26222303300)> same as above (700 times)
+DBG(26224591234)> IMP IRQ: IMP ncp gate#22528 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(26224591234)> IMP IRQ: IMP ncp recv poll#22528 nw=0 buf0=0 link=0
+DBG(26225542721)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(27045940354)> same as above (558 times)
+DBG(27048050579)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(27268904673)> same as above (159 times)
+DBG(27269003976)> IMP IRQ: IMP ncp gate#23552 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(27269003976)> IMP IRQ: IMP ncp recv poll#23552 nw=0 buf0=0 link=0
+DBG(27271930948)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(28297101941)> same as above (657 times)
+DBG(28299086093)> IMP IRQ: IMP ncp gate#24576 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(28299086093)> IMP IRQ: IMP ncp recv poll#24576 nw=0 buf0=0 link=0
+DBG(28300642523)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(28845568755)> same as above (363 times)
+DBG(28848141839)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(29364500892)> same as above (355 times)
+DBG(29366911402)> IMP IRQ: IMP ncp gate#25600 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(29366911402)> IMP IRQ: IMP ncp recv poll#25600 nw=0 buf0=0 link=0
+DBG(29367163941)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(30493172925)> same as above (736 times)
+DBG(30493952496)> IMP IRQ: IMP ncp gate#26624 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(30493952496)> IMP IRQ: IMP ncp recv poll#26624 nw=0 buf0=0 link=0
+DBG(30496690975)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(30749133701)> same as above (169 times)
+DBG(30751644616)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(31568072207)> same as above (488 times)
+DBG(31576672919)> IMP IRQ: IMP ncp gate#27648 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(31576672919)> IMP IRQ: IMP ncp recv poll#27648 nw=0 buf0=0 link=0
+DBG(31577297193)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(32463972173)> same as above (675 times)
+DBG(32466283914)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(32491772516)> same as above (25 times)
+DBG(32493916133)> IMP IRQ: IMP ncp gate#28672 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(32493916133)> IMP IRQ: IMP ncp recv poll#28672 nw=0 buf0=0 link=0
+DBG(32494094913)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(33536720454)> same as above (737 times)
+DBG(33537311762)> IMP IRQ: IMP ncp gate#29696 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(33537311762)> IMP IRQ: IMP ncp recv poll#29696 nw=0 buf0=0 link=0
+DBG(33539373168)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(34282697080)> same as above (499 times)
+DBG(34286229789)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(34629879700)> same as above (217 times)
+DBG(34631620163)> IMP IRQ: IMP ncp gate#30720 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(34631620163)> IMP IRQ: IMP ncp recv poll#30720 nw=0 buf0=0 link=0
+DBG(34633058342)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(35600867706)> same as above (660 times)
+DBG(35602058810)> IMP IRQ: IMP ncp gate#31744 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(35602058810)> IMP IRQ: IMP ncp recv poll#31744 nw=0 buf0=0 link=0
+DBG(35602421792)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(36028087032)> same as above (305 times)
+DBG(36029238351)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(36635039861)> same as above (415 times)
+DBG(36637783340)> IMP IRQ: IMP ncp gate#32768 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(36637783340)> IMP IRQ: IMP ncp recv poll#32768 nw=0 buf0=0 link=0
+DBG(36638132084)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(37660964144)> same as above (736 times)
+DBG(37661653972)> IMP IRQ: IMP ncp gate#33792 ILEN=0 STATUS=002000 pending=6 link_up=0
+DBG(37661653972)> IMP IRQ: IMP ncp recv poll#33792 nw=0 buf0=0 link=0
+DBG(37664257141)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(37821515500)> same as above (109 times)
+DBG(37825168273)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(38646909008)> same as above (564 times)
+DBG(38648197454)> IMP IRQ: IMP ncp gate#3

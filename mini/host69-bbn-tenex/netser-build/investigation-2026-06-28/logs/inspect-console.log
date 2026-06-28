@@ -1,0 +1,25 @@
+kit-cache/rcornwell-sims/BIN/pdp10-ki runtime/build-tenex-inspect-faithful.do
+[?2004l
+KI-10 simulator Open SIMH V4.1-0 Current        git commit id: a483514b+uncommitted-changes
+Memory size changed: CPU0 = 512KW
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/build-tenex-inspect-faithful.do-7> restore -F /home/deltaprism/arpanet/mini/host69-bbn-tenex/snap/host69-live.state
+%SIM-ERROR: MTA0: Can't open 'media/system.tap': No such file or directory
+Error Attaching MTA to media/system.tap
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/build-tenex-inspect-faithful.do-11> detach mta0
+Unit not attached
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/build-tenex-inspect-faithful.do-14> attach -u dc 16945 speed=2400
+%SIM-INFO: Listening on port 16945
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/build-tenex-inspect-faithful.do-15> attach -u tym 16946
+%SIM-INFO: Listening on port 16946
+DT0: 18b/36b format, buffering file in memory
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/build-tenex-inspect-faithful.do-18> attach -r dt1  /home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/login-build/login.dta
+%SIM-INFO: DT1: unit is read only
+DT1: 18b/36b format, buffering file in memory
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/build-tenex-inspect-faithful.do-19> attach -r mta0 /home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/login-build/login.tap
+%SIM-INFO: MTA0: unit is read only
+%SIM-INFO: MTA0: Tape Image '/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/login-build/login.tap' scanned as SIMH format
+=== RESTORED (faithful-inspect); media attached as loginbuild; console on stdio/pane ===
+=== ENTFLG=-1 ===
+
+!Segmentation fault (core dumped)
+[?2004h[01;32mdeltaprism@ARPANet[00m:[01;34m~/arpanet/mini/host69-bbn-tenex[00m$ 
