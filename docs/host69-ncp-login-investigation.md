@@ -549,20 +549,50 @@ tight-loops a regular file and garbles the FAIL drive).
 
 ---
 
-## NEXT SESSION — START HERE (handoff, session 4 end)
+### 10.9 ✅✅ DEMO PROVEN END-TO-END (2026-06-28, session 5) — the CLIENT displays the herald
 
-Branch `host69-tenex-ncp-imp`. **The host69 server side is DONE.** `@L 69` from ncp31 traverses the
-entire NCP stack AND NETLIT-1c completes the full ICP socket-swap and sends a herald that the lab
-daemon reads off the wire (`TENEX NETLIT TEST\r\n`). See §10.8. The only thing left is **lab-tool
-polish**: the lab `ncpdov` mis-delivers the herald to the client app (duplicate ncp31 daemon + stale
-sockets). This is NOT host69 work.
+`NCP=ncp31 ./ncp-telnet -o 69` printed **`BBN-TENEX NETLIT TEST`** in the client while host69's
+console walked the full ICP (`RFC RECEIVED → … → HERALD SENT → DONE`). The §10.8 "lab-tool polish"
+gap is **CLOSED**. Two fixes:
+
+1. **noc ncp31 double-spawn — FIXED (commit `170f30a`).** Root cause = `mini/noc/server/process.py`
+   `_handle_pty_read` treating a PTY **EOF/EIO as process death** (fires `on_exit` →
+   `NCPController._handle_exit` nulls `self._process`, state→CRASHED) while the real `ncpdov` is still
+   alive → a restart/re-fired IMP-RUNNING event spawns a SECOND ncpdov on the same ports (state guards
+   blind because the handle was nulled). Fix = `NCPController._reap_stray_daemons()` in
+   `noc/server/ncp.py`: sweep `/proc` for any live ncpdov on this NCP's exact `(tx,rx)` pair and
+   SIGKILL it before spawning. The systemd noc runs from the repo, so the fix went live on recover.
+
+2. **The actual blocker was MESH-WIDE routing loss**, not the double-spawn: every IMP islanded (each
+   NCP pings its OWN IMP but `IMP cannot be reached` to all others) — the §8 self-inflicted wound from
+   `ncp-telnet`/`ncp-ping` spam. Fix = `mini/arpanet-recover.sh recover` (NOT plain `systemctl restart
+   arpanet-noc`). host69's ki survives recover; afterward `ncp31→69` reads `Host is not up` (§8 item 3:
+   a SIMH imp restart doesn't drop host69's 1B22 CONI ready line, so TENEX never re-asserts host-ready
+   to the new imp05). **Land host-ready by RELAUNCHING host69 (`launch-1c-test.sh`) after imp05 is
+   stable** — the `impctl.py restart 5` nudge did NOT land it; the FORCEDOWN relaunch did.
+
+**Recovery runbook:** `sudo ./arpanet-recover.sh recover` → poll `ncp-ping -c1 69` until it leaves
+`IMP cannot be reached` → kill+relaunch host69 (`launch-1c-test.sh` in `h69r` tmux) to `NETLIT IS
+LISTENING` → `ncp-ping -c1 69` `Reply` → `ncp-telnet -o 69` shows `BBN-TENEX NETLIT TEST`.
+
+---
+
+## NEXT SESSION — START HERE (handoff, session 5 end)
+
+Branch `host69-tenex-ncp-imp`. **The host69 server side is DONE and the visible demo is PROVEN
+END-TO-END** — `@L 69` (`NCP=ncp31 ./ncp-telnet -o 69`) displays `BBN-TENEX NETLIT TEST` in the
+client (§10.9). The session-4 lab-tool gap (duplicate ncp31 daemon / mesh routing) is fixed.
+**The only thing left for the authentic experience is real NETSER** (a true login server behind the
+herald, so `@L 69 → herald → @LOGIN`); NETSER assembly is FAIL/STALLM-blocked — see the
+`host69-netser-build-attempt` memory. If `@L 69` ever stops working, use the §10.9 recovery runbook.
 
 **Status of the stack:**
 - IMP/1822 input + re-arm — solved (§10.3, fix `e7c64e7`).
 - IMP/1822 output — solved (§10.7, fix `37744c0`: raise `IMPOD` after EOB ship).
 - RST/RRP host-host handshake — converges (§10.7).
 - `@L 69` reaches the login socket; LSNG→RFCR (§10.7), client must use `ncp-telnet -o` (socket 1).
-- **NETLIT-1c full ICP socket-swap + herald — WORKS (§10.8). Herald proven on the wire.**
+- **NETLIT-1c full ICP socket-swap + herald — PROVEN END-TO-END (§10.9). Client displays `BBN-TENEX NETLIT TEST`.**
+- noc ncp31 double-spawn — fixed (§10.9, commit `170f30a`); mesh recovery = `arpanet-recover.sh recover` (§10.9 runbook).
 
 **★ HOW TO RUN host69 (critical — read first): run the emulator INSIDE the persistent `h69r` tmux
 session, NOT from a Claude command** (a Claude-spawned `pdp10-ki` is reaped by the sandbox at ~5s with
