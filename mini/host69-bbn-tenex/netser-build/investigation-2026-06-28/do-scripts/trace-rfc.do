@@ -26,7 +26,11 @@ deposit IMP FORCEDOWN 1
 step 450000000
 deposit IMP FORCEDOWN 0
 step 400000000
-echo === enable DEBUG_IRQ recv trace ===
+echo === enable DEBUG_IRQ recv trace + CONO (arm/re-arm) + CONI (NCP-dispatch probe) ===
 set imp debug=IRQ
-echo === resuming for NETLIT + one @L 69 ===
+set imp debug=CONO
+set imp debug=CONI
+echo === clear IMPFLS (70360): FORCEDOWN re-ran IMPRSS which set flush-count=-2, ===
+echo === which would flush the first 2 body msgs (incl the @L 69 RFC). ===
+deposit 70360 0
 go
