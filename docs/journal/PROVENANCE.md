@@ -8,7 +8,7 @@ nothing critical silently lives on one disk with no record.
 ## Classes & inventory (droplet `~/arpanet`)
 | Artifact | Path | Size | Class |
 |---|---|---|---|
-| host69 booted TENEX snapshot | `mini/host69-bbn-tenex/snap/host69-live.state` | 2.4M | **IRREPLACEABLE** (the SAVE/RESTORE breakthrough; droplet-only) |
+| host69 booted TENEX snapshot | `mini/host69-bbn-tenex/snap/host69-live.state` | 2.4M | **IRREPLACEABLE** — the SAVE/RESTORE breakthrough; **now committed to git ✅** (`.gitignore` exception) |
 | host69 TENEX packs/tapes | `mini/host69-bbn-tenex/kit-cache/build-tenex/install/media/` | 12M (sparse) | configured (rebuild = long install) |
 | Sigma 7 CP-V runtime | `mini/host01-sigma/` | 412M | configured (kit: `kenrector/sigma-cpv-kit`) |
 | Multics runtime | `mini/host06-multics/` | 900M | configured (kit: DPS8M `QuickStart_MR12.8`) |
@@ -41,14 +41,13 @@ Each host `*ctl.sh` fetches its **public OS kit** and can rebuild the *base* sys
 state on top of each base — especially the **host69 booted-TENEX snapshot**, which required the
 manual SAVE/RESTORE install documented in `docs/host69-tenex-install-findings.md`.
 
-## Risk & recommended vault (decision needed)
-The irreplaceable, droplet-only items (host69 snapshot 2.4M; the configured packs) have **no
-off-box durable copy**. Options, smallest-effort first:
-1. **git-LFS** for the small-but-critical (`host69-live.state` 2.4M, the 12M build media) — cheap,
-   versioned, off-box on push.
-2. **Object storage / off-site backup** for the multi-GB per-host packs + a `SHA256SUMS` manifest
-   in git.
-3. At minimum, **mirror the host69 snapshot to a second machine** (it's only 2.4M) and add it to
-   the timestamped backups.
-
-No blobs were moved and the `.gitignore` policy was left unchanged — pick an option and I'll wire it up.
+## Distribution policy (resolved)
+- **The crown jewel — the host69 booted-TENEX snapshot (2.4M) — is now committed to git** and
+  rides to GitHub, so the single most irreplaceable, hardest-won artifact is durable and
+  versioned off-box. (A `.gitignore` exception keeps the rest of `snap/` ignored.)
+- **The large per-host disk images (~6G) are NOT distributed in this repo** — too big, and they
+  contain configured/installed state. They live on the droplet (+ `~/arpanet-runtime-backups`
+  25G, + a Civitae cold copy for the upstream/ITS-line packs). **To obtain them, contact the
+  maintainer** (Kurt Hamm — `kurthamm` on GitHub, or `kurt@hamm.me`).
+- The base OSes are rebuildable from public kits via each host's `*ctl.sh` (see Rebuild recipes
+  above); only the *post-install configured* state requires the maintainer's copy.
