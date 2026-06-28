@@ -402,43 +402,86 @@ RTS. NETLIT (correct, listening) and `RECSTR`/`RECRTS` are downstream of a hands
 completing. This is plausibly where the stale snapshot state (the 25 conns / reset bookkeeping)
 finally bites — but now at the host-host-protocol layer, precisely located.
 
-**Next:** trace the RST/RRP exchange. Why does host69 send 48 RSTs and not converge? Look at
-`RECRST` (netwrk, called from `IM8RST`@133242) and the host-status table (`HSTSTS`@070440 region) —
-does host69 ever mark the lab host fully "up" (both reset directions exchanged)? And does the lab's
-`ncpdov` see host69 as up so it proceeds to send the connection RTS? Candidate root: host69's
-host-host reset state for the lab neighbor is stale/wedged from the snapshot (RST loop), so the
-connection RTS is never sent/accepted. Decisive instrument: count `RECRST` + dump `HSTSTS` for the
-lab host before/after `@L 69`; correlate with whether the lab daemon emits the ICP RTS.
+### 10.5 LAB-SIDE gating (2026-06-28) — the RTS is withheld until host69 sends an RRP; host69's RST spam destroys the connection
+
+Read the lab daemon `mini/src/ncpd-ovREUSE/src/ncp.c` (the authentic-ish NCP the lab speaks). The
+ICP-open path gates the connection RTS on the host-host reset (line ~1634):
+
+```c
+if ((hosts[host].flags & HOST_ALIVE) == 0) {     // host69 not yet known up
+    ncp_rst (host);                              // lab sends RST to host69
+    when_rrp (i, app_open_rts, app_open_fail);   // ONLY after host69's RRP -> app_open_rts sends the connection RTS
+}
+```
+- `HOST_ALIVE` for host69 is set when the lab **receives an RST or RRP from host69** (`process_rst`
+  line 1265, `process_rrp` line ~1283). The lab sends the connection **RTS only after it receives an
+  RRP from host69** in response to the lab's RST (`when_rrp` → `app_open_rts`, `RRP_TIMEOUT=20`).
+- **`process_rst` (line 1275) calls `reset_host(source)` which `destroy()`s ALL of that host's
+  connections.** So every RST host69 spams at the lab **tears down the in-progress `@L` connection**.
+  host69's **48 RSTs** are not benign — they actively reset the lab's host-host state and can nuke the
+  pending ICP each time.
+
+**Synthesis of both sides:** the two ends are not converging the host-host reset. host69 keeps
+sending RST (doesn't mark the lab "up"); the lab answers RRP and marks host69 alive, but needs
+host69's RRP (to the lab's RST) before it will emit the connection RTS. If host69 never sends that
+RRP — or sends RST again and destroys the connection first — the lab's `when_rrp` times out
+(`app_open_fail`) and the RTS is never delivered. Either way, **the missing message is the connection
+RTS, and the cause is unsettled host-host reset state.**
 
 ---
 
 ## NEXT SESSION — START HERE (handoff)
 
-Continue from branch `host69-tenex-ncp-imp`. The IMP input-delivery layer is **SOLVED** (§10.3),
-the RFC now reaches the NCP, and the blocker is localized to the **host-host RST/RRP handshake**
-(§10.4 — read it). The IMPFLS flush + the host-table gates are settled; NETLIT and RECSTR are
-downstream of the reset handshake and not the current problem.
-the `@L 69` RFC now reaches *and is delivered into* TENEX, which re-arms input. **Rebuild the
-emulator first** (`cd kit-cache/rcornwell-sims && make pdp10-ki`, fork repo @ `e7c64e7`) — the
-binary carries the fix; a clean clone needs the rebuild.
+Continue from branch `host69-tenex-ncp-imp`. **Rebuild the emulator first**
+(`cd mini/host69-bbn-tenex/kit-cache/rcornwell-sims && make pdp10-ki`; fork repo HEAD `ec6b0b8` =
+fix `e7c64e7` + diagnostic counters) — the gitignored binary carries the fix + the NCP probe.
 
-**The blocker has moved UP one layer to NCP→listen-socket dispatch** (the original §10 / §10.1
-question, now genuinely reachable). The RFC is delivered to the IMP driver's input queue and TENEX
-re-arms, **but NETLIT's `GDSTS` stays idle (LSNG, `STS=12926844928 SKT=-2`)** — the NCP is not
-advancing NETLIT's socket-1 listen to `RFCR`.
+**Status of the stack (do NOT re-litigate without new evidence):**
+- IMP/1822 delivery — **solved** (§10.3, emulator fix `e7c64e7`).
+- NCP input re-arm — **solved** (§10.3).
+- IMPFLS bring-up flush — **understood + bypassed** (`deposit 70360 0` after the FORCEDOWN cycle; §10.4).
+- NETLIT — **exonerated**, listening correctly (LSNG); do **not** touch or rebuild it.
+- RECSTR / socket listener — downstream, **not reached yet**; do not debug it yet.
+- **CURRENT WALL: host-host `RST`/`RRP` reset convergence** (§10.4 host69-side, §10.5 lab-side).
 
-**Next question:** does `RECSTR`/the NCP control-input loop (`netwrk.mac`) dequeue the delivered
-RFC and try to match socket 1, or does the queued input never get NCP-serviced? Candidates:
-- NCP input loop stalled / job-0 service not draining `IMPIBI` (the 25 stuck RFNM conns may be
-  starving NCP *process-level* service, even though IMP *interrupt-level* input now works).
-- RECSTR runs but mis-dispatches (re-check the §10.1 match path now that delivery is real).
-- The foreground unprivileged NETLIT isn't the socket the monitor hands the RFC to.
+**Goal (brutally narrow):** explain why host69 exchanges `RST`/`RRP` but never reaches the state
+where the lab delivers the connection `RTS`. The missing message is the `RTS`; the reason is
+host-host reset state — find the `HSTSTS` transition that fails.
 
-**Settled (do NOT revisit):** NETLIT correct + listening on socket 1; byte size = 32 both sides;
-host-ready lands; RFC reaches host69's IMP **and is now delivered**; TENEX arms + re-arms input.
+**Constraints:** one source only = **`ncp31 → host69`**. Do NOT use ncp1/ncp2/ncp35, repeated `@L`
+attempts, NETLIT rebuilds, or `set imp debug` beyond the proven instrumentation.
 
-Harness: `netser-build/investigation-2026-06-28/launchers/launch-trace.sh` (2323 telnet console,
-brings host69 to host-ready ~75s). NETLIT load: `MOUNT DTA1:` → `copyfile.sh LOADER.SAV <SUBSYS>`
-→ `copyfile.sh PA1050.SAV <SUBSYS>` → `LOADER` → `DTA1:NETLIT` → `\033G` (then a CR to flush the
-stray `G`) → `START`. Trace flush: `kill -TERM` the ki. Leave the lab clean (host69 down, imp05
-up).
+**Runbook:**
+1. Bring host69 up on the patched path (`launch-trace.sh`); land host-ready.
+2. Account for IMPFLS (the `.do` already does `deposit 70360 0` after FORCEDOWN; verify it echoed).
+3. **Trace before firing `@L`** — host69 side: `RECRST` (netwrk, called from `IM8RST`@133242), the
+   send-RST path (`IMSRST`@133611), the receive-RRP path, host-status table `HSTSTS`(~`070440`) for
+   ncp31's host number, any reset counter/timer, and `IMPCNP` dispatch. **Lab side (cheap, do first):**
+   capture `ncpdov`'s stderr (`fprintf` logs "received RST/RRP from", "Send ICP RTS") — it shows
+   directly whether the lab gets host69's RRP and whether it emits the RTS. (Ncpdov is launched by
+   `mini/noc/server/ncp.py`; find/route its stderr.)
+4. Fire exactly **one** `@L 69` from ncp31.
+5. Capture: host69 inbound control-command sequence; host69 outbound RST/RRP; lab `ncpdov` view;
+   `HSTSTS` before/after.
+
+**Decision tree:**
+- host69 gets RST but never RRP → lab not replying, or host69's outgoing RRP path invalid/invisible.
+- host69 sends RST repeatedly but never marks ncp31 up → host-status / reset-completion logic stuck.
+- host69 marks ncp31 up but RTS still absent → lab `ncpdov` withholding RTS (doesn't see host69 up).
+- RTS arrives after convergence → next layer is finally `RECSTR`/`RECRTS` → socket match → NETLIT `RFCR`.
+
+**Pinned cautions:**
+1. **IMPFLS is a production-cutover hazard.** If the host-ready lever runs `IMPRSS`, it arms
+   "flush next 2 inbound msgs," so a real `@L 69` can be eaten. Need a deterministic prod rule:
+   avoid that host-ready method, clear `IMPFLS` after it, or delay until 2 harmless msgs consume it.
+2. **The 25 stuck RFNM conns** were NOT the input-arm cause and NOT NETLIT — but may still poison
+   reset convergence / host-status. Prove it here, with a sharp place to look.
+
+**Addrs (tenex.dis):** recstr=441110 recrts=441206 reccls=441057 imsrst=133611 im8rst=133241
+im8rrp=133244 recrst (call@133242) impbht=070656 imphrt=070430 impchu=070351 impcho=070352
+impflg=070216 impibi=070321 impibo=070322 impnfi=070227 impncl=070336 impfls=070360 netsts=075656
+(hststs ≈ 070440). **Harness:** `launch-trace.sh` (2323 telnet console, ~75–90s to host-ready).
+NETLIT load: `MOUNT DTA1:` → `copyfile.sh LOADER.SAV <SUBSYS>` → `copyfile.sh PA1050.SAV <SUBSYS>`
+→ `LOADER` (wait for `*`) → `DTA1:NETLIT` → `\033G` → CR (flush stray `G`) → `START`. Trace flush:
+`kill -TERM` the ki (SIMH debug is block-buffered). **Leave the lab clean (host69 down, imp05 up).**
+The scripted NETLIT load occasionally flakes on console timing — verify `OPENF OK LISTENING` before firing.
