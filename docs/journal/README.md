@@ -30,23 +30,40 @@ Everything else in `mini/arpanet`'s `NCPS` list was either a **commented-out pla
 **NCP echo stub** (the `ncpdov` daemons that answer `ncp-ping` but run no real OS). The IMP farm
 itself was solid; real machines were "early days."
 
+**But present ≠ active.** Even the listed real hosts were not reliably *network-active*
+upstream: the IMP host-attach lines used `localhost` (silent IPv6 failure of the NCP host
+interface), and the KA ITS shipped with a KAIMP interrupt bug so it **could not answer network
+logins**. So upstream's working network was effectively *the IMP farm + the generic NCP stubs*;
+the real machines booted, but `@L` login into them was incomplete. Closing that gap — making
+hosts actually answer on the network — is a large part of what we added.
+
 ---
 
 ## What we added (kurthamm fork — this repo)
 
-The work spans two lines: the **droplet** (this repo, the most-evolved) and an earlier
-**Civitae** line (`feature/its-ncp-debug`, the ITS login fixes + WIP), imported for backfill.
+**Read this carefully — provenance was verified against the live `github.com/obsolescence/arpanet`
+main (HEAD `78123c7`), not assumed.** The key distinction is **presence vs network-active**: a
+host *directory* existing in upstream does NOT mean that host was active on the simulated
+network. Upstream shipped several hosts that were present/bootable but whose NCP login did not
+work (a `localhost`/IPv6 silent-failure bug in the IMP host-attach lines, and a KAIMP interrupt
+bug that stopped ITS from answering network logins). The work spans two lines: the **droplet**
+(this repo, most-evolved) and an earlier **Civitae** line (`feature/its-ncp-debug`).
 
-### New / brought-to-life hosts
-| Host | Machine / OS | Was, upstream | State | Notebook |
+### Host roster — presence vs network-active (honest)
+| Host | OS / emulator | In upstream? | Network-active upstream? | Our contribution |
 |---|---|---|---|---|
-| **#1 UCLA** | SDS **Sigma 7 / CP-V** | "planned soon" | ✅ running (`@L 1`, port 4003) | `mini/host01-sigma/` |
-| **#6 MIT** | **Multics** (DPS8M MR12.8) | "longer-term hope" | ✅ running (`@L 6`, port 6180) | `mini/host06-multics/` |
-| **#11 Stanford** | WAITS + **PARRY** / AP-lab | WAITS only (bridge) | ✅ WAITS login via `waitsconnect`; PARRY restored | `docs/host11-*.md`, `mini/host11-ap-lab/` |
-| **#65 UCLA** | UCLA **CCN** | commented plan | 🟡 in repo | `mini/host65-ucla-ccn/` |
-| **#69 BBN** | **BBN-TENEX** | not even planned | 🟧 **active** — host-ready solved; login blocked at NCP RFC dispatch | `docs/host69-ncp-login-investigation.md` |
-| **#70/134/198 MIT** | ITS (PDP-10) | present but logins broken | ✅ network logins fixed | (ITS fixes below) |
-| **#126 HILTON** | **KA-10 ITS** (HILTON-KA1) | commented plan | ✅ running (`@L 126`, port 10015) | `mini/host126/` |
+| ~18 map stubs (UCLA-NMC, SRI-ARC, RAND, …) | **generic `ncpdov`** (Lars Brinkhoff `linux-ncp`) | **yes (upstream's)** | yes, but broken by the `localhost`/IPv6 bug | fixed plumbing (`127.0.0.1`) so they actually route |
+| **#70/134/198 MIT** | ITS / KA PDP-10 | yes (present, bootable) | **NO** — KAIMP bug, no `@L` login | **activated**: `pdp10-ka-fixed` (KAIMP) + Chaosnet |
+| **#126 HILTON-KA1** | ITS / KA-10 | yes (present, bootable) | **NO** (not in upstream "working" set) | **activated/completed** (same KA fix) |
+| **#11 Stanford** | WAITS (SIMH PDP-10) | yes — via Linux bridge, *not* own NCP | partial (bridge) | + **PARRY / AP-lab** (new) |
+| **#1 UCLA** | **Sigma 7 / CP-V** (SIMH sigma) | **no dir** ("planned") | no | **built new** |
+| **#6 MIT** | **Multics** (DPS8M MR12.8) | **no dir** ("hope"; upstream #6 was ITS) | no | **built new** |
+| **#65 UCLA** | **OS/360 MVT** (Hercules) + `ccn_frontdoor.py` | **no dir** | no | **built new** |
+| **#69 BBN** | **BBN-TENEX** (SIMH PDP-10 KI) | **no dir** (not even planned) | no | **building** — host-ready solved; login blocked at NCP RFC dispatch (`docs/host69-ncp-login-investigation.md`) |
+
+Authenticity also varies by **network seam**: ITS and TENEX speak their *own* period NCP
+natively; WAITS (`waitsconnect`) and OS/360 (`ccn_frontdoor.py`) run authentic OSes but attach
+to the ARPANET via *modern* bridges/shims; the ~18 stubs run no real OS at all.
 
 ### Subsystems & engineering we added
 - **ITS network logins** (Civitae `feature/its-ncp-debug`): `pdp10-ka-fixed` (KAIMP interrupt
