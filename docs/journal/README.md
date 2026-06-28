@@ -120,9 +120,11 @@ still future work. Don't let "it runs `@L 1`" be read as "it's an authentic NCP 
 - [x] **host11-waits/PARRY** — `docs/host11-ap-lab.md`, `docs/host11-parry-restoration.md`.
 
 ## Remaining catch-up TODO
-- [ ] Land the `kx10_imp.c` patches (host-ready 1B22 gate + FORCEDOWN) in tracked `src/sims/`
-      — currently only in the gitignored build cache + the host69 artifacts.
-- [ ] Vault + `PROVENANCE.md` for the runtime packs/snapshots/tapes (droplet + Civitae) — the
-      irreplaceable configured disk images that are too large for git.
+- [x] Emulator fork preserved out of the gitignored build cache → `netser-build/emulator-fork/`
+      (patch + git bundle + README). *Future:* publish a `kurthamm/sims` fork and point the
+      `src/sims` submodule at it (so it's a first-class tracked dependency, not a patch).
+- [x] `docs/journal/PROVENANCE.md` — bootable-binary inventory, checksums, rebuild recipes, and
+      vault recommendation. *Decision needed:* actually vault the irreplaceable blobs (the
+      droplet-only host69 snapshot + the configured packs) — git-LFS / object store / mirror.
 - [ ] Resume the host69 NCP frontier: incoming RFC reaches host69 but isn't dispatched to the
       listen socket (`netwrk.mac`) — see the host69 notebook.
