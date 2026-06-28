@@ -1,10 +1,11 @@
-ec6b0b81843415681f7f63c1b0830f086d46c9d1  2026-06-28  host69 TENEX ncp: NCP-dispatch trace instrumentation (RFC -> RECSTR path)
-e7c64e7a86fd5645f53f1ea60e19e067d5dab923  2026-06-28  host69 TENEX ncp: fix IMP input re-arm deadlock (two 1822-fidelity bugs)
-842109e8b1106729267063139954579caeda1294  2026-06-28  host69 ncp: FORCEDOWN lever + current working state (preservation snapshot)
-a483514b9d95269d7f493bd60709d7063810e704  2026-06-25  host69 TENEX ncp: diagnostic instrumentation (recv poll + gate state)
-2ee4d7649dca69e9be232c345de65dbb0c95b621  2026-06-25  host69 TENEX ncp: keep UDP receiver polling + surface IMP-ready on live link
-33f226e963c22f8d06e1bdaf3dfa731c3d034575  2026-06-25  host69 TENEX: TENEX-faithful BBN IMP CONI/CONO bit layout (UNIT_NCP)
-877cde564d6bd29c6f5a75c215954c90f9b4aea7  2026-06-25  ncp IMP: EXPERIMENTAL single-PI-channel output-done (UNPROVEN) + keep debug
-a438d50c6f5697e38fe5b98c3d08061e9c7f2174  2026-06-25  ncp IMP: drive host<->IMP 1822 handshake (input-armed delivery, hold NOP, surface IMP_RDY)
-9eaf68fe5b41ffeccaa5e6691e09579636697b95  2026-06-24  ncp IMP: gate inbound 1822 input until host drives its interface
 fa21f3bf6143fdc72861da9921cc1caef4a8fd42  2026-06-24  Add authentic 1822-over-UDP host interface (set imp ncp) for BBN-TENEX
+9eaf68fe5b41ffeccaa5e6691e09579636697b95  2026-06-24  ncp IMP: gate inbound 1822 input until host drives its interface
+a438d50c6f5697e38fe5b98c3d08061e9c7f2174  2026-06-25  ncp IMP: drive host<->IMP 1822 handshake (input-armed delivery, hold NOP, surface IMP_RDY)
+877cde564d6bd29c6f5a75c215954c90f9b4aea7  2026-06-25  ncp IMP: EXPERIMENTAL single-PI-channel output-done (UNPROVEN) + keep debug
+33f226e963c22f8d06e1bdaf3dfa731c3d034575  2026-06-25  host69 TENEX: TENEX-faithful BBN IMP CONI/CONO bit layout (UNIT_NCP)
+2ee4d7649dca69e9be232c345de65dbb0c95b621  2026-06-25  host69 TENEX ncp: keep UDP receiver polling + surface IMP-ready on live link
+a483514b9d95269d7f493bd60709d7063810e704  2026-06-25  host69 TENEX ncp: diagnostic instrumentation (recv poll + gate state)
+842109e8b1106729267063139954579caeda1294  2026-06-28  host69 ncp: FORCEDOWN lever + current working state (preservation snapshot)
+e7c64e7a86fd5645f53f1ea60e19e067d5dab923  2026-06-28  host69 TENEX ncp: fix IMP input re-arm deadlock (two 1822-fidelity bugs)
+ec6b0b81843415681f7f63c1b0830f086d46c9d1  2026-06-28  host69 TENEX ncp: NCP-dispatch trace instrumentation (RFC -> RECSTR path)
+f24af287db37f8700a1dfcdd2cd5e325249d8a8c  2026-06-28  host69 TENEX: [GATE]+[OUT] output-engine probes (impord/impob/nopcnt/queues)

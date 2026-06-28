@@ -1,475 +1,5 @@
-diff --git a/PDP10/imp_udp.c b/PDP10/imp_udp.c
-new file mode 100644
-index 0000000..0b1c9cf
---- /dev/null
-+++ b/PDP10/imp_udp.c
-@@ -0,0 +1,252 @@
-+/* imp_udp.c: 1822 host-interface-over-UDP socket routines for the PDP-10 IMP
-+
-+   Derived from h316_udp.c, Copyright (c) 2013 Robert Armstrong, bob@jfcl.com.
-+
-+   Permission is hereby granted, free of charge, to any person obtaining a
-+   copy of this software and associated documentation files (the "Software"),
-+   to deal in the Software without restriction, including without limitation
-+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-+   and/or sell copies of the Software, and to permit persons to whom the
-+   Software is furnished to do so, subject to the following conditions:
-+
-+   The above copyright notice and this permission notice shall be included in
-+   all copies or substantial portions of the Software.
-+
-+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-+   ROBERT ARMSTRONG BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY.
-+
-+   PURPOSE
-+
-+   This is Robert Armstrong's portable IMP/host UDP modem emulation, lifted
-+   from the H316 ARPAnet IMP simulator (h316_udp.c) so that the rcornwell
-+   PDP-10 IMP device (kx10_imp.c) can speak the SAME wire protocol when run in
-+   authentic "ncp" mode.  An H316 IMP's host-interface ("hi") device and a
-+   PDP-10 host both call this module; they exchange raw 1822 host messages as
-+   datagrams.  The datagram layout (magic 'H316', per-link sequence number,
-+   16-bit word count, then network-order H316 words) is unchanged from RLA's
-+   original, which is exactly why a PDP-10 built with this module interoperates
-+   with the lab's H316 IMP (h316ov) over a UDP port pair, e.g.
-+
-+        TENEX :  attach -u imp 21052:localhost:21051   (set imp ncp)
-+        IMP05 :  attach -u hi2  21051:localhost:21052
-+
-+   The only changes from h316_udp.c are: (a) self-contained constants so we do
-+   not depend on H316-specific h316_imp.h, and (b) no VM_IMPTIP build guard.
-+*/
-+
-+#include "sim_defs.h"           /* simh machine independent definitions       */
-+#include "sim_tmxr.h"           /* MUX layer: packet send/receive semantics    */
-+#include "sim_sock.h"           /* sim_parse_addr()                            */
-+#include "imp_udp.h"
-+
-+/* Self-contained equivalents of the H316 constants this module relied on. */
-+#define MAXDATA      IMP_UDP_MAXDATA   /* longest IMP packet (in H316 words)   */
-+#define NOLINK       IMP_UDP_NOLINK
-+#define IMP_DBG_UDP  0x0004            /* trace bit; harmless if dev lacks it  */
-+
-+/* Local constants ... */
-+#define MAXLINKS        10      /* maximum number of simultaneous connections  */
-+
-+/* UDP connection data structure ... */
-+struct _UDP_LINK {
-+  t_bool  used;                 /* TRUE if this UDP_LINK is in use             */
-+  char    rhostport[90];        /* Remote host:port                            */
-+  char    lport[64];            /* Local port                                  */
-+  uint32  rxsequence;           /* next message sequence number for receive    */
-+  uint32  txsequence;           /* next message sequence number for transmit   */
-+  DEVICE  *dptr;                /* Device associated with link                 */
-+};
-+typedef struct _UDP_LINK UDP_LINK;
-+
-+/*   This magic number is stored at the beginning of every UDP message and is
-+   checked on receive.  It MUST match h316_udp.c so the two ends agree. */
-+#define MAGIC   ((uint32) (((((('H' << 8) | '3') << 8) | '1') << 8) | '6'))
-+
-+/* UDP wrapper data structure - all fields in NETWORK byte order on the wire. */
-+struct _UDP_PACKET {
-+  uint32  magic;                /* UDP "magic number" (see above)              */
-+  uint32  sequence;             /* UDP packet sequence number                  */
-+  uint16  count;                /* number of H316 words to follow              */
-+  uint16  data[MAXDATA];        /* and the actual H316 data words/IMP packet   */
-+};
-+typedef struct _UDP_PACKET UDP_PACKET;
-+#define UDP_HEADER_LEN  (2*sizeof(uint32) + sizeof(uint16))
-+
-+/* Locals ... */
-+static UDP_LINK udp_links[MAXLINKS] = { {0} };          /* per-connection data */
-+static TMLN udp_lines[MAXLINKS] = { {0} };              /* line descriptors    */
-+static TMXR udp_tmxr = { MAXLINKS, NULL, 0, udp_lines}; /* datagram mux        */
-+
-+static int32 udp_find_free_link (void)
-+{
-+  int32 i;
-+  for (i = 0;  i < MAXLINKS;  ++i) {
-+    if (udp_links[i].used == 0) {
-+      memset(&udp_links[i], 0, sizeof(UDP_LINK));
-+      return i;
-+    }
-+  }
-+  return NOLINK;
-+}
-+
-+static t_stat udp_parse_remote (int32 link, const char *premote)
-+{
-+  /* Parse "llll:host:rrrr", "llll::rrrr", "host:rrrr" forms.  See h316_udp.c. */
-+  char *end;  int32 lport, rport;
-+  char host[64], port[16];
-+
-+  if (*premote == '\0') return SCPE_2FARG;
-+  memset (udp_links[link].lport, 0, sizeof(udp_links[link].lport));
-+  memset (udp_links[link].rhostport, 0, sizeof(udp_links[link].rhostport));
-+  if (2 == sscanf (premote, "%d::%d", &lport, &rport)) {
-+    if ((lport < 1) || (lport >65535) || (rport < 1) || (rport >65535)) return SCPE_ARG;
-+    snprintf (udp_links[link].lport, sizeof (udp_links[link].lport) - 1, "%d", lport);
-+    snprintf (udp_links[link].rhostport, sizeof (udp_links[link].rhostport) - 1, "localhost:%d", rport);
-+    return SCPE_OK;
-+  }
-+
-+  lport = strtoul(premote, &end, 10);
-+  if ((*end == ':') && (lport > 0)) {
-+    snprintf (udp_links[link].lport, sizeof (udp_links[link].lport) - 1, "%d", lport);
-+    premote = end+1;
-+  }
-+
-+  if (sim_parse_addr (premote, host, sizeof(host), "localhost", port, sizeof(port), NULL, NULL))
-+    return SCPE_ARG;
-+  snprintf (udp_links[link].rhostport, sizeof (udp_links[link].rhostport) - 1, "%s:%s", host, port);
-+  if (udp_links[link].lport[0] == '\0')
-+    strlcpy (udp_links[link].lport, port, sizeof (udp_links[link].lport));
-+
-+  if ((strcmp (udp_links[link].lport, port) == 0) &&
-+      (strcmp ("localhost", host) == 0))
-+    return sim_messagef (SCPE_ARG, "WARNING - use different transmit and receive ports!\n");
-+
-+  return SCPE_OK;
-+}
-+
-+t_stat udp_create (DEVICE *dptr, const char *premote, int32 *pln)
-+{
-+  t_stat ret;
-+  char linkinfo[256];
-+  int32 link = udp_find_free_link();
-+  if (link < 0) return SCPE_MEM;
-+
-+  if ((ret = udp_parse_remote(link, premote)) != SCPE_OK) return ret;
-+
-+  sprintf(linkinfo, "Buffer=%d,Line=%d,%s,UDP,Connect=%s", (int)(sizeof(UDP_PACKET)+sizeof(int32)), link, udp_links[link].lport, udp_links[link].rhostport);
-+  ret = tmxr_open_master (&udp_tmxr, linkinfo);
-+  if (ret != SCPE_OK) return ret;
-+
-+  udp_links[link].used = TRUE;  *pln = link;
-+  udp_lines[link].dptr = udp_links[link].dptr = dptr;      /* save device */
-+  udp_tmxr.uptr = dptr->units;
-+  udp_tmxr.last_poll_time = 1;          /* don't poll periodically for connects */
-+  (void)tmxr_poll_conn (&udp_tmxr);     /* force connection initialization now  */
-+  udp_tmxr.last_poll_time = 1;
-+  sim_debug(IMP_DBG_UDP, dptr, "link %d - listening on port %s and sending to %s\n", link, udp_links[link].lport, udp_links[link].rhostport);
-+  return SCPE_OK;
-+}
-+
-+t_stat udp_release (DEVICE *dptr, int32 link)
-+{
-+  if ((link < 0) || (link >= MAXLINKS)) return SCPE_IERR;
-+  if (!udp_links[link].used) return SCPE_IERR;
-+  if (dptr != udp_links[link].dptr) return SCPE_IERR;
-+
-+  tmxr_detach_ln (&udp_lines[link]);
-+  udp_links[link].used = FALSE;
-+  sim_debug(IMP_DBG_UDP, dptr, "link %d - closed\n", link);
-+  return SCPE_OK;
-+}
-+
-+t_stat udp_send (DEVICE *dptr, int32 link, uint16 *pdata, uint16 count)
-+{
-+  UDP_PACKET pkt;  int pktlen;  uint16 i;  t_stat iret;
-+  if ((link < 0) || (link >= MAXLINKS)) return SCPE_IERR;
-+  if (!udp_links[link].used) return SCPE_IERR;
-+  if ((pdata == NULL) || (count == 0) || (count > MAXDATA)) return SCPE_IERR;
-+  if (dptr != udp_links[link].dptr) return SCPE_IERR;
-+
-+  /* Build the packet - EVERYTHING in network order, matching h316_udp.c. */
-+  pkt.magic = htonl(MAGIC);
-+  pkt.sequence = htonl(udp_links[link].txsequence++);
-+  pkt.count = htons(count);
-+  for (i = 0;  i < count;  ++i)  pkt.data[i] = htons(*pdata++);
-+  pktlen = UDP_HEADER_LEN + count*sizeof(uint16);
-+
-+  iret = tmxr_put_packet_ln (&udp_lines[link], (const uint8 *)&pkt, (size_t)pktlen);
-+  if (iret != SCPE_OK) return sim_messagef(iret, "UDP%d - tmxr_put_packet_ln() failed with error %s\n", link, sim_error_text(iret));
-+  sim_debug(IMP_DBG_UDP, dptr, "link %d - packet sent (sequence=%d, length=%d)\n", link, ntohl(pkt.sequence), ntohs(pkt.count));
-+  return SCPE_OK;
-+}
-+
-+static int32 udp_receive_packet (int32 link, UDP_PACKET *ppkt)
-+{
-+  size_t pktsiz;
-+  const uint8 *pbuf;
-+  t_stat ret;
-+
-+  udp_lines[link].rcve = TRUE;          /* Enable receiver  */
-+  tmxr_poll_rx (&udp_tmxr);
-+  ret = tmxr_get_packet_ln (&udp_lines[link], &pbuf, &pktsiz);
-+  udp_lines[link].rcve = FALSE;         /* Disable receiver */
-+  if (ret != SCPE_OK) {
-+    sim_messagef (ret, "UDP%d - tmxr_get_packet_ln() failed with error %s\n", link, sim_error_text(ret));
-+    return NOLINK;
-+  }
-+  if (pbuf == NULL) return 0;
-+  memcpy (ppkt, pbuf, pktsiz);
-+  return pktsiz;
-+}
-+
-+int32 udp_receive (DEVICE *dptr, int32 link, uint16 *pdata, uint16 maxbuf)
-+{
-+  UDP_PACKET pkt;  int32 pktlen, explen, implen, i;  uint32 magic, pktseq;
-+  if ((link < 0) || (link >= MAXLINKS)) return SCPE_IERR;
-+  if (!udp_links[link].used) return SCPE_IERR;
-+  if (dptr != udp_links[link].dptr) return SCPE_IERR;
-+
-+  while ((pktlen = udp_receive_packet(link, &pkt)) > 0) {
-+    if (((size_t)pktlen) < UDP_HEADER_LEN) {
-+      sim_debug(IMP_DBG_UDP, dptr, "link %d - received packet w/o header (length=%d)\n", link, pktlen);
-+      continue;
-+    }
-+    magic = ntohl(pkt.magic);
-+    if (magic != MAGIC) {
-+      sim_debug(IMP_DBG_UDP, dptr, "link %d - received packet w/bad magic number (magic=%08x)\n", link, magic);
-+      continue;
-+    }
-+    implen = ntohs(pkt.count);
-+    explen = UDP_HEADER_LEN + implen*sizeof(uint16);
-+    if (explen != pktlen) {
-+      sim_debug(IMP_DBG_UDP, dptr, "link %d - received packet length wrong (expected=%d received=%d)\n", link, explen, pktlen);
-+      continue;
-+    }
-+
-+    pktseq = ntohl(pkt.sequence);
-+    if ((pktseq == 0) && (udp_links[link].rxsequence != 0)) {
-+      sim_debug(IMP_DBG_UDP, dptr, "link %d - remote modem restarted\n", link);
-+    } else if (pktseq < udp_links[link].rxsequence) {
-+      sim_debug(IMP_DBG_UDP, dptr, "link %d - received packet out of sequence 1 (expected=%d received=%d\n", link, udp_links[link].rxsequence, pktseq);
-+      continue;
-+    }
-+    else if (pktseq != udp_links[link].rxsequence) {
-+      sim_debug(IMP_DBG_UDP, dptr, "link %d - received packet out of sequence 2 (expected=%d received=%d\n", link, udp_links[link].rxsequence, pktseq);
-+    }
-+    udp_links[link].rxsequence = pktseq+1;
-+
-+    if ((pdata == NULL) || (maxbuf == 0)) {
-+      sim_debug(IMP_DBG_UDP, dptr, "link %d - received packet discarded (no buffer available)\n", link);
-+      return implen;
-+    }
-+
-+    sim_debug(IMP_DBG_UDP, dptr, "link %d - packet received (sequence=%d, length=%d)\n", link, pktseq, pktlen);
-+    for (i = 0;  i < (implen < maxbuf ? implen : maxbuf);  ++i)
-+      *pdata++ = ntohs(pkt.data[i]);
-+    return implen;
-+  }
-+
-+  return pktlen;
-+}
-diff --git a/PDP10/kx10_cpu.c b/PDP10/kx10_cpu.c
-index 2d51230..0bfcd3a 100644
---- a/PDP10/kx10_cpu.c
-+++ b/PDP10/kx10_cpu.c
-@@ -143,6 +143,39 @@ uint8   IND;                                  /* Indirect flag */
- t_addr  AS;                                   /* Address switches */
- int     BYF5;                                 /* Flag for second half of LDB/DPB instruction */
- int     uuo_cycle;                            /* Uuo cycle in progress */
-+int     crdir_wait = 0;                       /* CRDIR(JSYS 240) trace: awaiting return */
-+t_addr  crdir_pc = 0;                          /* CRDIR(JSYS 240) trace: user PC at call */
-+int     crdir_icount = 0;                      /* monitor instrs executed inside CRDIR */
-+t_addr  crdir_minpc = 0;                        /* min monitor PC seen inside CRDIR */
-+t_addr  crdir_maxpc = 0;                        /* max monitor PC seen inside CRDIR */
-+t_addr  crdir_ring[32];                        /* last monitor PCs inside CRDIR */
-+int     crdir_ring_i = 0;
-+/* NCP-dispatch trace: cumulative (sampling-immune) execution counters for the
-+   monitor PCs on the delivered-RFC -> NCP path (addrs from tenex.dis).  Read
-+   out via the IMP CONI probe.  136411 = IMPEIN 'hrlm a,@impibi' (RFC queued to
-+   NCP input queue, interrupt level); 137437 = 'aos impncl' (process-level
-+   dispatcher created a control connection for the message); 441110 = recstr
-+   (NCP RFC -> listen-socket matcher). */
-+unsigned long ncp_q_impibi = 0;    /* PC 0136411 hits: RFC queued to NCP input */
-+unsigned long ncp_aos_impncl = 0;  /* PC 0137437 hits: control connection created */
-+unsigned long ncp_recstr = 0;      /* PC 0441110 hits: NCP RFC->listen matcher ran */
-+/* IMPEIN discard-branch discriminators (mutually exclusive paths that bypass the
-+   queue at 136411): which one does the delivered RFC take? */
-+unsigned long ncp_e_nobuf = 0;     /* PC 0136371: IMIB<=0  -> IMPEI2 (no buffer) */
-+unsigned long ncp_e_flush = 0;     /* PC 0136373: flushing -> IMPEI3 */
-+unsigned long ncp_e_nomsg = 0;     /* PC 0136377: IMIDSP==IMIN0/IMIN00 -> IMPEI2 */
-+unsigned long ncp_e_irreg = 0;     /* PC 0136433: IMPEI4 (dead-host/irregular) */
-+/* IMPCNP control-message host-table gates (why RECSTR may not be dispatched). */
-+unsigned long ncp_badhost = 0;     /* PC 0133021: sender in IMPBHT -> flush whole ctl msg */
-+unsigned long ncp_forcerst = 0;    /* PC 0133046: sender not up (IMPHRT) -> force IMSRST not RECSTR */
-+unsigned long ncp_imsrst = 0;      /* PC 0133611: IMSRST ran (host69 sent an RST back) */
-+unsigned long ncp_dispatch = 0;    /* PC 0133052: IMPCNP 'pushj p,(e)' dispatched a control command */
-+unsigned long ncp_recrts = 0;      /* PC 0441206: RECRTS (received RTS = ICP request) ran */
-+unsigned long ncp_reccls = 0;      /* PC 0441057: RECCLS (received CLS) ran */
-+unsigned long ncp_disp_handler = 0;/* AC7 (handler addr) captured at the 133052 dispatch */
-+unsigned long ncp_im8rst = 0;      /* PC 0133241: IM8RST handler (host-host RST received) */
-+unsigned long ncp_im8rrp = 0;      /* PC 0133244: IM8RRP handler (host-host RRP received) */
-+unsigned long ncp_im8nop = 0;      /* PC 0133072: IM8NOP handler */
- int     SC;                                   /* Shift count */
- int     SCAD;                                 /* Shift count extension */
- int     FE;                                   /* Exponent */
-@@ -1630,6 +1663,7 @@ t_stat dev_apr(uint32 dev, uint64 *data) {
- #if KA
- 
- #if BBN
-+
- t_stat dev_pag(uint32 dev, uint64 *data) {
-     uint64 res = 0;
-     int    i;
-@@ -1687,6 +1721,18 @@ t_stat dev_pag(uint32 dev, uint64 *data) {
-         break;
- 
-     case DATAO:
-+       res = *data;
-+       for (i = 0; i < 512; i++)
-+          e_tlb[i] = u_tlb[i] = 0;
-+       mon_base_reg = (res & 03777) << 9;
-+       ac_stack = (res >> 9) & 0760;
-+       user_base_reg = (res >> 9) & 03777000;
-+       user_limit = page_limit[(res >> 30) & 07];
-+       page_enable = (res & SMASK) != 0;
-+       exec_map = (res & BIT4) != 0;
-+       sim_debug(DEBUG_DATAIO, &cpu_dev,
-+                 "DATAO PAG %012llo mbr=%06o ac=%03o ubr=%06o\n",
-+                 *data, mon_base_reg, ac_stack, user_base_reg);
-        break;
- 
-     case DATAI:
-@@ -3268,7 +3314,7 @@ int Mem_read(int flag, int cur_context, int fetch, int mod) {
-                 if (fetch == 0 && hst_lnt) {
-                     hst[hst_p].mb = MB;
-                 }
--                MB = get_reg(AB);
-+                UPDATE_MI(AB);
-                 return 0;
-             }
-         }
-@@ -3718,9 +3764,9 @@ int page_lookup_bbn(t_addr addr, int flag, t_addr *loc, int wr, int cur_context,
-                  uf = 1;
-              if (xct_flag & 004 && wr == 0)
-                  uf = 1;
--             if (xct_flag & 002 && BYF5)
-+             if (xct_flag & 002 && wr == 1)
-                  uf = 1;
--             if (xct_flag & 001 && wr == 1)
-+             if (xct_flag & 001 && (wr == 0 || BYF5))
-                  uf = 1;
-          }
-     }
-@@ -3951,6 +3997,7 @@ int Mem_read_bbn(int flag, int cur_context, int fetch, int mod) {
-  */
- int Mem_write_bbn(int flag, int cur_context) {
-     t_addr addr;
-+    int page = (RMASK & AB) >> 9;
- 
-     /* If not doing any special access, just access register */
-     if (AB < 020 && ((xct_flag == 0 || cur_context || (FLAGS & USER) != 0))) {
-@@ -3958,6 +4005,13 @@ int Mem_write_bbn(int flag, int cur_context) {
-         UPDATE_MI(AB);
-         return 0;
-     }
-+    if (next_write) {
-+        e_tlb[page] = 0;
-+        u_tlb[page] = 0;
-+        next_write = 0;
-+        UPDATE_MI(AB);
-+        return 0;
-+    }
-     if (modify) {
-         if (sim_brk_summ && sim_brk_test(last_addr, SWMASK('W')))
-             watch_stop = 1;
-@@ -4593,6 +4647,46 @@ if ((reason = build_dev_tab ()) != SCPE_OK)            /* build, chk dib_tab */
-     }
- 
-     if (f_inst_fetch) {
-+        if ((FLAGS & USER) == 0) {   /* exec-mode (monitor) only: NCP-path PC counters */
-+            switch (PC & RMASK) {
-+            case 0136411: ncp_q_impibi++;   break;
-+            case 0137437: ncp_aos_impncl++; break;
-+            case 0441110: ncp_recstr++;     break;
-+            case 0136371: ncp_e_nobuf++;    break;
-+            case 0136373: ncp_e_flush++;    break;
-+            case 0136377: ncp_e_nomsg++;    break;
-+            case 0136433: ncp_e_irreg++;    break;
-+            case 0133021: ncp_badhost++;    break;
-+            case 0133046: ncp_forcerst++;   break;
-+            case 0133611: ncp_imsrst++;     break;
-+            case 0133052: ncp_dispatch++;
-+                          ncp_disp_handler = (unsigned long)(FM[fm_sel | 7] & RMASK); break;
-+            case 0133241: ncp_im8rst++;     break;  /* IM8RST handler (host-host RST) */
-+            case 0133244: ncp_im8rrp++;     break;  /* IM8RRP handler (host-host RRP) */
-+            case 0133072: ncp_im8nop++;     break;  /* IM8NOP handler */
-+            case 0441206: ncp_recrts++;     break;
-+            case 0441057: ncp_reccls++;     break;
-+            }
-+        }
-+        if (crdir_wait) {
-+            if (FLAGS & USER) {   /* first user fetch after CRDIR JSYS = its return */
-+                fprintf(stderr, "[CRDIR] RET pc=%llo call+%lld icount=%d minpc=%llo maxpc=%llo AC1=%llo\r\n",
-+                    (unsigned long long)(PC & RMASK),
-+                    (long long)((long long)(PC & RMASK) - (long long)crdir_pc),
-+                    crdir_icount, (unsigned long long)crdir_minpc, (unsigned long long)crdir_maxpc,
-+                    (unsigned long long)FM[fm_sel|1]);
-+                { int k; fprintf(stderr, "[CRDIR] lastPCs:");
-+                  for (k = 0; k < 32; k++)
-+                     fprintf(stderr, " %llo", (unsigned long long)crdir_ring[(crdir_ring_i + k) & 31]);
-+                  fprintf(stderr, "\r\n"); }
-+                crdir_wait = 0;
-+            } else {              /* monitor running inside CRDIR (exec mode) */
-+                crdir_icount++;
-+                crdir_ring[crdir_ring_i & 31] = PC & RMASK; crdir_ring_i++;
-+                if (crdir_minpc == 0 || (PC & RMASK) < crdir_minpc) crdir_minpc = PC & RMASK;
-+                if ((PC & RMASK) > crdir_maxpc) crdir_maxpc = PC & RMASK;
-+            }
-+        }
- #if !(KI|KL)
- fetch:
- #endif
-@@ -5021,6 +5115,13 @@ muuo:
-     case 0102: case 0103:
- #endif
-     case 0104:  /* JSYS */
-+              if (AB == 0240) {           /* CRDIR JSYS - trace args + result */
-+                  fprintf(stderr, "[CRDIR] CALL pc=%llo AC1=%llo AC2=%llo AC3=%llo\r\n",
-+                      (unsigned long long)(PC & RMASK), (unsigned long long)FM[fm_sel|1],
-+                      (unsigned long long)FM[fm_sel|2], (unsigned long long)FM[fm_sel|3]);
-+                  crdir_pc = PC & RMASK; crdir_wait = 1;
-+                  crdir_icount = 0; crdir_minpc = 0; crdir_maxpc = 0;
-+              }
-     case 0106:
-     case 0107:
- #if !(KL_ITS | KS_ITS)
-@@ -6368,6 +6469,12 @@ dpnorm:
-     case 0104: /* TENEX JSYS */
- #if BBN
-               if (QBBN) {
-+                   if (AB == 0240) {           /* CRDIR JSYS - trace args + result */
-+                       fprintf(stderr, "[CRDIR] CALL pc=%llo AC1=%llo AC2=%llo AC3=%llo\r\n",
-+                           (unsigned long long)(PC & RMASK), (unsigned long long)FM[fm_sel|1],
-+                           (unsigned long long)FM[fm_sel|2], (unsigned long long)FM[fm_sel|3]);
-+                       crdir_pc = PC & RMASK; crdir_wait = 1;
-+                   }
-                    BR = ((uint64)(FLAGS) << 23) | ((PC + !pi_cycle) & RMASK);
-                    if (AB < 01000) {
-                       AB += 01000;
-@@ -6387,6 +6494,7 @@ dpnorm:
-                        goto last;
-                    }
-                    PC = AR & RMASK;
-+                   f_pc_inh = 1;
-                    break;
-               }
- #endif
-@@ -8806,7 +8914,6 @@ jrstf:
-               break;
- 
-     case 0256: /* XCT */
--
-               f_load_pc = 0;
-               f_pc_inh = 1;
-               xct_flag = 0;
-@@ -12040,6 +12147,7 @@ last:
-         page_fault = 0;
-         AB = 070 + maoff;
-         f_pc_inh = 1;
-+        pi_enc = 4;
-         pi_cycle = 1;
-         goto fetch;
-     }
 diff --git a/PDP10/kx10_imp.c b/PDP10/kx10_imp.c
-index f97aec5..90341aa 100644
+index f97aec5..0f22473 100644
 --- a/PDP10/kx10_imp.c
 +++ b/PDP10/kx10_imp.c
 @@ -26,6 +26,7 @@
@@ -668,7 +198,7 @@ index f97aec5..90341aa 100644
               check_interrupts(uptr);
               break;
          }
-@@ -955,6 +1070,108 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -955,6 +1070,129 @@ t_stat imp_devio(uint32 dev, uint64 *data)
               break;
          case TYPE_BBN:
          case TYPE_WAITS:
@@ -730,9 +260,10 @@ index f97aec5..90341aa 100644
 +                     cm[3]=M[070224]; cm[4]=M[070214];
 +                     if (cm[0]!=pm[0]||cm[1]!=pm[1]||cm[2]!=pm[2]||cm[3]!=pm[3]||cm[4]!=pm[4]) {
 +                         sim_debug(DEBUG_CONI, dptr,
-+                            "    [GATE] imprdy=%012llo neton=%012llo nettch=%012llo impdrq=%012llo imprdl=%012llo\n",
++                            "    [GATE] imprdy=%012llo neton=%012llo nettch=%012llo impdrq=%012llo imprdl=%012llo impord=%012llo impob=%012llo nopcnt=%012llo\n",
 +                            (unsigned long long)cm[0],(unsigned long long)cm[1],(unsigned long long)cm[2],
-+                            (unsigned long long)cm[3],(unsigned long long)cm[4]);
++                            (unsigned long long)cm[3],(unsigned long long)cm[4],
++                            (unsigned long long)M[070213],(unsigned long long)M[070330],(unsigned long long)M[070361]);
 +                         pm[0]=cm[0];pm[1]=cm[1];pm[2]=cm[2];pm[3]=cm[3];pm[4]=cm[4];
 +                     }
 +                 }
@@ -772,12 +303,32 @@ index f97aec5..90341aa 100644
 +                         }
 +                     }
 +                 }
++                 {  /* OUTPUT-engine probe: is the host->IMP send path enabled and idle?
++                       impord(70213)=master output-enable (SETOM in IMPRSS up, SETZM in
++                       down); impdrq(70224)=reset-cycle-requested; impob(70330)=output-in-
++                       progress flag (IMPXOU won't start a new msg if set); nopcnt(70361)=
++                       host-ready NOPs pending; impobo(70324)/imphbo(70326)=lo/hi-pri output
++                       queue heads.  If impord=0 every queued RST/RRP is stranded. */
++                     extern uint64 M[];
++                     static uint64 om[6] = {~0ULL,~0ULL,~0ULL,~0ULL,~0ULL,~0ULL};
++                     uint64 oc[6];
++                     int i;
++                     oc[0]=M[070213]; oc[1]=M[070224]; oc[2]=M[070330];
++                     oc[3]=M[070361]; oc[4]=M[070324]; oc[5]=M[070326];
++                     if (oc[0]!=om[0]||oc[1]!=om[1]||oc[2]!=om[2]||oc[3]!=om[3]||oc[4]!=om[4]||oc[5]!=om[5]) {
++                         sim_debug(DEBUG_CONI, dptr,
++                            "    [OUT] impord=%012llo impdrq=%012llo impob=%012llo nopcnt=%012llo impobo=%012llo imphbo=%012llo\n",
++                            (unsigned long long)oc[0],(unsigned long long)oc[1],(unsigned long long)oc[2],
++                            (unsigned long long)oc[3],(unsigned long long)oc[4],(unsigned long long)oc[5]);
++                         for (i=0;i<6;i++) om[i]=oc[i];
++                     }
++                 }
 +                 break;
 +             }
               *data = (uint64)(imp_data.pia & 0777);
               if (uptr->STATUS & IMPOD)
                   *data |= IMP_ODONE;
-@@ -982,6 +1199,12 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -982,6 +1220,12 @@ t_stat imp_devio(uint32 dev, uint64 *data)
          break;
      case DATAI:
          *data = imp_data.ibuf;
@@ -790,7 +341,7 @@ index f97aec5..90341aa 100644
              uptr->STATUS &= ~(IMPID|IMPLW);
          sim_debug(DEBUG_DATAIO, dptr, "IMP %03o DATI %012llo %08x PC=%o\n",
                   dev, *data, (uint32)(*data >> 4), PC);
-@@ -1213,8 +1436,12 @@ t_stat imp_srv(UNIT * uptr)
+@@ -1213,8 +1457,12 @@ t_stat imp_srv(UNIT * uptr)
          check_interrupts (uptr);
      }
  #endif
@@ -804,7 +355,7 @@ index f97aec5..90341aa 100644
      return SCPE_OK;
  }
  
-@@ -1296,6 +1523,28 @@ t_stat imp_eth_srv(UNIT * uptr)
+@@ -1296,6 +1544,28 @@ t_stat imp_eth_srv(UNIT * uptr)
  {
      sim_clock_coschedule(uptr, 1000);              /* continue poll */
  
@@ -833,7 +384,7 @@ index f97aec5..90341aa 100644
      imp_timer_task(&imp_data);
      if (uptr->ILEN == 0 && (uptr->STATUS & (IMPIB|IMPID)) == 0)
          imp_packet_in(&imp_data);
-@@ -1608,6 +1857,133 @@ imp_packet_in(struct imp_device *imp)
+@@ -1608,6 +1878,133 @@ imp_packet_in(struct imp_device *imp)
     }
  }
  
@@ -967,7 +518,7 @@ index f97aec5..90341aa 100644
  void
  imp_send_packet (struct imp_device *imp, int len)
  {
-@@ -1619,6 +1995,12 @@ imp_send_packet (struct imp_device *imp, int len)
+@@ -1619,6 +2016,12 @@ imp_send_packet (struct imp_device *imp, int len)
      int        lk;
      int        mt;
  
@@ -980,7 +531,7 @@ index f97aec5..90341aa 100644
      lk = 0;
      n = len;
      switch (imp->sbuffer[0] & 0xF) {
-@@ -3103,6 +3485,9 @@ t_stat imp_reset (DEVICE *dptr)
+@@ -3103,6 +3506,9 @@ t_stat imp_reset (DEVICE *dptr)
          /* Clear ARP table. */
          memset(imp_data.arp_table, 0, sizeof(imp_data.arp_table));
          imp_data.dhcp_state = DHCP_STATE_OFF;
@@ -990,7 +541,7 @@ index f97aec5..90341aa 100644
      }
      /* Clear queues. */
      imp_data.sendq = NULL;
-@@ -3146,6 +3531,31 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
+@@ -3146,6 +3552,31 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
                     break;
      }
  #endif
@@ -1022,7 +573,7 @@ index f97aec5..90341aa 100644
      if (!(uptr->flags & UNIT_DHCP) && imp_data.ip == 0)
        return sim_messagef (SCPE_NOATT, "%s: An IP Address must be specified when DHCP is disabled\n",
                 imp_dev.name);
-@@ -3229,6 +3639,18 @@ t_stat imp_detach(UNIT* uptr)
+@@ -3229,6 +3660,18 @@ t_stat imp_detach(UNIT* uptr)
  {
  
      if (uptr->flags & UNIT_ATT) {

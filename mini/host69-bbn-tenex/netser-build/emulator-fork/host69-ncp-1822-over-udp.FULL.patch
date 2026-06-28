@@ -28941,7 +28941,7 @@ index 29874c4..06ac1e2 100644
  /* Unit service
  
 diff --git a/PDP10/kx10_imp.c b/PDP10/kx10_imp.c
-index f97aec5..90341aa 100644
+index f97aec5..0f22473 100644
 --- a/PDP10/kx10_imp.c
 +++ b/PDP10/kx10_imp.c
 @@ -26,6 +26,7 @@
@@ -29140,7 +29140,7 @@ index f97aec5..90341aa 100644
               check_interrupts(uptr);
               break;
          }
-@@ -955,6 +1070,108 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -955,6 +1070,129 @@ t_stat imp_devio(uint32 dev, uint64 *data)
               break;
          case TYPE_BBN:
          case TYPE_WAITS:
@@ -29202,9 +29202,10 @@ index f97aec5..90341aa 100644
 +                     cm[3]=M[070224]; cm[4]=M[070214];
 +                     if (cm[0]!=pm[0]||cm[1]!=pm[1]||cm[2]!=pm[2]||cm[3]!=pm[3]||cm[4]!=pm[4]) {
 +                         sim_debug(DEBUG_CONI, dptr,
-+                            "    [GATE] imprdy=%012llo neton=%012llo nettch=%012llo impdrq=%012llo imprdl=%012llo\n",
++                            "    [GATE] imprdy=%012llo neton=%012llo nettch=%012llo impdrq=%012llo imprdl=%012llo impord=%012llo impob=%012llo nopcnt=%012llo\n",
 +                            (unsigned long long)cm[0],(unsigned long long)cm[1],(unsigned long long)cm[2],
-+                            (unsigned long long)cm[3],(unsigned long long)cm[4]);
++                            (unsigned long long)cm[3],(unsigned long long)cm[4],
++                            (unsigned long long)M[070213],(unsigned long long)M[070330],(unsigned long long)M[070361]);
 +                         pm[0]=cm[0];pm[1]=cm[1];pm[2]=cm[2];pm[3]=cm[3];pm[4]=cm[4];
 +                     }
 +                 }
@@ -29244,12 +29245,32 @@ index f97aec5..90341aa 100644
 +                         }
 +                     }
 +                 }
++                 {  /* OUTPUT-engine probe: is the host->IMP send path enabled and idle?
++                       impord(70213)=master output-enable (SETOM in IMPRSS up, SETZM in
++                       down); impdrq(70224)=reset-cycle-requested; impob(70330)=output-in-
++                       progress flag (IMPXOU won't start a new msg if set); nopcnt(70361)=
++                       host-ready NOPs pending; impobo(70324)/imphbo(70326)=lo/hi-pri output
++                       queue heads.  If impord=0 every queued RST/RRP is stranded. */
++                     extern uint64 M[];
++                     static uint64 om[6] = {~0ULL,~0ULL,~0ULL,~0ULL,~0ULL,~0ULL};
++                     uint64 oc[6];
++                     int i;
++                     oc[0]=M[070213]; oc[1]=M[070224]; oc[2]=M[070330];
++                     oc[3]=M[070361]; oc[4]=M[070324]; oc[5]=M[070326];
++                     if (oc[0]!=om[0]||oc[1]!=om[1]||oc[2]!=om[2]||oc[3]!=om[3]||oc[4]!=om[4]||oc[5]!=om[5]) {
++                         sim_debug(DEBUG_CONI, dptr,
++                            "    [OUT] impord=%012llo impdrq=%012llo impob=%012llo nopcnt=%012llo impobo=%012llo imphbo=%012llo\n",
++                            (unsigned long long)oc[0],(unsigned long long)oc[1],(unsigned long long)oc[2],
++                            (unsigned long long)oc[3],(unsigned long long)oc[4],(unsigned long long)oc[5]);
++                         for (i=0;i<6;i++) om[i]=oc[i];
++                     }
++                 }
 +                 break;
 +             }
               *data = (uint64)(imp_data.pia & 0777);
               if (uptr->STATUS & IMPOD)
                   *data |= IMP_ODONE;
-@@ -982,7 +1199,13 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -982,7 +1220,13 @@ t_stat imp_devio(uint32 dev, uint64 *data)
          break;
      case DATAI:
          *data = imp_data.ibuf;
@@ -29264,7 +29285,7 @@ index f97aec5..90341aa 100644
          sim_debug(DEBUG_DATAIO, dptr, "IMP %03o DATI %012llo %08x PC=%o\n",
                   dev, *data, (uint32)(*data >> 4), PC);
          if (uptr->ILEN != 0)
-@@ -1213,8 +1436,12 @@ t_stat imp_srv(UNIT * uptr)
+@@ -1213,8 +1457,12 @@ t_stat imp_srv(UNIT * uptr)
          check_interrupts (uptr);
      }
  #endif
@@ -29279,7 +29300,7 @@ index f97aec5..90341aa 100644
      return SCPE_OK;
  }
  
-@@ -1296,6 +1523,28 @@ t_stat imp_eth_srv(UNIT * uptr)
+@@ -1296,6 +1544,28 @@ t_stat imp_eth_srv(UNIT * uptr)
  {
      sim_clock_coschedule(uptr, 1000);              /* continue poll */
  
@@ -29308,7 +29329,7 @@ index f97aec5..90341aa 100644
      imp_timer_task(&imp_data);
      if (uptr->ILEN == 0 && (uptr->STATUS & (IMPIB|IMPID)) == 0)
          imp_packet_in(&imp_data);
-@@ -1608,6 +1857,133 @@ imp_packet_in(struct imp_device *imp)
+@@ -1608,6 +1878,133 @@ imp_packet_in(struct imp_device *imp)
     }
  }
  
@@ -29442,7 +29463,7 @@ index f97aec5..90341aa 100644
  void
  imp_send_packet (struct imp_device *imp, int len)
  {
-@@ -1619,6 +1995,12 @@ imp_send_packet (struct imp_device *imp, int len)
+@@ -1619,6 +2016,12 @@ imp_send_packet (struct imp_device *imp, int len)
      int        lk;
      int        mt;
  
@@ -29455,7 +29476,7 @@ index f97aec5..90341aa 100644
      lk = 0;
      n = len;
      switch (imp->sbuffer[0] & 0xF) {
-@@ -3103,6 +3485,9 @@ t_stat imp_reset (DEVICE *dptr)
+@@ -3103,6 +3506,9 @@ t_stat imp_reset (DEVICE *dptr)
          /* Clear ARP table. */
          memset(imp_data.arp_table, 0, sizeof(imp_data.arp_table));
          imp_data.dhcp_state = DHCP_STATE_OFF;
@@ -29465,7 +29486,7 @@ index f97aec5..90341aa 100644
      }
      /* Clear queues. */
      imp_data.sendq = NULL;
-@@ -3146,6 +3531,31 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
+@@ -3146,6 +3552,31 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
                     break;
      }
  #endif
@@ -29497,7 +29518,7 @@ index f97aec5..90341aa 100644
      if (!(uptr->flags & UNIT_DHCP) && imp_data.ip == 0)
        return sim_messagef (SCPE_NOATT, "%s: An IP Address must be specified when DHCP is disabled\n",
                 imp_dev.name);
-@@ -3229,6 +3639,18 @@ t_stat imp_detach(UNIT* uptr)
+@@ -3229,6 +3660,18 @@ t_stat imp_detach(UNIT* uptr)
  {
  
      if (uptr->flags & UNIT_ATT) {

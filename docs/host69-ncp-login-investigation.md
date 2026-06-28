@@ -428,6 +428,60 @@ RRP — or sends RST again and destroys the connection first — the lab's `when
 (`app_open_fail`) and the RTS is never delivered. Either way, **the missing message is the connection
 RTS, and the cause is unsettled host-host reset state.**
 
+### 10.6 ROOT CAUSE (2026-06-28, session 2) — host69 cannot TRANSMIT post-FORCEDOWN; output engine wedged (`IMPOB` stuck)
+
+The §10.4/§10.5 "RST/RRP convergence" framing was a **symptom, not the cause.** Re-ran one clean
+`@L 69` from ncp31 with the lab `ncpdov` stderr tapped (`strace -f -e write` on the ncp31 daemon
+PID, since the controller reads then discards ncpdov output) and the host69 `[NCP]`/`[GATE]` probes.
+Findings:
+
+1. **Lab side (definitive, reproduced twice):** ncp31 → `send to 105, type 12/RST` → gets the RFNM
+   → **`Timed out waiting for RRP`** (RRP_TIMEOUT=20) → `error 255` → `Open refused`. The lab
+   received **nothing** back from host69 — no RRP, and no RST either.
+2. **host69 side:** the lab's RST **is** received and dispatched (`[NCP] dispatch=1 IM8: rst=1 rrp=1`,
+   `ctlconn=1`). The source path is correct: `IM8RST`→`CALL RECRST`(netwrk.mac:2297)→`NETHDN`→
+   `JRST IMPRRP` — and the `RET` from `IMPRRP` is the only way execution reaches the `IM8RRP`/`HSTHSH`
+   fall-through, so **`IMPRRP` (build+queue the answering RRP) definitely runs.** The RRP is built.
+3. **But host69 transmits NOTHING.** Across the entire trace (boot **and** `@L`): `OD=1`
+   (output-done) fires **0** times, `out=` is frozen, **no** output CONO is ever issued (`OON`=0,
+   `EOB`=0, `STO`=0), and **0** `DATAO` output-buffer writes. host69 only ever issued two
+   **input-side** CONOs (`206415` = input PI + 1B19 host-ready; `014010` = input GEB). The host→IMP
+   1822 output channel never runs — not the 48 boot RSTs, not the RRP.
+4. **Why:** the TENEX **software** output-in-progress flag `IMPOB` (mem `070330`, *"buffer now being
+   emptied by pi routine"*) is **stuck non-zero live** (`impob=777777000000`), while `IMPORD`
+   (`070213`, master output-enable) = `-1` (output **is** allowed) and `IMPDRQ` (`070224`) = 0.
+   `IMPXOU` ("start msg going out", impdv.mac ~5594) does `SKIPN IMPOB` → with `IMPOB`≠0 it believes
+   "output already in progress" and **never starts a new send.** So every queued RST/RRP is stranded
+   behind a flag that says busy-forever. The monitor only clears `IMPOB` when its output engine
+   drains the queue, which is driven by **output-done interrupts that never arrive.**
+5. **The trigger is the FORCEDOWN recycle.** At the **snapshot** (pre-FORCEDOWN) `impob=070330`=**0**
+   (idle) and `nopcnt`=2 — output had worked. **Live, post-FORCEDOWN**, `impob`=`777777000000`
+   (stuck) and `nopcnt`=2: `IMPRSS` re-armed `NOPCNT=3`, the engine shipped **one** host-ready NOP
+   (3→2), then wedged with `IMPOB` set because no output-done came back to advance/clear it. This is
+   the **output-side analog of the §10.3 input re-arm bug** — an emulator 1822-fidelity gap in the
+   host→IMP output-done handshake during/after the FORCEDOWN down/up cycle.
+
+**Conclusion:** host69 can *hear* the lab but cannot *answer*. The lab's RTS is withheld only because
+host69 never sends the RRP, and host69 never sends the RRP (or anything) because its IMP **output
+channel is wedged** (`IMPOB` stuck) after the FORCEDOWN bring-up. The fix is in the **emulator output
+path** (`PDP10/kx10_imp.c`), not in NCP reset convergence and not on the lab side.
+
+**Diagnostic instrumentation added** (gitignored fork, uncommitted): `[GATE]` probe extended with
+`impord/impob/nopcnt`; new `[OUT]` probe block (impord/impdrq/impob/nopcnt/impobo/imphbo). Tap method
+for the lab view: `sudo strace -f -tt -e trace=write -s2048 -p <ncp31-ncpdov-pid>` (PID = the
+`./ncpdov localhost 20311 20312` process; 20311/20312 = CCA-TENEX = host 31). `kill -TERM` the ki to
+flush SIMH's block-buffered debug.
+
+**Next step (proposed):** trace the FORCEDOWN→IMPRSS→first-NOP output with `set imp debug=IRQ;CONO;
+DETAIL` enabled *before* the FORCEDOWN cycle to find exactly where the output-done handshake stalls
+(the manual-launch port-cleanup is fragile — drive it through `launch-trace.sh`'s machinery with a
+debug-early `.do`, or add a one-shot wait for ports 16945/2323/21052 to clear). Then fix the
+emulator so the TENEX NCP output path raises output-done (`IMPOD` + interrupt) after `imp_send_packet`
+so `IMODN` advances and clears `IMPOB`. Candidate sites: the `CONO IMPEOB` handler at kx10_imp.c:992
+(currently *clears* `IMPOD` after the send, never sets it) vs the generic service routine
+(kx10_imp.c:1438 — which *does* `STATUS |= IMPOD; check_interrupts`). Validate by re-firing one
+`@L 69` and confirming the lab logs `received RRP from 105` then `Send ICP RTS`.
+
 ---
 
 ## NEXT SESSION — START HERE (handoff)
@@ -437,16 +491,23 @@ Continue from branch `host69-tenex-ncp-imp`. **Rebuild the emulator first**
 fix `e7c64e7` + diagnostic counters) — the gitignored binary carries the fix + the NCP probe.
 
 **Status of the stack (do NOT re-litigate without new evidence):**
-- IMP/1822 delivery — **solved** (§10.3, emulator fix `e7c64e7`).
+- IMP/1822 **input** delivery — **solved** (§10.3, emulator fix `e7c64e7`).
 - NCP input re-arm — **solved** (§10.3).
 - IMPFLS bring-up flush — **understood + bypassed** (`deposit 70360 0` after the FORCEDOWN cycle; §10.4).
 - NETLIT — **exonerated**, listening correctly (LSNG); do **not** touch or rebuild it.
 - RECSTR / socket listener — downstream, **not reached yet**; do not debug it yet.
-- **CURRENT WALL: host-host `RST`/`RRP` reset convergence** (§10.4 host69-side, §10.5 lab-side).
+- Lab-side RST/RRP and "host-host convergence" (§10.4/§10.5) — **symptom, not cause** (see §10.6).
+  Do NOT keep chasing the lab side or `HSTSTS`.
+- **CURRENT WALL (§10.6): host69's IMP OUTPUT channel is wedged after FORCEDOWN.** The TENEX software
+  flag `IMPOB` (`070330`) is stuck non-zero, so `IMPXOU` never starts a send → host69 transmits
+  nothing (no RRP, no RST) → lab times out waiting for RRP → `@L 69` refused. `IMPORD`=-1 (output
+  enabled), `IMPDRQ`=0. Root cause is an **emulator output-done handshake gap** in
+  `PDP10/kx10_imp.c`, the output-side analog of the §10.3 input fix.
 
-**Goal (brutally narrow):** explain why host69 exchanges `RST`/`RRP` but never reaches the state
-where the lab delivers the connection `RTS`. The missing message is the `RTS`; the reason is
-host-host reset state — find the `HSTSTS` transition that fails.
+**Goal (brutally narrow):** make host69 actually TRANSMIT. Fix the emulator so the TENEX NCP output
+path raises output-done (`IMPOD`+interrupt) after `imp_send_packet`, so `IMODN` drains the queue and
+clears `IMPOB`. Then the queued RRP (and the 48 RSTs) go out, the lab logs `received RRP from 105`
+→ `Send ICP RTS`, and the ICP proceeds to `RECSTR`/socket-match/NETLIT. Verify with one `@L 69`.
 
 **Constraints:** one source only = **`ncp31 → host69`**. Do NOT use ncp1/ncp2/ncp35, repeated `@L`
 attempts, NETLIT rebuilds, or `set imp debug` beyond the proven instrumentation.
