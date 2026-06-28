@@ -95,7 +95,8 @@ if grep -q "PROGRAM BREAK" "$CLOG"; then
   pkill -9 -f console-daemon 2>/dev/null; pkill -9 -f "$HELP/drain.py" 2>/dev/null
   ( cd "$LB" && "$TENDMP" -x scratch.dta >/dev/null 2>&1
     cp -f xcr.rel netlit.rel; cp -f netlit.rel dta/netlit.rel
-    "$TENDMP" -T -L TENEX -b "$DTBOOT" -c login.dta netlit.rel subsys/loader.sav subsys/pa1050.sav >/dev/null 2>&1 )
+    EXTRA=""; [ -f dluser.sav ] && EXTRA="$EXTRA dluser.sav"; [ -f demusr.txt ] && EXTRA="$EXTRA demusr.txt"
+    "$TENDMP" -T -L TENEX -b "$DTBOOT" -c login.dta netlit.rel subsys/loader.sav subsys/pa1050.sav $EXTRA >/dev/null 2>&1 )
   echo "[B] RUN TAPE login.dta:"; "$TENDMP" -t "$LB/login.dta" 2>&1 | head -5
   echo "[B] DONE.  Now run the test:  bash $H/netser-build/launch-1c-test.sh"
 else

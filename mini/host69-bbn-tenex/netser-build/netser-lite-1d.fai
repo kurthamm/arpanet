@@ -173,30 +173,20 @@ DOICP:	HRROI A,MRF		; RFC RECEIVED
 	ATPTY
 	 JRST FAILP
 	MOVEM 1,PTY		; tty designator returned
-; DIAGNOSTIC: write a marker to the PTY/TTY -- if the client displays it, the
-; NVT->client output path works (so any missing @ is the EXEC, not the path).
-	MOVE A,PTY
-	HRROI B,PMSG
-	SETZ C,
-	SOUT
-	 JFCL
-	MOVE A,PTY
-	HRROI B,CRLF
-	SETZ C,
-	SOUT
-	 JFCL
-; kick the line so the login job starts (NETSER DOLGC: MOVEI 2,3 / STI)
+; kick the line so the login job starts (NETSER DOLGC: MOVEI 2,3 / STI).
+; The monitor now owns the NVT; the EXEC's herald + @ flow to the client.
 	MOVE 1,PTY
 	MOVEI 2,3
 	STI
 	 JFCL
-	HRROI A,MRL		; LOGIN STARTED
+	HRROI A,MRL		; (console only) LOGIN STARTED ON NVT
 	PSOUT
 	HRROI A,CRLF
 	PSOUT
-; the monitor now owns the NVT + login job.  One-shot: halt cleanly (the login
-; job is a separate job and survives this fork halting).
-	HALTF
+; PERSISTENT: the login job is a separate job and runs independently; loop back
+; and re-listen on socket 1 for the next visitor.
+	MOVEI A,3000
+	DISMS
 	JRST START
 
 FAILP:	MOVEM 1,ATPERR		; ATPTY left the ATPXn error code in AC1
@@ -235,9 +225,14 @@ GJERR:	HRROI A,EGJ
 	PSOUT
 	HALTF
 	JRST START
+; OPENF (listen) failed -- usually socket 1 still settling right after a handoff.
+; Persistent server: wait and retry the listen rather than dying.
 OPERR:	HRROI A,EOP
 	PSOUT
-	HALTF
+	HRROI A,CRLF
+	PSOUT
+	MOVEI A,5000
+	DISMS
 	JRST START
 
 FNAME:	ASCIZ /NET:1#./
