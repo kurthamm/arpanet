@@ -1,5 +1,39 @@
 # NETSER-lite (NETLIT) — Status & Handoff
 
+## ★★★★★ MILESTONE 1d — REAL CREDENTIALED LOGIN + GOLDEN-SNAPSHOT SERVICE (2026-06-29, session 5)
+
+**`@L 69` reaches a real BBN-TENEX `@` EXEC and a non-privileged DEMO account logs in.** Authentic
+1972 experience PROVEN end-to-end:
+```
+ SUMEX-AIM Tenex 1.31.82, SUMEX-AIM EXEC 1.51
+@LOGIN DEMO  1
+ JOB 1 ON TTY131 22-JUN-72 12:08
+@SYSTAT   ->  1 131 DEMO EXEC      @LOGOUT
+```
+**The key: NETSER is NOT needed.** The login core is one JSYS our monitor already has — **`ATPTY`
+(274)**: it hands the NCP data connection to TENEX's own dial-up login path (`ASNNVT` → carrier →
+`TTC7SJ` START JOB → EXEC), gated by `ENTFLG=-1`. `netser-lite-1d.fai` = 1c's DOICP socket-swap +
+`ATPTY` + `STI`. Persistent (re-listens after each session). Commits `6833ee8`/`77cd55d`/`dc49ece`.
+Full writeup: `docs/host69-ncp-login-investigation.md` §10.10.
+
+**DEMO account** (non-priv, `#3=700000`, password `DEMO`): `demusr.txt` + DLUSER at bring-up. LOGIN
+over the net: `LOGIN DEMO DEMO 1` (account = any number <2^33). DLUSER `CAN'T CREATE...CONTINUING` is
+cosmetic — the dir+password ARE created.
+
+**Golden-snapshot service (production model, §10.11, commit `1c014bf`):** `snap/host69-login.state`
+bakes DEMO + NETLIT-1d LISTENING; the service just `restore -F`s it (no DLUSER/LOADER/console-FIFO).
+- Rebuild snapshot: `build-snap-launch.sh` (ki FOREGROUND in tmux `h69r:0` — stdout MUST be the
+  pane/tty or SIMH is non-interactive & the WRU break fails) → drive DLUSER/NETLIT → LISTENING →
+  break `sim>` (`set console wru=034` AFTER `restore`; `tmux send-keys h69r:0 'C-\'`) → `save`.
+- Service: `mini/host69ctl.sh` (daemon/setup) + `mini/arpanet-host69.service` (Type=exec,
+  After/Requires arpanet-noc, RestartSec=90, StartLimitBurst=3). Installed, NOT enabled.
+- **PENDING: cold-start validation** — blocked by the lab mesh not re-converging after churn
+  (recover runs clean but inter-IMP routing islands). Next-session checklist in the investigation
+  journal §"NEXT SESSION (session 6)". **Risk to check:** does restore's FORCEDOWN/NETDWN drop
+  NETLIT's socket-1 listen? Verify NETLIT still LISTENS after a golden cold start.
+
+---
+
 ## ★★★★ MILESTONE 1c PROVEN END-TO-END (2026-06-28, session 5) — the CLIENT displays the herald
 
 `NCP=ncp31 ./ncp-telnet -o 69` printed **`BBN-TENEX NETLIT TEST`** in the client, while host69's

@@ -59,7 +59,7 @@ bug that stopped ITS from answering network logins). The work spans two lines: t
 | **#1 UCLA** | **Sigma 7 / CP-V** (SIMH sigma) | **no dir** ("planned") | no | **built new** |
 | **#6 MIT** | **Multics** (DPS8M MR12.8) | **no dir** ("hope"; upstream #6 was ITS) | no | **built new** |
 | **#65 UCLA** | **OS/360 MVT** (Hercules) + `ccn_frontdoor.py` | **no dir** | no | **built new** |
-| **#69 BBN** | **BBN-TENEX** (SIMH PDP-10 KI) | **no dir** (not even planned) | no | **building** — host-ready solved; login blocked at NCP RFC dispatch (`docs/host69-ncp-login-investigation.md`) |
+| **#69 BBN** | **BBN-TENEX** (SIMH PDP-10 KI) | **no dir** (not even planned) | no | **LOGIN PROVEN** — `@L 69` → real BBN-TENEX `@` EXEC, credentialed DEMO login (NETLIT-1d via `ATPTY`; NETSER not needed). Golden-snapshot service built; cold-start validation pending a healthy mesh. (`docs/host69-ncp-login-investigation.md` §10.10/§10.11) |
 
 ### Network seam — how each host actually reaches visitors (the honesty that matters)
 Running a real OS is *not* the same as being an authentic ARPANET host. By integration method:

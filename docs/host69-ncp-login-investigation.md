@@ -49,13 +49,14 @@ ncpXX (lab) --RFC--> imp31 --ARPANET routing--> imp05 hi2 --UDP--> host69 imp de
 | Layer | State |
 |---|---|
 | host69 boots / SAVE-RESTORE | ✅ comes up `NETWORK ON, IMP ON`, `pia=050` |
-| host69 ↔ imp05 UDP link | ✅ both ends ESTAB (21052↔21051) |
-| 1822 **host-ready** handshake | ✅ SOLVED (see §3) |
-| Lab routing / reachability to host 69 | ✅ `ncp31 → 69` reaches imp05 and host is "up" |
-| NETLIT login listener on socket 1 | ✅ runs, `OPENF OK LISTENING`, faithful to NETSER (see §6) |
-| `@L 69` RFC reaches host69 | ✅ proven by trace (see §7) |
-| NCP delivers RFC to the listen socket | ❌ **FRONTIER** — RFC held/undispatched (see §8) |
-| 25 stale RFNM "stuck output" conns / metronome | ⚠️ present; correlated, causal role unproven |
+| host69 ↔ imp05 UDP link + 1822 host-ready | ✅ SOLVED (§3) |
+| `@L 69` RFC reaches host69 + NCP dispatches to socket 1 | ✅ SOLVED (§10.3/10.7) |
+| NETLIT-1c full ICP socket-swap + herald to client | ✅ PROVEN END-TO-END (§10.9) |
+| **`@L 69` → real TENEX `@` EXEC + credentialed DEMO login** | ✅ **PROVEN** via `ATPTY` (§10.10); NETSER not needed |
+| NETLIT-1d persistent (re-listens after each session) | ✅ proven (§10.10) |
+| Golden snapshot (`host69-login.state`) + systemd service | ✅ built (§10.11) |
+| Cold-start service validation against a healthy mesh | ⏳ **pending** — blocked by lab mesh not re-converging (§10.11) |
+| Lab mesh fragility (host69 bounce islands routing) | ⚠️ open follow-up, after validation |
 
 ---
 
@@ -577,51 +578,94 @@ LISTENING` → `ncp-ping -c1 69` `Reply` → `ncp-telnet -o 69` shows `BBN-TENEX
 
 ---
 
-## NEXT SESSION — START HERE (handoff, session 5 end)
+### 10.10 ✅✅✅ REAL CREDENTIALED LOGIN (2026-06-28/29, session 5) — NETSER is NOT needed; ATPTY is the key
 
-Branch `host69-tenex-ncp-imp`. **The host69 server side is DONE and the visible demo is PROVEN
-END-TO-END** — `@L 69` (`NCP=ncp31 ./ncp-telnet -o 69`) displays `BBN-TENEX NETLIT TEST` in the
-client (§10.9). The session-4 lab-tool gap (duplicate ncp31 daemon / mesh routing) is fixed.
-**The only thing left for the authentic experience is real NETSER** (a true login server behind the
-herald, so `@L 69 → herald → @LOGIN`); NETSER assembly is FAIL/STALLM-blocked — see the
-`host69-netser-build-attempt` memory. If `@L 69` ever stops working, use the §10.9 recovery runbook.
+The authentic `@L 69 → BBN-TENEX → @LOGIN → session` is **PROVEN** — and it did **not** require
+rebuilding NETSER (the FAIL/STALLM wall, §ref `host69-netser-build-attempt`). Reading the real
+`netser.fai` (routine `DOLGC` @927) + our monitor showed the login core is **one JSYS we already
+have: `ATPTY` (JSYS 274)**, implemented in our running monitor (`build-tenex/mon/netwrk.mac:1073`,
+network-aware). It hands the NCP data connection to TENEX's normal dial-up login path:
+`ATPTY`(recv JFN in AC1, send JFN in AC2) → `ASNNVT` assigns a Network Virtual Terminal → carrier-on
+→ `ttysrv.mac` `TT7CX`/`TTCON` → `TTC7SJ` "START JOB" → monitor runs `<SYSTEM>EXEC.SAV` → `@` flows
+back over the net; gated by `ENTFLG<0` (we deposit `-1`). `ATPTY` even RELEASES the JFNs — the MONITOR
+pumps bytes, so the server needs NO byte-shuttle.
+
+**NETLIT-1d** (`netser-build/netser-lite-1d.fai`) = 1c's DOICP socket-swap + `ATPTY` + `STI`. All
+primitive JSYS; assembles with the on-box FAIL. Commits: `6833ee8` (ATPTY → live `@` EXEC reached),
+`77cd55d` (credentialed login), `dc49ece` (persistent + marker removed).
+
+Proven transcript over the ARPANET (`NCP=ncp31 ./ncp-telnet -o 69`, sending a CR):
+```
+ SUMEX-AIM Tenex 1.31.82, SUMEX-AIM EXEC 1.51
+@LOGIN DEMO  1
+ JOB 1 ON TTY131 22-JUN-72 12:08
+@SYSTAT     ->  1 131 DEMO EXEC   (DEMO is a real logged-in job)
+@LOGOUT
+```
+- **DEMO account** = non-privileged (`#3=700000`, no wheel/operator; `#6=5`; password `DEMO`),
+  created by DLUSER at bring-up (`netser-build/demusr.txt`; `launch-1d-login.sh` /
+  `build-snap-launch.sh`). DLUSER's `CAN'T CREATE ... CONTINUING` is the known-cosmetic message — the
+  dir+password ARE created. LOGIN over the net: `LOGIN DEMO DEMO 1` (account = any number <2^33).
+- **Persistent**: after the ATPTY handoff NETLIT loops back and re-listens on socket 1 (verified two
+  back-to-back logins on one run; brief `OPENF FAILED` window while socket 1 settles).
+- Client noise: `[NOECHO]` is the `ncp-telnet` client printing TENEX's old-NVT echo negotiation
+  (client-side; the web terminal won't show it).
+
+### 10.11 GOLDEN-SNAPSHOT SERVICE (2026-06-29, session 5) — built; cold-start validation blocked by mesh
+
+The console-driven systemd bring-up (DLUSER+LOADER+START over a telnet/FIFO with sleeps) is the wrong
+shape for production (Kurt: "a tiny séance every restart"). Chosen architecture = **golden snapshot**.
+- **Built `snap/host69-login.state`** (gitignored runtime artifact): host69 booted clean, DEMO created,
+  NETLIT-1d LISTENING, then SIMH-`SAVE`d. Rebuild via `netser-build/build-snap-launch.sh` (ki
+  FOREGROUND in tmux `h69r:0` — stdout MUST be the pane/tty or SIMH goes non-interactive and the WRU
+  break fails) + console-daemon in `h69r:1` + drive DLUSER/NETLIT → LISTENING, then break to `sim>`
+  (`set console wru=034` must be AFTER `restore`; `tmux send-keys -t h69r:0 'C-\'`) → `save`.
+- **Service rewired** (`mini/host69ctl.sh` + `mini/arpanet-host69.service`, `Type=exec`,
+  After/Requires `arpanet-noc`): `daemon` = foreground ki that `restore -F`s the snapshot, reattaches
+  IMP to imp05, FORCEDOWN re-asserts host-ready, `go`; `setup` = wait host-ready; passive drainers on
+  16945/16946/2323 (the 2323 one unblocks the FORCEDOWN steps + drains NETLIT's console). NO
+  DLUSER/LOADER/FIFO in startup. `RestartSec=90`, `StartLimitBurst=3`. Installed, NOT enabled. Commit
+  `1c014bf`. (Earlier WIP `e9f33ef` documents why oneshot/setsid/screen all get the ki reaped → Type=exec.)
+- **BLOCKED — cold-start validation**: needs a healthy mesh to run `ncp-telnet -o 69`, but after a
+  session of host69 restart churn the **lab mesh won't re-converge** — `arpanet-recover.sh recover`
+  completes clean (36 IMPs, ncp31 up) yet inter-IMP routing stays islanded (`ncp-ping` to other hosts
+  hangs / "IMP cannot be reached"). Deferred mesh-fragility item, now the gate on validation.
+- **UNVALIDATED RISK**: the restore's FORCEDOWN does NETDWN, which may tear down NETLIT's socket-1
+  listen. Must verify NETLIT still LISTENS after a golden cold start (couldn't — mesh down).
+
+---
+
+## NEXT SESSION — START HERE (handoff, session 6 — golden-snapshot validation)
+
+Branch `host69-tenex-ncp-imp`. **The architecture is DONE and committed** (latest `1c014bf`): real
+`@L 69` credentialed DEMO login is PROVEN (§10.10), NETLIT-1d is persistent, the golden snapshot
+exists, and the service restores it instead of console-driving. **The ONLY remaining task is
+cold-start VALIDATION against a healthy mesh** — a validation problem, not architecture.
 
 **Status of the stack:**
-- IMP/1822 input + re-arm — solved (§10.3, fix `e7c64e7`).
-- IMP/1822 output — solved (§10.7, fix `37744c0`: raise `IMPOD` after EOB ship).
-- RST/RRP host-host handshake — converges (§10.7).
-- `@L 69` reaches the login socket; LSNG→RFCR (§10.7), client must use `ncp-telnet -o` (socket 1).
-- **NETLIT-1c full ICP socket-swap + herald — PROVEN END-TO-END (§10.9). Client displays `BBN-TENEX NETLIT TEST`.**
-- noc ncp31 double-spawn — fixed (§10.9, commit `170f30a`); mesh recovery = `arpanet-recover.sh recover` (§10.9 runbook).
+- IMP/1822 input+output, RST/RRP — solved (§10.3/10.6/10.7).
+- `@L 69` → real TENEX `@` EXEC + credentialed DEMO login — PROVEN (§10.10).
+- noc ncp31 double-spawn — fixed (`170f30a`).
+- Golden snapshot + service — built (§10.11), validation pending.
 
-**★ HOW TO RUN host69 (critical — read first): run the emulator INSIDE the persistent `h69r` tmux
-session, NOT from a Claude command** (a Claude-spawned `pdp10-ki` is reaped by the sandbox at ~5s with
-`SIGTERM PC 102737`; tmux escapes it). Pattern:
-```
-tmux send-keys -t h69r "bash /home/deltaprism/arpanet/mini/host69-bbn-tenex/netser-build/build-1c.sh >/tmp/netlit-build.out 2>&1 &" Enter
-```
-then poll `/tmp/netlit-build.out` + `logs/cty.log` from Claude. Firing `ncp-telnet`, pgrep, strace
-from Claude is fine — only the long-lived ki must live in tmux.
+**Start from a CLEAN BASELINE (do NOT recover-thrash a churned lab):**
+1. Reboot / cleanly restart the lab host if needed.
+2. Start the NOC/IMP mesh (`arpanet-noc`).
+3. Confirm inter-IMP routing: `NCP=ncp31 ./ncp-ping -c1 <6|11|16>` REPLIES. Don't proceed until healthy.
+4. `sudo systemctl start arpanet-host69`.
+5. `NCP=ncp31 ./ncp-ping -c1 69` replies.
+6. `cd mini; NCP=ncp31 ./ncp-telnet -o 69`.
+7. Prove DEMO login from the SERVICE-restored snapshot: `LOGIN DEMO DEMO 1` → `@` → `SYSTAT`.
+8. Confirm NETLIT re-listens after `LOGOUT`.
+9. If all pass: `sudo systemctl enable arpanet-host69.service`.
 
-**Reproduce the milestone (all repo-local, no Claude paths):**
-1. Build: `bash netser-build/build-1c.sh` in `h69r` tmux → `PROGRAM BREAK` → rebuilds `login.dta`.
-   (The emulator binary `kit-cache/rcornwell-sims/BIN/pdp10-ki` must carry output fix `37744c0`.)
-2. Launch+load: `bash netser-build/launch-1c-test.sh` in `h69r` tmux → host-ready boot + auto-load
-   NETLIT → `LISTENING`.
-3. Fire ONCE from `mini/`: `NCP=ncp31 ./ncp-telnet -o 69`. host69 console walks RFC RECEIVED → … →
-   HERALD SENT → DONE. To SEE the herald on the wire: `sudo strace -f -e read -s200 -p <ncp31-ncpdov-pid>`
-   and look for `TENEX NETLIT TEST`.
+**THE RISK TO CHECK (step 6/7):** does the restore `.do`'s FORCEDOWN/NETDWN disturb NETLIT's socket-1
+listen? If host69 pings but `@L 69` gives "Open refused" / no herald, that's it. FIX (only after mesh
+healthy): reorder — restore → reattach IMP → re-assert host-ready WITHOUT NETDWN if possible, OR
+re-START NETLIT after FORCEDOWN. Then address mesh fragility (why host69 bounces island routing) as a
+separate follow-up.
 
-**The ONE remaining task (lab-tool, bounded):** make `mini/noc-server.py` spawn exactly ONE `ncpdov`
-per NCP — it currently double-spawns ncp31 (two on ports 20311/20312), which breaks the
-client→lab→host69 path and mis-routes the herald. Fix that (or manually leave a single ncp31 daemon
-owning `mini/ncp31` and re-fire immediately), then the already-working herald should display in
-`ncp-telnet`. Do NOT reset the whole IMP mesh; do NOT rebuild/restart host69 or NETLIT to chase this.
-
-**Authentic login beyond the demo:** a real `@L 69 → BBN-TENEX herald → @LOGIN` still needs real
-**NETSER** (blocked on the FAIL/STALLM assembler wall, `[[host69-netser-build-attempt]]`). NETLIT-1c
-proves the entire NCP/ICP server mechanics; NETSER is the production login server.
-
-**Key files:** server source `netser-build/netser-lite-1c.fai`; build `netser-build/build-1c.sh`;
-test `netser-build/launch-1c-test.sh`; runbook `netser-build/RUN-1C-OUTSIDE-CLAUDE.md`; full status
-`netser-build/NETLIT-STATUS.md` (milestone 1c). Lab tap: ncp31 daemon = `./ncpdov localhost 20311 20312`.
+**Authentic login is SOLVED — NETSER is NOT needed** (§10.10 supersedes the NETSER wall for the login
+goal). Key files: `netser-build/netser-lite-1d.fai`, `demusr.txt`, `build-snap-launch.sh`,
+`build-snap.do`; `mini/host69ctl.sh`, `mini/arpanet-host69.service`; full status
+`netser-build/NETLIT-STATUS.md`. Memory: `host69-real-login-gate`.
