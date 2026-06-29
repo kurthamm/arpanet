@@ -1,14 +1,14 @@
-cd mini
+cd "$(dirname "$0")/mini"
 ./arpanet stop
 cd ..
 
-screen -S web-client -X stuff $'\003'
-screen -S web-server -X stuff $'\003'
-screen -S waitsconnect -X stuff $'\003'
+screen -S web-client   -X quit 2>/dev/null || true
+screen -S web-server   -X quit 2>/dev/null || true
+screen -S web-http     -X quit 2>/dev/null || true
+screen -S waitsconnect -X quit 2>/dev/null || true
 
-echo "Stopped everything. To check, screen -ls should show no screen sessions:"
+echo "Stopped everything. Remaining screen sessions:"
 sleep 1
-echo "screen -ls"
 screen -ls
 echo
 echo "Done."

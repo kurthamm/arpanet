@@ -864,7 +864,7 @@ int main(int argc, char **argv) {
     signal(SIGTERM, cleanup);
 
     /* Initialize IMP connection (hardcoded) */
-    char *imp_argv[] = { "waitsconnect", "localhost", "20111", "20112" };
+    char *imp_argv[] = { "waitsconnect", "127.0.0.1", "20111", "20112" };
     imp_init(4, imp_argv);
     imp_host_ready(1);
 
