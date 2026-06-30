@@ -55,8 +55,11 @@ ncpXX (lab) --RFC--> imp31 --ARPANET routing--> imp05 hi2 --UDP--> host69 imp de
 | **`@L 69` → real TENEX `@` EXEC + credentialed DEMO login** | ✅ **PROVEN** via `ATPTY` (§10.10); NETSER not needed |
 | NETLIT-1d persistent (re-listens after each session) | ✅ proven (§10.10) |
 | Golden snapshot (`host69-login.state`) + systemd service | ✅ built (§10.11) |
-| Cold-start service validation against a healthy mesh | ⏳ **pending** — blocked by lab mesh not re-converging (§10.11) |
-| Lab mesh fragility (host69 bounce islands routing) | ⚠️ open follow-up, after validation |
+| Cold-start service validation against a healthy mesh | ✅ **MET** (§10.12) — clean restart → two full DEMO logins from the service-restored snapshot |
+| imp05 hi2 startup ordering (host69 must listen before imp05) | ⚠️ production follow-up (§10.12) |
+| NETLIT re-listen robustness (1e: 0 s re-listen, survives unlimited sessions) | ✅ FIXED — 5/5 live gate (§10.13) |
+| Promote 1e into the golden snapshot (service durably runs 1e) | ✅ DONE — service-restored 1e served 5/5 logins (§10.13b) |
+| Lab mesh fragility (host69 bounce islands routing) | ⚠️ open follow-up |
 
 ---
 
@@ -632,6 +635,143 @@ shape for production (Kurt: "a tiny séance every restart"). Chosen architecture
   hangs / "IMP cannot be reached"). Deferred mesh-fragility item, now the gate on validation.
 - **UNVALIDATED RISK**: the restore's FORCEDOWN does NETDWN, which may tear down NETLIT's socket-1
   listen. Must verify NETLIT still LISTENS after a golden cold start (couldn't — mesh down).
+
+### 10.13 ✅ NETLIT-1e re-listen hardening — 5-SESSION GATE PASSED (2026-06-29, session 6)
+
+**GATE PASSED.** On a stable mesh, 5 consecutive `@L 69` sessions (connect → `LOGIN DEMO DEMO 1` →
+`SYSTAT` → clean `LOGOUT`) all completed, **each re-listening in 0 s** with no `GTJFN FAILED`/`!` death
+— including session 2's logout, exactly where 1d died. Final state: clean `LISTENING`. NETLIT-1e even
+survived the `ncp-telnet` client's post-logout reconnects (the suspected 1d aggravator). Transcript:
+`netser-build/netlit-1e-5session-gate-2026-06-29.txt`. The `CLOSF`+`RLJFN` on the contact socket
+eliminated the ~2.5 min settle (→ 0 s, which is what enables many concurrent users); removing the JFN
+leak + `HALTF` eliminated the trapdoor.
+
+**Mesh stability (the blocker below) — RESOLVED as an operational procedure, root-caused:** today's
+instability was the **thrashed-mesh state from my repeated imp05 restarts + connection spam**, NOT an
+inherent fault. Recipe that yields stable host69 connectivity: (1) `sudo ./arpanet-recover.sh recover`
+(re-converges all IMPs incl. a fresh imp05); (2) **WAIT** for convergence — minutes, be patient — note
+host69 only needs imp05 reachable, which converges before the far mesh (11/16); (3) bring host69 up
+*after* imp05 is fresh/stable; (4) **do NOT restart imp05 to "nudge"** and do not spam pings/telnet —
+that is what islands it. Verified: after a clean recover, host69 reached + HELD reachability (both 1d
+and 1e), and ran the 5-session gate without a hiccup. (The imp05-ordering §10.12 item 1 is the durable
+fix; this is the manual procedure until then.)
+
+Below: the original BLOCKED writeup (kept for the root-cause detail).
+
+### 10.13a NETLIT-1e — BUILT + root-caused (the analysis; gate later passed, see §10.13)
+
+Narrow re-listen hardening pass (Kurt: don't redesign login / don't touch the snapshot until proven /
+don't revisit IMP-NCP routing). **Root cause of the 1d "~2 logins then GTJFN FAILED → `!`" trapdoor,
+confirmed against the authoritative real `netser.fai`:**
+- 1d's `OPERR` retry loop (the ~2.5 min `OPENF FAILED` settle) re-`GTJFN`'d socket 1 every iteration
+  **without releasing** the prior JFN → a JFN leak; after enough retries the JFN table exhausted, the
+  next `GTJFN` failed, and the error paths did **`HALTF`** → dropped to the `!` EXEC.
+- 1d also `CLOSF`'d the contact socket **without `RLJFN`** → the NCP connection lingered (this is the
+  ~2.5 min settle that also throttles concurrent onboarding).
+- Real `netser.fai` never `HALTF`s: `MKICPF`/`DOICP` clean up with `CLRJFN` (= `CLOSF` **then** `RLJFN`)
+  on every path (lines 538/576/584/586/914/920).
+
+**Fix = `netser-build/netser-lite-1e.fai`** (login/ICP/ATPTY path byte-for-byte unchanged from 1d):
+a `CLRJ` helper (`CLOSF`+`RLJFN`, no-op on JFN 0); every socket `CLRJ`'d on every exit/retry path;
+the listen JFN released before each retry (`OPERR`); **all `HALTF` removed** — `GJERR`/`FAILJ`/`FAILS`/
+`FAILR`/`FAILP` now log + clean up + `JRST START`. Assembles on-box (`PROGRAM BREAK 000515'`), loads,
+`START`s, reaches `LISTENING`, and stayed LISTENING with no death through the idle/test window.
+
+**Why this also serves "as many simultaneous users as possible" (Kurt's added requirement):** each
+ATPTY'd user is an independent monitor login job; the only serialization point is socket 1, so fast +
+reliable re-listen (no leak, no 2.5 min settle, no HALTF) is exactly what lets many users onboard.
+
+**BLOCKED — the 5-consecutive-session gate could not run.** host69 mesh connectivity was unstable:
+after a launch host69 replies to ~1 ping then goes "not up" (imp05 routes but won't hold host69's
+host-ready). The 1d **service** showed the same instability today (converged once after ~3 min, flaky).
+Restarting imp05 made it worse — **lesson: after a host69/imp05 change, WAIT for convergence (minutes);
+do NOT restart imp05 to "nudge" it.** This is the imp05-ordering / host-ready / mesh-fragility area Kurt
+fenced off from this pass. The hardening code is done and idle-verified; the network proof needs a stable
+connectivity window (→ the mesh-stability/imp05-ordering follow-up is a prerequisite, see §10.12 item 1).
+Build/test recipe: `build-1c.sh netser-lite-1e.fai` (assemble; it polls too early for `PROGRAM BREAK`,
+so extract manually: TERM ki → `tendmp -x scratch.dta` → `cp xcr.rel netlit.rel` → rebuild `login.dta`)
+then `launch-1d-login.sh` (manual `START` — the ESC-G/START choreography races).
+
+### 10.13b ✅ NETLIT-1e PROMOTED INTO THE GOLDEN SNAPSHOT — service durably runs 1e (2026-06-30)
+
+The hardened NETLIT-1e is now what the `arpanet-host69` service restores. Built the snapshot via
+`build-snap-launch.sh` (restore `host69-live.state` → host-ready → drive DLUSER+LOADER+START NETLIT-1e
+→ `LISTENING` → `C-\` break → `save`), promoted to `snap/host69-login.state` (1d preserved as
+`host69-login.state.1d-bak`, the 1e source kept as `host69-login-1e-v2.state`). **Validation: service
+cold-start → host69 reachable → 5/5 consecutive `@L 69` credentialed DEMO logins** (each a fresh listen;
+consecutive success proves re-listen). **Durable deployment complete.**
+
+**Two build lessons (cost a BUGHLT + a rebuild):**
+1. **Capture point matters.** The first 1e save broke (`C-\`) while TENEX was at a non-resumable PC
+   (101575); on service restore it pinned at PC 113760 and `BUGHLT AT 100561`. Fix: let the system
+   **idle at LISTENING ~20 s** so NETLIT is quiescent, then break (caught PC 101002) — restores clean.
+   If a snapshot BUGHLTs on restore, rebuild it; don't ship it. (Rollback to 1d via `host69-login.state.1d-bak`
+   was clean — the rp03 packs are shared and tolerate it.)
+2. **`All connections busy` on the restored console is BENIGN** — it's the monitor rejecting mesh
+   probe/ping connections (NCP table pressure baked into a snapshot built while host69 was live on the
+   mesh). It does **not** block ICP logins (5/5 passed). Cosmetic follow-up: rebuild the snapshot with a
+   cleaner NCP table (e.g. build with imp05 briefly detached after host-ready) to silence the cty.log noise.
+
+Also a process note: SIMH `build-snap-launch.sh` does **not** wait for ports to clear — if 2323 is in
+TIME_WAIT it `bind`-fails and the ki falls back to stdio and **segfaults**. Wait for
+2323/16945/16946/21052 to clear before launching it.
+
+### 10.12 ✅ COLD-START SERVICE VALIDATION — GATE MET (2026-06-29, session 6)
+
+With a healthy mesh (`ncp-ping` to 11/16 reply), ran the full validation against the
+golden-snapshot service. **`sudo systemctl restart arpanet-host69` → two complete, clean DEMO
+logins from the service-restored snapshot.** Transcript artifact:
+`netser-build/golden-service-validation-2026-06-29.txt`.
+```
+ SUMEX-AIM Tenex 1.31.82, SUMEX-AIM EXEC 1.51
+@LOGIN DEMO  1
+ JOB 1 ON TTY131 22-JUN-72 12:10
+@SYSTAT   ->  1 131 DEMO EXEC      (DEMO is a real logged-in job)
+@LOGOUT
+KILLED JOB 1, USER DEMO, ACCT 1, TTY 131, AT 6/22/72 1210
+```
+Results: NETLIT LISTENS from the restored snapshot; host69 `ncp-ping`-reachable after the clean
+restart (no imp05 nudge needed this run); full credentialed login + SYSTAT + clean LOGOUT; NETLIT
+**re-listened** after the first logout (~2.5 min settle) and a **second** `@L 69` logged in identically
+(two full sessions per restart, matching §10.10). The §10.11 FORCEDOWN/NETDWN "tears down the listen"
+risk is **DISPROVEN** — the listen survives restore.
+
+**BUT the re-listen is fragile across repeats:** after the *second* logout NETLIT got past `OPENF` but
+then hit **`GTJFN FAILED` and dropped to the `!` monitor EXEC** — i.e. NETLIT exited; a third `@L 69`
+would get "Open refused" until a restart. So persistence is currently **~2 sessions per restart**, not
+indefinite. (Possible aggravator, unconfirmed: after each logout the `ncp-telnet` client re-opened the
+contact socket ~3× — `TELNET to host 105.` ×3 in each transcript — which may collide with NETLIT's
+vulnerable re-listen window and induce the `GTJFN FAILED`. Worth isolating before blaming NETLIT.)
+
+**The MUST-USE client detail (cost me three restarts):** drive `ncp-telnet -o 69` with stdin from a
+held-open pipe (raw fd / FIFO), NOT through a **pty/pexpect** — under a pty the herald deterministically
+**stalls at ~28 bytes** (`...Tenex 1.31.82, SU`) and the session dies. Raw stdin delivers the full
+herald + interactive login. (The production web-terminal path is its own transport; this caveat is for
+automated CLI testing only.)
+
+**Three follow-ups surfaced (NOT login-architecture blockers — do NOT redesign the login/NETLIT/ATPTY/
+snapshot):**
+1. **imp05 hi2 startup ordering (production).** `imp05 hi2` must be (re)started/nudged *after* host69 is
+   listening; otherwise imp05 boots without the host69 peer and host69 reads "Host is not up". It did
+   NOT bite this run (imp05 was already healthy and stayed up across the host69 restart), but on a cold
+   box boot the order isn't guaranteed. Least-magical fix options (decide later, don't build yet):
+   (A) `host69ctl start` starts host69, then restarts/nudges only imp05 hi2, then verifies `ncp-ping 69`;
+   or (B) `arpanet-recover` knows host69 is a real hosted peer and starts it before restarting imp05.
+   **This gates `systemctl enable` (auto-start on boot).**
+2. **NETLIT re-listen fragility (the real robustness gap).** Two parts: (a) after a session the
+   monitor's NCP connection-cleanup holds socket 1, so NETLIT hot-loops `OPENF FAILED` ~2.5 min before
+   re-`OPENF`-ing → `LISTENING` (within that window `@L 69` gets "Open refused"); (b) the re-listen
+   eventually *fails* — after the 2nd logout it passed `OPENF` then `GTJFN FAILED` → dropped to `!` →
+   NETLIT exited (host69 then refuses until restart). `Restart=on-failure` does NOT catch this (the ki
+   is still alive; only NETLIT died). So host69 currently serves ~2 logins per restart. Fix later:
+   harden NETLIT's re-listen loop (keep socket 1 NETSER-style / retry GTJFN, don't HALTF on transient
+   failure) and first rule out the client-reconnect aggravator above. **This is the gap to close before
+   a public/high-traffic exhibit**, though for a one-visitor-at-a-time demo it's tolerable with
+   `RestartSec`-style recycling.
+3. **`host69ctl setup` host-ready race.** `setup` (ExecStartPost) can match a *stale* `HOST-READY DONE`
+   and report active ~110s early (systemd shows "active" while the ki is still in the FORCEDOWN cycle).
+   Cosmetic for steady state but it makes `systemctl restart` return before the service is truly ready;
+   fix = truncate/marker the runlog per-boot so `setup` only matches the current boot's line.
 
 ---
 

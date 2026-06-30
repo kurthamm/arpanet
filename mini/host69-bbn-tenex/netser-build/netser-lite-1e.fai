@@ -1,0 +1,309 @@
+	TITLE NETLIT
+; NETSER-lite 1e (HARDENED RE-LISTEN): identical login path to 1d (1c ICP socket-swap
+; + ATPTY handoff to TENEX's own login), but the re-listen loop is made robust so the
+; server survives unlimited connect/login/logout cycles and onboards users fast enough
+; to support many concurrent logins (each ATPTY'd user is an independent monitor job;
+; the only serialization point is socket 1, so socket 1 must free + re-listen quickly).
+;
+; WHY 1d died after ~2 sessions (and why it onboarded only ~1 user / 2.5 min):
+;   - the contact socket was CLOSF'd but never RLJFN'd  -> the NCP connection lingered
+;     in a closing state, so re-OPENF of socket 1 failed for ~2.5 min (the "OPENF FAILED"
+;     settle) AND the JFN was never freed;
+;   - the OPENF-retry loop (OPERR) re-GTJFN'd socket 1 every iteration without releasing
+;     the prior JFN  -> a JFN leak; after enough retries the JFN table exhausted;
+;   - then GTJFN itself failed and the error paths did HALTF -> dropped to the "!" EXEC.
+; FIX (matches real netser.fai, which uses CLRJFN = CLOSF then RLJFN on every path and
+; never HALTFs): a CLRJ helper closes AND releases a JFN; every socket is CLRJ'd on every
+; exit/retry path; the listen JFN is released before each retry; no HALTF anywhere.
+
+	OPDEF GTJFN [104B8+20]
+	OPDEF RLJFN [104B8+23]
+	OPDEF OPENF [104B8+21]
+	OPDEF CLOSF [104B8+22]
+	OPDEF PSOUT [104B8+76]
+	OPDEF NOUT  [104B8+224]
+	OPDEF SOUT  [104B8+53]
+	OPDEF MTOPR [104B8+77]
+	OPDEF GDSTS [104B8+145]
+	OPDEF BOUT  [104B8+51]
+	OPDEF CVSKT [104B8+275]
+	OPDEF DISMS [104B8+167]
+	OPDEF HALTF [104B8+170]
+	OPDEF ATPTY [104B8+274]
+	OPDEF STI   [104B8+114]
+
+	P__17
+	A__1
+	B__2
+	C__3
+	D__4
+	LCLSK0__100		; chosen local data socket (octal, even)
+
+START:	MOVE P,[IOWD PDLEN,PDLST]
+	HRROI A,MSG1
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+; ---- listen on socket 1 ----
+	MOVSI A,400001
+	HRROI B,FNAME
+	GTJFN
+	 JRST GJERR
+	MOVEM A,SOCKJ
+	MOVE B,[XWD 400000,100000]
+	OPENF
+	 JRST OPERR
+	MOVE A,SOCKJ
+	MOVEI B,24
+	MOVSI C,777723
+	MTOPR
+	 JFCL
+	HRROI A,MSG3
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+; ---- wait for RFC (foreign host appears in GDSTS) ----
+WATCH:	MOVE A,SOCKJ
+	GDSTS
+	MOVEM C,FHST
+	MOVEM D,FSKT
+	MOVE 5,FHST
+	CAIN 5,777
+	 JRST WSLP
+	JUMPN 5,DOICP
+WSLP:	MOVEI A,2000
+	DISMS
+	JRST WATCH
+
+; ================= ICP =================
+DOICP:	HRROI A,MRF		; RFC RECEIVED
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+; build NET:<LCLSK0>.<FHST>-<FSKT+2>;T  (octal numbers)
+	MOVEI 1,STRING
+	HRLI 1,(<POINT 7,0>)
+	HRROI 2,NETPFX
+	SETZ 3,
+	SOUT
+	MOVEI 2,LCLSK0
+	MOVEI 3,10		; octal radix
+	NOUT
+	 JFCL
+	MOVEI 2,"."
+	IDPB 2,1
+	MOVE 2,FHST
+	MOVEI 3,10
+	NOUT
+	 JFCL
+	MOVEI 2,"-"
+	IDPB 2,1
+	MOVE 2,FSKT
+	ADDI 2,2
+	MOVEI 3,10
+	NOUT
+	 JFCL
+	HRROI 2,SEMIT
+	SETZ 3,
+	SOUT
+; GTJFN the two data sockets
+	MOVSI 1,1
+	HRROI 2,STRING
+	GTJFN
+	 JRST FAILJ
+	MOVEM 1,SJFN
+	MOVSI 1,1
+	HRROI 2,STRING
+	GTJFN
+	 JRST FAILJ
+	MOVEM 1,RJFN
+	CVSKT
+	 JRST FAILJ
+	MOVEM 2,LCLSKT
+; accept the contact RFC (RFCR -> OPND)
+	MOVE A,SOCKJ
+	MOVEI B,20
+	MTOPR
+	 JFCL
+	HRROI A,MRA		; ACCEPTED
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+; let the allocate arrive, then send the data-socket number on the contact
+	MOVEI A,3000
+	DISMS
+	HRROI A,MRS		; SEND SOCKET#
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	MOVE 1,SOCKJ
+	MOVE 2,LCLSKT
+	BOUT
+	HRROI A,MRSD		; SOCKET# SENT
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+; close AND release the contact connection (full CLRJ -- bare CLOSF was the bug: it
+; left socket 1's NCP connection lingering for ~2.5 min and never freed the JFN).
+	MOVE 1,SOCKJ
+	PUSHJ P,CLRJ
+	SETZM SOCKJ
+; open the data connections (these block until the client connects)
+	HRROI A,MRO		; OPEN DATA
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	MOVE 1,SJFN
+	MOVE 2,[XWD 103000,100000]
+	OPENF
+	 JRST FAILS
+	MOVE 1,RJFN
+	MOVE 2,[XWD 100000,200000]
+	OPENF
+	 JRST FAILR
+	HRROI A,MROD		; DATA OPEN
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+; ================= LOGIN HANDOFF (NETSER DOLGC) =================
+; Hand the open send/recv data connection to the monitor as a Network Virtual
+; Terminal.  ATPTY: recv JFN in AC1, send JFN in AC2.  (Old-style NVT: no 1B2.)
+	HRROI A,MRP		; ATTACH NVT
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	MOVE 1,RJFN
+	MOVE 2,SJFN
+	ATPTY
+	 JRST FAILP
+	MOVEM 1,PTY		; tty designator returned
+; kick the line so the login job starts (NETSER DOLGC: MOVEI 2,3 / STI).
+	MOVE 1,PTY
+	MOVEI 2,3
+	STI
+	 JFCL
+	HRROI A,MRL		; (console only) LOGIN STARTED ON NVT
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+; ATPTY consumed the data JFNs (the monitor owns the NVT now); forget our copies so
+; a later cleanup never double-releases a reused JFN.  Loop back and re-listen FAST.
+	SETZM SJFN
+	SETZM RJFN
+	MOVEI A,1000
+	DISMS
+	JRST START
+
+; ATPTY failed: release the data JFNs ATPTY didn't take, then re-listen (NO HALTF).
+FAILP:	MOVEM 1,ATPERR		; ATPTY left the ATPXn error code in AC1
+	HRROI A,EAP
+	PSOUT
+	MOVE 2,ATPERR
+	MOVEI 3,10
+	NOUT
+	 JFCL
+	HRROI A,CRLF
+	PSOUT
+	JRST RCOVR
+
+; ---- error / retry paths: log, clean up every socket, re-listen.  NEVER HALTF. ----
+; GTJFN of a DATA socket failed mid-ICP -- release whatever we hold and re-listen.
+FAILJ:	HRROI A,EFJ
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	JRST RCOVR
+; OPENF of the SEND data connection failed.
+FAILS:	HRROI A,EFS
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	JRST RCOVR
+; OPENF of the RECV data connection failed.
+FAILR:	HRROI A,EFR
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	JRST RCOVR
+
+; RCOVR: close+release any socket we might still hold, then re-listen.
+RCOVR:	MOVE 1,SOCKJ
+	PUSHJ P,CLRJ
+	MOVE 1,SJFN
+	PUSHJ P,CLRJ
+	MOVE 1,RJFN
+	PUSHJ P,CLRJ
+	SETZM SOCKJ
+	SETZM SJFN
+	SETZM RJFN
+	MOVEI A,3000
+	DISMS
+	JRST START
+
+; GTJFN of the LISTEN socket failed (no JFN allocated) -- just wait and retry.
+GJERR:	HRROI A,EGJ
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	MOVEI A,3000
+	DISMS
+	JRST START
+
+; OPENF of the LISTEN socket failed -- socket 1 still settling after a handoff.
+; Release the JFN we GTJFN'd (the bug 1d had: it leaked one JFN per retry), wait, retry.
+OPERR:	HRROI A,EOP
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	MOVE 1,SOCKJ
+	PUSHJ P,CLRJ
+	SETZM SOCKJ
+	MOVEI A,2000
+	DISMS
+	JRST START
+
+; CLRJ: close AND release the JFN in AC1, ignoring errors (no-op if AC1=0).
+; Preserves nothing; callers reload ACs.  Mirrors real netser.fai CLRJFN.
+CLRJ:	JUMPE 1,CPOPJ
+	MOVEM 1,CLRTMP
+	CLOSF
+	 JFCL
+	MOVE 1,CLRTMP
+	RLJFN
+	 JFCL
+CPOPJ:	POPJ P,
+
+FNAME:	ASCIZ /NET:1#./
+NETPFX:	ASCIZ /NET:/
+SEMIT:	ASCIZ /;T/
+MSG1:	ASCIZ /NETLIT 1E LOGIN SERVER LISTEN SOCKET 1/
+MSG3:	ASCIZ /LISTENING/
+MRF:	ASCIZ /RFC RECEIVED/
+MRA:	ASCIZ /CONTACT ACCEPTED/
+MRS:	ASCIZ /SEND SOCKET NUMBER/
+MRSD:	ASCIZ /SOCKET NUMBER SENT/
+MRO:	ASCIZ /OPEN DATA SOCKETS/
+MROD:	ASCIZ /DATA SOCKETS OPEN/
+MRP:	ASCIZ /ATTACH NVT (ATPTY)/
+MRL:	ASCIZ /LOGIN STARTED ON NVT/
+EAP:	ASCIZ /ATPTY FAILED, CODE /
+EFJ:	ASCIZ /GTJFN DATA FAILED/
+EFS:	ASCIZ /OPENF SEND FAILED/
+EFR:	ASCIZ /OPENF RECV FAILED/
+EGJ:	ASCIZ /GTJFN FAILED/
+EOP:	ASCIZ /OPENF FAILED/
+CRLF:	BYTE (7) 15,12,0
+
+	PDLEN__40
+PDLST:	BLOCK PDLEN
+SOCKJ:	0
+SJFN:	0
+RJFN:	0
+FHST:	0
+FSKT:	0
+LCLSKT:	0
+PTY:	0
+ATPERR:	0
+CLRTMP:	0
+STRING:	BLOCK 24
+	END START

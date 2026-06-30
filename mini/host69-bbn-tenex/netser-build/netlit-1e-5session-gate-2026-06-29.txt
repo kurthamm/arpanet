@@ -1,0 +1,49 @@
+NETLIT-1e re-listen hardening — 5-consecutive-session gate (2026-06-29)
+Live-loaded netser-lite-1e.fai on host69 (NETLIT-1e), mesh stable post-recover.
+Each session: connect @L 69 -> LOGIN DEMO DEMO 1 -> SYSTAT -> LOGOUT (clean, held).
+
+================ SESSION 1  @ 16:10:39 ================
+  herald=yes  clean-logout=yes
+  re-listen in 0s
+================ SESSION 2  @ 16:11:08 ================
+  herald=yes  clean-logout=yes
+  re-listen in 0s
+================ SESSION 3  @ 16:11:37 ================
+  herald=yes  clean-logout=yes
+  re-listen in 0s
+================ SESSION 4  @ 16:12:07 ================
+  herald=yes  clean-logout=yes
+  re-listen in 0s
+================ SESSION 5  @ 16:12:36 ================
+  herald=yes  clean-logout=yes
+  re-listen in 0s
+================ SUMMARY: 5/5 full sessions ================
+=== final cty tail ===
+DATA SOCKETS OPEN
+ATTACH NVT (ATPTY)
+LOGIN STARTED ON NVT
+NETLIT 1E LOGIN SERVER LISTEN SOCKET 1
+LISTENING
+
+=== representative session transcript (session 1) ===
+[NOECHO][NOECHO]^M
+ SUMEX-AIM Tenex 1.31.82, SUMEX-AIM EXEC 1.51^M
+@^M
+@LOGIN DEMO  1^M
+ JOB 1 ON TTY131 22-JUN-72 13:05^M
+@SYSTAT^M
+^M
+ UP 1:09:10  2 JOBS^M
+ LOAD AV   0.10   0.02   0.01^M
+^M
+ JOB TTY  USER      SUBSYS^M
+ 1   131  DEMO      EXEC^M
+ 2   100  SYSTEM    (PRIV)^M
+ 3   111  NOT LOGGED IN   EXEC^M
+^M
+@LOGOUT^M
+KILLED JOB 1, USER DEMO, ACCT 1, TTY 131, AT  6/22/72 1305^M
+  USED 0:0:1 IN 0:0:13^M
+TELNET to host 105.
+TELNET to host 105.
+TELNET to host 105.

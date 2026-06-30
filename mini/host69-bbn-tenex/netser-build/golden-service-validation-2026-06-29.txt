@@ -1,0 +1,50 @@
+host69 GOLDEN-SNAPSHOT SERVICE — cold-start validation transcript (2026-06-29)
+Service: arpanet-host69.service (golden restore of snap/host69-login.state)
+Method: clean 'systemctl restart' -> host-ready -> raw 'NCP=ncp31 ncp-telnet -o 69'
+  (stdin held open via FIFO through a clean LOGOUT; pexpect/pty stalls the herald ~28B, do not use it)
+
+===== SESSION 1 (first login from service-restored snapshot) =====
+[NOECHO][NOECHO]
+ SUMEX-AIM Tenex 1.31.82, SUMEX-AIM EXEC 1.51
+@
+@LOGIN DEMO  1
+ JOB 1 ON TTY131 22-JUN-72 12:10
+@SYSTAT
+
+ UP 0:13:22  2 JOBS
+ LOAD AV   0.07   0.17   0.16
+
+ JOB TTY  USER      SUBSYS
+ 1   131  DEMO      EXEC
+ 2   100  SYSTEM    (PRIV)
+ 3   111  NOT LOGGED IN   EXEC
+
+@LOGOUT
+KILLED JOB 1, USER DEMO, ACCT 1, TTY 131, AT  6/22/72 1210
+  USED 0:0:1 IN 0:0:13
+TELNET to host 105.
+TELNET to host 105.
+TELNET to host 105.
+
+===== SESSION 2 (second login — persistence / re-listen proof) =====
+[NOECHO][NOECHO]
+ SUMEX-AIM Tenex 1.31.82, SUMEX-AIM EXEC 1.51
+@
+@LOGIN DEMO  1
+ JOB 1 ON TTY131 22-JUN-72 12:13
+@SYSTAT
+
+ UP 0:16:56  2 JOBS
+ LOAD AV   0.06   0.11   0.14
+
+ JOB TTY  USER      SUBSYS
+ 1   131  DEMO      EXEC
+ 2   100  SYSTEM    (PRIV)
+ 3   111  NOT LOGGED IN   EXEC
+
+@LOGOUT
+KILLED JOB 1, USER DEMO, ACCT 1, TTY 131, AT  6/22/72 1213
+  USED 0:0:1 IN 0:0:12
+TELNET to host 105.
+TELNET to host 105.
+TELNET to host 105.
