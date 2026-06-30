@@ -79,6 +79,24 @@ MIDAS→TENEX port) as a stretch; **#18** already covered. DECtape-COPY install 
 Numbering follows the page's convention (original booklet number = authentic; `NNA` = adaptation).
 Login over the net: `DEMO/DEMO/1` (the booklet used `iccc/iccc/11514`).
 
+### ⛔ HARD GUARD — install safety rules (added 2026-06-30 after a near-miss)
+A first #3 install attempt nearly looked like disk corruption. Root cause: it booted the **06-26
+`host69-live.state`** base against the **evolved 06-30 disk packs** (stale free-page bitmap → COPY
+allocations risked clobbering post-06-26 files), and the KI was halted with **`^C`** mid-write. A
+no-write forensic test (golden snapshot booted against a *disposable copy* of the packs) later proved
+the disk was **fine** — the failures were **load-induced boot timeouts** (box at load ~11), not
+corruption. Rules for ALL future TENEX installs/edits, no exceptions:
+1. **Never install against the live packs.** Work on a **disposable copy** (`cp media → scratch/media`,
+   run the KI from the scratch cwd so the RP relative paths resolve to the copy; verify via `/proc/PID/fd`).
+2. **Snapshot generation MUST match disk-pack generation.** Never boot an older base snapshot against
+   newer packs (or vice-versa). Check dates/provenance before any boot that will write.
+3. **Never `^C` a live KI.** Flush + clean-halt only; stop the host process with SIGTERM, never a guest `^C`.
+4. **No racy FIFO-timed console installs.** Use deterministic **SIMH `EXPECT`/`SEND`** scripting.
+5. **Protect evidence** during any forensic work: `chmod a-w` the real packs + golden snapshot; verify
+   md5 unchanged afterward.
+6. Keep a clean pack backup that matches each golden snapshot generation (the gap that bit us: only an
+   06-22 checkpoint existed for an 06-29 snapshot).
+
 ## Phase 3 — Website wiring
 - `arpanet_terminal2.html`: add host69 to `activeHosts` (login `@LOGIN DEMO DEMO 1`); update intro/reachable lists.
 - `arpa/arpanet-nodes.json`: set host 69 status to live/reachable.
