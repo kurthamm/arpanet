@@ -1,8 +1,10 @@
 # /etc/systemd/system/arpanet-host69.service
 [Unit]
-Description=ARPANET BBN-TENEX host 69 (@L 69 login service)
+Description=ARPANET BBN-TENEX host 69 (@L 69 login service, golden snapshot)
 After=arpanet-noc.service
 Requires=arpanet-noc.service
+StartLimitIntervalSec=900
+StartLimitBurst=3
 
 [Service]
 Type=exec
@@ -13,8 +15,8 @@ ExecStart=/home/deltaprism/arpanet/mini/host69ctl.sh daemon 69
 ExecStartPost=/home/deltaprism/arpanet/mini/host69ctl.sh setup 69
 ExecStop=/home/deltaprism/arpanet/mini/host69ctl.sh stop 69
 Restart=on-failure
-RestartSec=15
-TimeoutStartSec=400
+RestartSec=90
+TimeoutStartSec=600
 TimeoutStopSec=60
 KillMode=control-group
 

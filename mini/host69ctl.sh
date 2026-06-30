@@ -33,9 +33,14 @@ ki_pid() { pgrep -f 'run-h69[.]do' 2>/dev/null | head -1; }
 # to host 69 is the noc's job and must NOT gate this service.
 netlit_up() { [ -n "$(ki_pid)" ] && grep -q "HOST-READY DONE" "$RUNLOG" 2>/dev/null; }
 reachable() { ( cd "$ROOT" && NCP=ncp31 timeout 12 ./ncp-ping -c1 69 2>/dev/null | grep -q "Reply from" ); }
+# host69's IMP is imp05; its hi2 (imp05.local.simh: attach -u hi2 21051:127.0.0.1:21052) must be
+# UP+bound before we assert host-ready, else host69 boots peerless ("Host is not up").  noc starts
+# imp05 asynchronously, so the daemon WAITS on this before restore+FORCEDOWN (boot-ordering fix).
+imp05_ready() { pgrep -f 'h316ov.*imp05' >/dev/null && ss -uan 2>/dev/null | grep -q ':21051'; }
 
 gen_do() {
   cat > "$DO" <<EOF
+echo === BOOT $BOOTID ===
 restore -F $SNAP
 detach dc
 detach tym
@@ -64,10 +69,20 @@ EOF
 
 # ExecStart: become the SIMH ki in the foreground (systemd main process).
 cmd_daemon() {
-  pgrep -f 'h316ov' >/dev/null || { echo "host69: lab/imp05 (h316ov) not running" >&2; exit 1; }
   for f in "$BIN" "$SNAP"; do [ -e "$f" ] || { echo "host69: MISSING $f" >&2; exit 1; }; done
+  # Clean slate: kill any stray host69 ki/helpers (e.g. a manual launch-1d-login.sh run-1c.do) that
+  # would hold 2323/16945/21052 and segfault our console/socket bind.  pdp10-ki is host69-only.
+  pkill -9 -x pdp10-ki 2>/dev/null; pkill -9 -f "$HELP/console-daemon.py" 2>/dev/null; pkill -9 -f "$HELP/drain.py" 2>/dev/null
+  # Per-boot id + fresh runlog FIRST, so ExecStartPost (run concurrently under Type=exec) anchors to
+  # THIS boot and never matches a stale HOST-READY DONE (the .do echoes "=== BOOT $BOOTID ===" first).
+  BOOTID="$$-$(date +%s)"; echo "$BOOTID" > "$SCR/host69.bootid"; : > "$RUNLOG"
+  # Boot-ordering: wait (<=180s) for imp05 + its hi2 (21051) so host69 asserts host-ready to a READY
+  # imp05.  Not up in time -> exit 1 -> systemd Restart=on-failure retries (RestartSec=90).
+  local i
+  for i in $(seq 1 90); do imp05_ready && break; sleep 2; done
+  imp05_ready || { echo "host69: imp05/hi2 (21051) not up after ~180s wait" >&2; exit 1; }
+  echo "host69: imp05/hi2 up -- restoring golden snapshot"
   gen_do
-  : > "$RUNLOG"
   # best-effort port clear; residual TIME_WAIT -> bind fail -> setup fails -> systemd restarts
   for i in $(seq 1 60); do ss -tan 2>/dev/null | grep -qE ':(2323|16945|16946|21052)\b' || break; sleep 1; done
   # passive drainers (children, die with the cgroup): 16945/16946 = DC/TYM lines,
@@ -82,8 +97,18 @@ cmd_daemon() {
 
 # ExecStartPost: wait for the golden boot to re-assert host-ready.
 cmd_setup() {
-  local ok=0 i
-  echo "host69: golden restore -- waiting for HOST-READY (~75-120s)..."
+  local ok=0 i bid
+  sleep 3                                   # let cmd_daemon write the bootid file first
+  bid="$(cat "$SCR/host69.bootid" 2>/dev/null)"
+  echo "host69: golden restore (boot $bid) -- waiting for HOST-READY..."
+  # Anchor to THIS boot: wait for the ki to echo '=== BOOT <bid> ===' (covers the daemon's imp05
+  # wait + restore).  Until that appears, any HOST-READY DONE in the runlog is stale -> ignore it.
+  for i in $(seq 1 150); do
+    grep -q "=== BOOT $bid ===" "$RUNLOG" 2>/dev/null && break
+    ki_pid >/dev/null || { echo "host69: ki gone before boot marker (see $RUNLOG)" >&2; exit 2; }
+    sleep 2
+  done
+  grep -q "=== BOOT $bid ===" "$RUNLOG" 2>/dev/null || { echo "host69: boot marker $bid never appeared" >&2; exit 2; }
   for i in $(seq 1 110); do
     grep -q "HOST-READY DONE" "$RUNLOG" 2>/dev/null && { ok=1; break; }
     ki_pid >/dev/null || { echo "host69: ki gone during host-ready (see $RUNLOG)" >&2; exit 2; }
@@ -91,15 +116,21 @@ cmd_setup() {
   done
   [ "$ok" = 1 ] || { echo "host69: host-ready timed out (console 2323 bind / TIME_WAIT?)" >&2; exit 2; }
   echo "host69: restored golden snapshot; NETLIT LISTENING, DEMO account ready (@L 69 -> TENEX login)"
+  # Best-effort reachability head-start + log.  Does NOT gate the service: mesh convergence is the
+  # noc's job and can take minutes; failing here would risk a restart loop (each bounce churns the mesh).
+  for i in $(seq 1 6); do
+    reachable && { echo "host69: reachable on mesh (ncp-ping 69)"; break; }
+    sleep 15
+  done
   exit 0
 }
 
 do_stop() {
   local pid; pid="$(ki_pid)"
   [ -n "$pid" ] && kill -TERM "$pid" 2>/dev/null
-  pkill -9 -f "$HELP/drain.py" 2>/dev/null
+  pkill -9 -f "$HELP/drain.py" 2>/dev/null; pkill -9 -f "$HELP/console-daemon.py" 2>/dev/null
   sleep 2
-  pid="$(ki_pid)"; [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null
+  pkill -9 -x pdp10-ki 2>/dev/null   # host69-only emulator; clear the ki + any stray
   return 0
 }
 

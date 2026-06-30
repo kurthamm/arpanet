@@ -24,10 +24,10 @@ set hi1 debug
 attach -u hi1 20051:127.0.0.1:20052
 # Host 0: BBN-NCC
 
-#set hi2 enabled
-#set hi2 debug
-#attach -u hi2 21051:localhost:21052
-# Host 1: BBN-TENEX
+set hi2 enabled
+set hi2 debug
+attach -u hi2 21051:127.0.0.1:21052
+# Host 1: BBN-TENEX  (host #69, attached PDP-10 KI/TENEX sim; live config is imp05.local.simh)
 
 #set hi3 enabled
 #attach -u hi3 22051:localhost:22052
