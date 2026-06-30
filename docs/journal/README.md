@@ -131,11 +131,22 @@ native-NCP attach still future work. Don't let "it runs `@L 1`" be read as "it's
       droplet-only host69 snapshot + the configured packs) — git-LFS / object store / mirror.
 - [x] host69 NCP frontier — **SOLVED**: RFC now dispatched, full credentialed login proven, NETLIT-1e
       re-listen hardened, golden-snapshot service enabled (host69 notebook §10.3–§10.13b).
-- [ ] **host69 go-live** (`docs/host69-go-live-plan.md`): Phase 1d reboot-survival test → Phase 2 the
-      four 1972 BBN booklet scenarios (#3 Tenex / #11 LIFE / #15 Chess / #18 DOCTOR, `arpa/scenarios.pdf`)
-      → Phase 3 website wiring → Phase 4 deploy.
+- [ ] **host69 go-live** (`docs/host69-go-live-plan.md`): Phase 1 done + **Phase 1d reboot-survival passed**
+      (session-start reboot auto-brought-up #69, login works). **Phase 2 software SOURCED (2026-06-30):**
+      **#3 Tenex** (EXEC/TECO/F40/SNDMSG/TELNET) — all software in the kit, **buildable now**; **#11 LIFE**
+      (Tomlinson) + **#15 Chess** (Greenblatt MacHack) — exact BBN originals lost, reconstruct/port (LIFE in
+      F40; CHESS from `PDP-10/its` OCM MIDAS); **#18 DOCTOR** already covered (18A). Next = build #3 → #11 →
+      #15. → Phase 3 website wiring → Phase 4 deploy.
 - [ ] **Lab mesh robustness** (project-wide): routing to a host **islands under connection/ping load** +
       heavy restart churn (recover-in-place sometimes won't reconverge → reboot resets it). The deeper
-      follow-up before advertising multi-user load.
+      follow-up before advertising multi-user load. (2026-06-30: emulator-idle probing against the live
+      imp05 re-triggered this — see the idle notebook's lesson; use an isolated throwaway IMP rig instead.)
 - [ ] **Land the `kx10_imp.c` host69 emulator fixes in tracked `src/sims/`** (currently a patch in
-      `netser-build/emulator-fork/` + the gitignored build cache).
+      `netser-build/emulator-fork/` + the gitignored build cache; now includes `host69-tenex-idle.patch`).
+- [x] **host69 lab CPU utilization** — **RESOLVED 2026-06-30** via host-side caps (no guest impact):
+      removed imp62's `set nothrottle` (→15%) and a systemd **`CPUQuota=40%`** on the ki applied post-boot
+      by `host69ctl.sh` (ki ~91→37%, load ~9.6→7.0). The "pure" `SET CPU IDLE` route is **staged but inert**
+      (`docs/host69-tenex-idle-patch.md`): the `kx10_cpu.c` SCHEDA detector + `kx10_imp.c` adaptive poll are
+      correct + login-verified, but TENEX executes ~99% of the time while the IMP link is up (sim_idle sleeps
+      <1%; `TYM2`'s 1 ms re-arm dominates), so idle doesn't bite — `CPUQuota` is the shipping answer.
+      *(Earlier "IMP isn't `UNIT_IDLE`" note was wrong — all device units have it; corrected.)*

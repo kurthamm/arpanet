@@ -1,0 +1,65 @@
+diff --git a/PDP10/kx10_cpu.c b/PDP10/kx10_cpu.c
+index 0bfcd3a..fe5b544 100644
+--- a/PDP10/kx10_cpu.c
++++ b/PDP10/kx10_cpu.c
+@@ -4999,7 +4999,19 @@ st_pi:
+     /* Check if possible idle loop */
+     if (sim_idle_enab &&
+           ((PC < 020 && AB < 020 && (IR & 0740) == 0340) ||
+-           (uuo_cycle && (IR & 0740) == 0 && IA == 041))) {
++           (uuo_cycle && (IR & 0740) == 0 && IA == 041) ||
++           /* BBN-TENEX idle: the existing clauses cover TOPS-10 (jump-self in the
++              AC block) and ITS (UUO via loc 041), but NOT TENEX, whose monitor
++              idles in the scheduler wait-list scan SCHEDA -- it walks the list of
++              DISMS'd forks checking each one's wakeup timer (fkintt vs todclk) and,
++              when no fork is runnable, spins `JRST SCHEDA`/`JRST SCHEDB` burning a
++              whole host core.  Only a clock tick can change those timers, so detect
++              that back-edge (JRST opcode 0254 -> SCHEDA 0102713 / SCHEDB 0102714)
++              and yield to the RTC.  These addresses are specific to the BBN-TENEX
++              1.31 monitor baked into the host69 golden snapshot; if that monitor is
++              rebuilt, re-derive SCHEDA from build-tenex/tenex.dis and update here
++              (see netser-build/emulator-fork/ + docs/host69-tenex-idle-patch.md). */
++           (IR == 0254 && (AB == 0102713 || AB == 0102714)))) {
+        sim_idle (TMR_RTC, FALSE);
+     }
+ 
+diff --git a/PDP10/kx10_imp.c b/PDP10/kx10_imp.c
+index 320ecf4..91c17ce 100644
+--- a/PDP10/kx10_imp.c
++++ b/PDP10/kx10_imp.c
+@@ -1571,8 +1571,33 @@ t_stat imp_eth_srv(UNIT * uptr)
+         /* Re-arm with a clock-INDEPENDENT activation: sim_clock_coschedule (the
+            top of this routine) stops firing once TENEX finishes booting and the
+            calibrated clock settles, which silently halts inbound UDP polling.
+-           A fixed-cycle sim_activate keeps the UDP receiver alive for the link. */
+-        sim_activate(uptr, 10000);
++           A fixed-cycle sim_activate keeps the UDP receiver alive for the link.
++
++           ADAPTIVE re-arm (2026-06-30): a flat 10000-cycle poll keeps a clock
++           event ~10k cycles out *forever*, which sits just under sim_idle()'s
++           sleep threshold -> "no wait, too short" -> the host never idles even
++           when TENEX is quiescent (the host69 ki pegged a core at the @ prompt
++           with nobody connected; SET CPU IDLE + the SCHEDA detector were inert
++           because of THIS poll).  So stay fast only in a short window after any
++           link activity (bring-up Nops, an in-flight input block, queued output,
++           or a held message) -- which keeps bring-up and interactive sessions
++           snappy -- and back off to a coarse poll when the link is quiet so the
++           next event is far enough out for sim_idle to sleep.  fast_polls starts
++           >0 so the host-ready handshake at boot is fast.  Inbound latency when
++           quiet is ~one coarse poll (negligible for a 1972 login). */
++        {
++            static int fast_polls = 100;
++            if (imp_unit[0].ILEN != 0 ||
++                (imp_unit[0].STATUS & (IMPIB|IMPID)) != 0 ||
++                imp_data.sendq != NULL || imp_data.pending_nw > 0)
++                fast_polls = 50;                  /* activity -> refresh fast window */
++            if (fast_polls > 0) {
++                fast_polls--;
++                sim_activate(uptr, 10000);        /* responsive */
++            } else {
++                sim_activate(uptr, 100000);       /* quiet -> let SET CPU IDLE sleep */
++            }
++        }
+         return SCPE_OK;
+     }
+ 

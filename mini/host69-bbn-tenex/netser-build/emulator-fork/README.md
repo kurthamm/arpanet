@@ -51,6 +51,14 @@ make pdp10-ki               # needs SDL2/pcap/zlib/edit; sanity check must print
 ```
 The resulting `BIN/pdp10-ki` is what `run-loginbuild.sh` uses to boot host69.
 
+## Additional patch: `host69-tenex-idle.patch` (2026-06-30)
+A later, **independent** change on top of the NCP work: `kx10_cpu.c` gains a TENEX clause in the
+SET-CPU-IDLE detector (TENEX idles in the scheduler wait-list scan `SCHEDA`=0102713), and
+`kx10_imp.c`'s UDP receiver gets an adaptive (back-off-when-quiet) re-arm. Both are login-verified
+but **do not** actually drop host CPU yet (TENEX executes ~99% of the time while the IMP link is up;
+the shipping utilization fix is a systemd `CPUQuota` cap — see `docs/host69-tenex-idle-patch.md`).
+Apply with `git apply host69-tenex-idle.patch` after the NCP commits; harmless to keep.
+
 ## TODO (ideal end state)
 Publish a `kurthamm/sims` fork with these commits and point the `src/sims` submodule at it, so
 the buildable emulator is a first-class tracked dependency rather than a preserved patch.

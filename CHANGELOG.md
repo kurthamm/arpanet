@@ -174,3 +174,40 @@ Rapid `ncp-telnet`/`ncp-ping` and heavy restart churn degrade inter-IMP routing
 (recover-in-place sometimes won't reconverge → reboot resets it). Recovery:
 `mini/arpanet-recover.sh recover` then WAIT for convergence; never restart an IMP
 to "nudge" it. The deeper robustness follow-up before advertising multi-user load.
+
+## 2026-06-30 — host69 utilization + Phase 2 scenario sourcing
+
+### Fixed: lab CPU utilization (the host69 ki + imp62 pegged the box)
+Post-reboot the 4-vCPU box ran at load ~6-8. Recon found two unthrottled hogs we
+had added (the upstream 35-IMP farm is throttled to 15% and was NOT the problem):
+- **imp62** had `set nothrottle` (~92% of a core) → removed it so it inherits the
+  farm's 15% (`mini/imp62.local.simh`). imp62 carries host126/HILTON-KA1 **and**
+  the PiDP-10 (host41) Tailscale bridge — load-bearing, kept but throttled.
+- **the host69 ki** busy-spun TENEX's idle loop at ~one core. `SET THROTTLE`
+  self-disables on this host (documented); a deep `SET CPU IDLE` effort hit a wall
+  (below). Pragmatic fix: a **systemd `CPUQuota=40%`** cgroup cap, applied by
+  `host69ctl.sh` *after* host-ready (so the boot stays full-speed) — host-side, no
+  effect on guest authenticity. ki dropped ~91%→~37%, load ~9.6→~7.0.
+
+### Added (emulator, staged): TENEX idle support — `netser-build/emulator-fork/host69-tenex-idle.patch`
+First-of-kind work: rcornwell's KI10 idle detector knew TOPS-10/ITS idle idioms but
+**not TENEX**. Added a TENEX clause to `kx10_cpu.c` (TENEX idles in the scheduler
+wait-list scan `SCHEDA`=0102713, derived from `build-tenex/tenex.dis`) + an adaptive
+re-arm to `kx10_imp.c`'s UDP poll. Both **login-verified**, but did **not** drop CPU:
+while the host-IMP link is up TENEX executes ~99% of the time (sim_idle sleeps <1% —
+`TYM2`'s 1 ms re-arm + near-continuous execution dominate). Correct groundwork, but
+idle doesn't bite yet → the `CPUQuota` cap is the shipping answer. Full notebook:
+`docs/host69-tenex-idle-patch.md`. **Lesson logged:** probing against the live imp05
+islanded the mesh and forced a full `arpanet-recover.sh recover`; future emulator
+probing must use an isolated throwaway IMP pair, never the live mesh.
+
+### Phase 2: exact scenario software identified + sourced (`docs/host69-go-live-plan.md`)
+Read the 1972 booklet for the four BBN-TENEX #69 scenarios' exact programs:
+- **#3 BBN Tenex** (EXEC/TECO/F40/SNDMSG/TELNET) — **all software in the kit**
+  (prebuilt `f40.sav.3`/`sndmsg.sav.8` in `imsss/files/subsys/`, `telnet` in cusps,
+  `teco` already on #69). **Buildable now** — the authentic anchor.
+- **#11 BBN LIFE** = **Ray Tomlinson's** Conway Life; exact BBN source **lost**
+  (only ITS MLIFE survives) → faithful FORTRAN-40 reconstruction (booklet specifies it).
+- **#15 BBN Chess** = **Greenblatt's MacHack VI**; exact BBN binary **lost**, source
+  survives as OCM `github.com/PDP-10/its:src/chprog/ocm.470` (MIDAS) → needs a TENEX port.
+- **#18 BBN DOCTOR** = ELIZA; already covered by the 18A adaptation on MIT-AI #134.

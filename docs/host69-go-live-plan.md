@@ -48,18 +48,34 @@ Goal: after a cold reboot, host69 comes up reachable on its own (no babysitting)
   robustness is the deeper follow-up. A fresh reboot avoids the accumulated-churn degradation.
 
 ## Phase 2 — 1972 booklet scenarios on #69
-The ICCC '72 booklet (`arpa/scenarios.pdf`, NIC 11863) has **four BBN-TENEX (host #69) scenarios**:
-- **#3 BBN Tenex** (p11) — login + EXEC tour: `?`, `SYS`, `WHERE`, `LINK`, `DIR`, `DAY`, `TYPE`, `DELETE`,
-  `LOGOUT`, plus `TECO` (editor), `F40`+`LOADER` (FORTRAN compile-and-run "HELLO ICCC"), `SNDMSG` (mail),
-  `TELNET` (outbound). **Feasible now** for the built-in/TECO parts (`subsys/teco.sav`, `loader.sav` present);
-  F40/SNDMSG/TELNET have **source in the kit but aren't built** (`deccusps/f40*`, `cusps/sndmsg.mac`,
-  `cusps/telnet.mac`) — buildable as authentic add-ons.
-- **#18 BBN DOCTOR** (p59) — ELIZA. Not in our TENEX kit (platform currently fakes it as "18A" on MIT-AI
-  #134). Building a TENEX DOCTOR **reclaims the authentic slot on #69** — highest payoff.
-- **#11 BBN LIFE** (p41) — `<HACKS>CORDERMAN.LIFE`; not in kit; small, most tractable recreation.
-- **#15 BBN Chess** (p51) — `<HACKS>CHESS.SAV`; not in kit; hardest to source.
-Plan: ship **#3** as the authentic anchor; pursue **#18 → #11 → #15** as we source/build their programs
-(DECtape-COPY install path is proven from the NETLIT work; the gap is *sourcing the programs*).
+The ICCC '72 booklet (`arpa/scenarios.pdf`, NIC 11863) has **four BBN-TENEX (host #69) scenarios**.
+Software sourcing resolved 2026-06-30 (booklet read for exact program identities + archive search):
+
+- **#3 BBN Tenex** (booklet §"BBN TENEX HOST #69") — login + EXEC tour: `?`, `SYS`, `WHERE`, `LINK`, `DIR`,
+  `DAY`, `TYPE`, `DELETE`, `LOGOUT`, plus `TECO` (editor), `F40`+`LOADER` (FORTRAN compile-and-run "HELLO
+  ICCC"), `SNDMSG` (mail), `TELNET` (outbound). **✅ ALL SOFTWARE IN THE KIT — buildable now:** `teco.sav`
+  already on #69; **prebuilt** `f40.sav.3` + `sndmsg.sav.8` in `kit-cache/imsss/files/subsys/`; TELNET =
+  `kit-cache/tenex/cusps/telnet.run` + `telnet.mac`. Install path = DECtape COPY (proven). **Authentic
+  anchor — do it first.**
+- **#18 BBN DOCTOR** — Weizenbaum ELIZA (LISP). **Already covered** by the platform's 18A on MIT-AI #134
+  (recovered ITS DOCTOR). Could restore to #69 via TENEX LISP (`imsss subsys/lisp.sav.5`) to reclaim the
+  authentic slot, but **deprioritized** — we already have a working DOCTOR experience.
+- **#11 BBN LIFE** — **Conway's Life, coded by Ray Tomlinson at BBN** (`@run <HACKS>LIFE`; 72×72 grid,
+  asterisk/space input, ESC-terminated; pattern file `<HACKS>CORDERMAN.LIFE`). **Exact BBN source LOST** —
+  not in `github.com/PDP-10/tenex`, our kit, or the web. Surviving Conway-Life source = **MLIFE** (Speciner),
+  MIDAS: <https://github.com/PDP-10/its/blob/d4478b47b3eb593fdb862f4c12b2cde60c13d564/src/rwg/mlife.21>
+  (+ Gosper `src/rwg/life.*`) — but that's ITS/MIDAS, not Tomlinson's. **Path: faithful reconstruction in
+  FORTRAN-40** (booklet fully specifies rules + I/O) — small + tractable; MLIFE is the reference behaviour.
+- **#15 BBN Chess** — **Richard Greenblatt's MacHack VI** ("Mac Hack Six"; `@run <HACKS>CHESS` =
+  `<HACKS>CHESS.SAV`; standard algebraic notation, `BD`/`PW`/`PB`/`GB`/`M`/`U` commands). **Exact BBN binary
+  LOST.** Same program's source SURVIVES (ITS/MIDAS, pinned at PDP-10/its `d4478b4`):
+  - **OCM/MacHack main:** <https://github.com/PDP-10/its/blob/d4478b47b3eb593fdb862f4c12b2cde60c13d564/src/chprog/ocm.470>
+  - **support:** `src/chprog/ocaux.224` and `src/chprog/ocdagb.31` (same tree)
+  - **docs:** <https://github.com/PDP-10/its/blob/d4478b47b3eb593fdb862f4c12b2cde60c13d564/doc/games.md> (+ `doc/chprog/ocm.order`, `doc/ms/chess.memo`); alt **Tech II** (Baisley) `src/rg/chess2.614`.
+  **Hardest** — needs a real MIDAS/ITS → TENEX port (JSYS + assembler differences) across `ocm`+`ocaux`+`ocdagb`.
+
+Plan: ship **#3** now (fully sourced) → **#11 LIFE** via FORTRAN-40 reconstruction → **#15 CHESS** (MacHack
+MIDAS→TENEX port) as a stretch; **#18** already covered. DECtape-COPY install path proven from NETLIT work.
 Numbering follows the page's convention (original booklet number = authentic; `NNA` = adaptation).
 Login over the net: `DEMO/DEMO/1` (the booklet used `iccc/iccc/11514`).
 

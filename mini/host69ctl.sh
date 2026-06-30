@@ -63,6 +63,14 @@ deposit IMP FORCEDOWN 0
 step 400000000
 deposit 70360 0
 echo === HOST-READY DONE ===
+# Cut steady-state host CPU via idle detection (NOT throttle). SET THROTTLE is
+# documented to disable itself and run full-speed when the host can't sustain the
+# requested IPS -- which is why 25%/4M/1M all left the ki near full core. The rcornwell
+# KI10 (PDP10/kx10_cpu.c:619, :4905) implements SET CPU IDLE with a detector for the
+# TENEX/ITS idle pattern (UUO dismiss via loc 041 / exec JRST-self): when TENEX idles
+# (a login server, ~99% of the time) sim_idle() sleeps the host instead of busy-spinning.
+# Placed after the boot step()s so the boot itself runs full-speed (no timeout risk).
+set cpu idle
 go
 EOF
 }
@@ -122,6 +130,13 @@ cmd_setup() {
     reachable && { echo "host69: reachable on mesh (ncp-ping 69)"; break; }
     sleep 15
   done
+  # Cap steady-state host CPU AFTER the boot (so the boot itself runs full-speed -- a static
+  # CPUQuota would slow the FORCEDOWN past TimeoutStartSec).  The KI10 emulator busy-spins TENEX's
+  # idle loop at ~one host core; 40% is still far above a real ~1 MIPS KI10 so login stays snappy.
+  # (SET CPU IDLE / the SCHEDA emulator patch are the "pure" fix but TENEX doesn't idle while the
+  #  IMP link is up -- see docs/host69-tenex-idle-patch.md; this cgroup cap is the pragmatic answer.)
+  sudo -n systemctl set-property --runtime arpanet-host69.service CPUQuota=40% 2>/dev/null \
+    && echo "host69: ki CPUQuota=40% applied" || echo "host69: WARN could not apply CPUQuota"
   exit 0
 }
 
