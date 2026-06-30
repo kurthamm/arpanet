@@ -127,3 +127,50 @@ Remaining flakiness: acceptance is intermittent across boots
 and should be avoided. Note: open-simh PR #522 (H316 host port 3/4
 device address swap) is also needed for hosts on IMP ports 3-4
 (MIT-AI 134, MIT-ML 198); host126 (port 2) is unaffected.
+
+## 2026-06 — ARPANET infrastructure & BBN-TENEX host #69
+
+Summary log for the larger efforts since 06-10; full detail in the per-effort
+notebooks (`docs/journal/README.md` is the index).
+
+### Added: event-driven per-IMP NCP startup (`mini/noc-server.py`)
+Replaced a fixed 35 s `NCP_START_DELAY` timer that raced IMP boot speed on the
+faster droplet (IMPs came up before 35 s and sat peerless). Each NCP now starts
+the instant *its* IMP reaches RUNNING (old timer kept as a backstop). Also fixed
+an `ncpdov` double-spawn (a PTY EOF mis-read as process death) by reaping any
+stray daemon on the NCP's port pair before spawning (`noc/server/ncp.py`).
+
+### Added: BBN-TENEX host #69 — native-NCP login (`@L 69`)
+A real BBN-TENEX (SIMH `pdp10-ki`, built via Lars Brinkhoff's build-tenex) made
+to answer `@L 69` with an authentic credentialed login. Highlights (full journal:
+`docs/host69-ncp-login-investigation.md` §3–§10):
+- **Persistence**: TENEX reboot-from-disk is upstream-unfinished, so we don't
+  reboot — SIMH SAVE a fully-booted monitor and RESTORE forever.
+- **1822 host-IMP emulator fidelity fixes** (`kx10_imp.c`): host-ready CONI gate +
+  FORCEDOWN lever, IMP input re-arm, output-done (`IMPOB`). In
+  `netser-build/emulator-fork/` (TODO: land in tracked `src/sims/`).
+- **Login server = NETLIT** (we built it; real NETSER is bootstrap-blocked). The
+  key insight: **`ATPTY` (JSYS 274)** hands the NCP connection to TENEX's own
+  dial-up login path — no NETSER needed. `@L 69` → `BBN-TENEX … EXEC` →
+  `LOGIN DEMO DEMO 1` → real session.
+
+### Changed: NETLIT-1e — re-listen hardening
+NETLIT-1d dropped to the `!` monitor EXEC after ~2 logins (a JFN leak in the
+OPENF-retry loop → exhaustion → `HALTF`; contact socket closed without `RLJFN`).
+NETLIT-1e adds a `CLRJ` close+release on every path, releases the listen JFN
+before each retry, and removes all `HALTF` (matches real `netser.fai`). Re-listen
+dropped from ~2.5 min to 0 s; survives unlimited sessions (5/5 gate).
+
+### Added: golden-snapshot service (`arpanet-host69.service`, `host69ctl.sh`)
+Login state (DEMO + NETLIT-1e LISTENING) baked into a SIMH SAVE snapshot; the
+service just `restore -F`s it (no console "séance"). Phase 1 durability: daemon
+waits for imp05+hi2 before host-ready (boot-ordering), sweeps stray `pdp10-ki`,
+uses a per-boot marker (fixes a `Type=exec` stale-health-check race). Service
+**enabled**. Reboot-survival test + the 1972-booklet scenarios are the remaining
+go-live work (`docs/host69-go-live-plan.md`).
+
+### Known issue: lab mesh routing islands under connection/ping load
+Rapid `ncp-telnet`/`ncp-ping` and heavy restart churn degrade inter-IMP routing
+(recover-in-place sometimes won't reconverge → reboot resets it). Recovery:
+`mini/arpanet-recover.sh recover` then WAIT for convergence; never restart an IMP
+to "nudge" it. The deeper robustness follow-up before advertising multi-user load.

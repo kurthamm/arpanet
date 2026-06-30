@@ -59,12 +59,12 @@ bug that stopped ITS from answering network logins). The work spans two lines: t
 | **#1 UCLA** | **Sigma 7 / CP-V** (SIMH sigma) | **no dir** ("planned") | no | **built new** |
 | **#6 MIT** | **Multics** (DPS8M MR12.8) | **no dir** ("hope"; upstream #6 was ITS) | no | **built new** |
 | **#65 UCLA** | **OS/360 MVT** (Hercules) + `ccn_frontdoor.py` | **no dir** | no | **built new** |
-| **#69 BBN** | **BBN-TENEX** (SIMH PDP-10 KI) | **no dir** (not even planned) | no | **LOGIN PROVEN** — `@L 69` → real BBN-TENEX `@` EXEC, credentialed DEMO login (NETLIT-1d via `ATPTY`; NETSER not needed). Golden-snapshot service built; cold-start validation pending a healthy mesh. (`docs/host69-ncp-login-investigation.md` §10.10/§10.11) |
+| **#69 BBN** | **BBN-TENEX** (SIMH PDP-10 KI) | **no dir** (not even planned) | no | **NATIVE-NCP LOGIN DONE + HARDENED + DEPLOYED** — `@L 69` → real BBN-TENEX `@` EXEC, credentialed DEMO login via **`ATPTY`** (JSYS 274; NETSER not needed). Login server **NETLIT-1e** (re-listen hardened: 0 s, no crash; 5/5 gate). Baked into a **golden SIMH snapshot**; `arpanet-host69.service` restores it and is **enabled**. Going live in phases (`docs/host69-go-live-plan.md`); full journal `docs/host69-ncp-login-investigation.md` §10. |
 
 ### Network seam — how each host actually reaches visitors (the honesty that matters)
 Running a real OS is *not* the same as being an authentic ARPANET host. By integration method:
 - **Native period NCP** (the host's own OS speaks 1822/NCP on its IMP — the authentic path):
-  **ITS** (#6/70/134/198/126) and **BBN-TENEX** (#69, *in progress* — the host69 effort).
+  **ITS** (#6/70/134/198/126) and **BBN-TENEX** (#69 — login done + hardened + deployed).
 - **NCP bridge** (a Linux NCP daemon stands in for the host's network stack): **WAITS** (#11)
   via `waitsconnect`.
 - **Terminal / front-door bridge** (real OS, but reached through the web terminal or a shim —
@@ -73,9 +73,9 @@ Running a real OS is *not* the same as being an authentic ARPANET host. By integ
   the TCP-6180 terminal; **OS/360 MVT** (#65) via `ccn_frontdoor.py` + `s3270`.
 - **No real OS** — the ~18 `ncpdov` map stubs.
 
-So our work splits cleanly: ITS we **activated as native NCP**; TENEX we're **making native NCP**
-now; Sigma/Multics/OS-360 are **authentic OSes wired in via bridges**, with native-NCP attach
-still future work. Don't let "it runs `@L 1`" be read as "it's an authentic NCP host."
+So our work splits cleanly: ITS and **TENEX (#69)** we **activated as native NCP** (host69 login
+proven + hardened + deployed); Sigma/Multics/OS-360 are **authentic OSes wired in via bridges**, with
+native-NCP attach still future work. Don't let "it runs `@L 1`" be read as "it's an authentic NCP host."
 
 ### Subsystems & engineering we added
 - **ITS network logins** (Civitae `feature/its-ncp-debug`): `pdp10-ka-fixed` (KAIMP interrupt
@@ -86,9 +86,10 @@ still future work. Don't let "it runs `@L 1`" be read as "it's an authentic NCP 
   `mini/src/waits-ncpd/waitsconnect.c`, `imp06.simh`) — preserved in the import (see below).
 - **Event-driven per-IMP NCP startup** (`mini/noc-server.py`) — replaced a fixed 35 s timer
   that raced IMP boot speed on faster hardware and left host interfaces peerless.
-- **1822 host-ready emulator gate + FORCEDOWN lever** (`kx10_imp.c`) — for host69; see its
-  notebook. (Currently only in the gitignored build cache + the host69 artifacts — TODO: land
-  in tracked `src/sims/`.)
+- **1822 host-IMP emulator fidelity fixes** (`kx10_imp.c`, rcornwell `pdp10-ki` fork) — for host69:
+  the host-ready CONI gate + **FORCEDOWN lever**, the **IMP input re-arm** fix, and the **output-done
+  (`IMPOB`)** fix (host69 notebook §3/§10.3/§10.6/§10.7). Preserved in `netser-build/emulator-fork/`
+  (patch + git bundle). TODO: land in tracked `src/sims/` (publish a `kurthamm/sims` fork).
 - **Host lifecycle & ops tooling** — `hostctl.sh`, per-host `*ctl.sh`, `arpanet-recover.sh`,
   `arpanet-health.sh` (`docs/host-lifecycle.md`).
 - **Production deployment** — migration to this DigitalOcean droplet, Cloudflare-tunnel hosting,
@@ -112,7 +113,9 @@ still future work. Don't let "it runs `@L 1`" be read as "it's an authentic NCP 
 ---
 
 ## Per-effort notebooks (status)
-- [x] **host69-bbn-tenex** — `docs/host69-ncp-login-investigation.md` + `netser-build/investigation-2026-06-28/` artifacts.
+- [x] **host69-bbn-tenex** — `docs/host69-ncp-login-investigation.md` (full journal: §8 dead-ends, §9 gotchas)
+      + `docs/host69-go-live-plan.md` (4-phase go-live) + `netser-build/` (NETLIT source, `emulator-fork/`,
+      `investigation-2026-06-28/` artifacts). Login DONE + hardened + deployed; going live in phases.
 - [x] **its-network-login** — `docs/journal/its-network-login.md` (the activation story for #70/134/198/126).
 - [x] **host06-multics** — `mini/host06-multics/README.md` (was undocumented).
 - [x] **host01-sigma** — `mini/host01-sigma/README.md` (honest: CP-V via terminal bridge, not yet native NCP).
@@ -126,5 +129,13 @@ still future work. Don't let "it runs `@L 1`" be read as "it's an authentic NCP 
 - [x] `docs/journal/PROVENANCE.md` — bootable-binary inventory, checksums, rebuild recipes, and
       vault recommendation. *Decision needed:* actually vault the irreplaceable blobs (the
       droplet-only host69 snapshot + the configured packs) — git-LFS / object store / mirror.
-- [ ] Resume the host69 NCP frontier: incoming RFC reaches host69 but isn't dispatched to the
-      listen socket (`netwrk.mac`) — see the host69 notebook.
+- [x] host69 NCP frontier — **SOLVED**: RFC now dispatched, full credentialed login proven, NETLIT-1e
+      re-listen hardened, golden-snapshot service enabled (host69 notebook §10.3–§10.13b).
+- [ ] **host69 go-live** (`docs/host69-go-live-plan.md`): Phase 1d reboot-survival test → Phase 2 the
+      four 1972 BBN booklet scenarios (#3 Tenex / #11 LIFE / #15 Chess / #18 DOCTOR, `arpa/scenarios.pdf`)
+      → Phase 3 website wiring → Phase 4 deploy.
+- [ ] **Lab mesh robustness** (project-wide): routing to a host **islands under connection/ping load** +
+      heavy restart churn (recover-in-place sometimes won't reconverge → reboot resets it). The deeper
+      follow-up before advertising multi-user load.
+- [ ] **Land the `kx10_imp.c` host69 emulator fixes in tracked `src/sims/`** (currently a patch in
+      `netser-build/emulator-fork/` + the gitignored build cache).
