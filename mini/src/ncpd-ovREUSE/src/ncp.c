@@ -19,8 +19,8 @@
 #define RRP_TIMEOUT    20
 #define ERP_TIMEOUT    20
 #define ALL_TIMEOUT    60
-#define RFC_TIMEOUT     3
-#define CLS_TIMEOUT     3
+#define RFC_TIMEOUT    30
+#define CLS_TIMEOUT    10
 
 #define IMP_REGULAR       0
 #define IMP_LEADER_ERROR  1
@@ -969,9 +969,11 @@ static int process_cls (uint8_t source, uint8_t *data)
     } else
       fprintf (stderr, "NCP: Connection %u confirmed closed.\n", i);
   } else {
-    fprintf (stderr, "NCP: Remote tried to close %u:%u which does not exist.\n",
-             lsock, rsock);
-    ncp_err (source, ERR_SOCKET, data - 1, 9);
+    /* Ignore CLS for an already-closed connection. Sending ERR here
+       confuses ITS's TARAKA, causing it to emit spurious DEAD messages
+       that tear down live data connections. */
+    fprintf (stderr, "NCP: Ignoring CLS for already-closed sockets %u:%u from %03o.\n",
+             lsock, rsock, source);
     return 8;
   }
 
@@ -1578,11 +1580,6 @@ static void app_echo (void)
 
   fprintf (stderr, "NCP: Application echo.\n");
 
-  if (hosts[host].echo.len > 0) {
-    reply_echo (host, 0, 0x20);
-    return;
-  }
-
   memcpy (&hosts[host].echo.addr, &client, len);
   hosts[host].echo.len = len;
   hosts[host].erp_time = time_tick + ERP_TIMEOUT;
@@ -1632,13 +1629,13 @@ static void app_open (void)
   connection[i].client.len = len;
 
   if ((hosts[host].flags & HOST_ALIVE) == 0) {
-    // We haven't communicated with this host yet, send reset and wait.
+    // Send RST to clear stale remote state, but don't wait for RRP.
+    // ITS (and some other hosts) process RST but do not reply with RRP
+    // for hosts they have no active connections with.
     ncp_rst (host);
-    when_rrp (i, app_open_rts, app_open_fail);
-  } else {
-    // Ok to send RTS directly.
-    app_open_rts (i);
+    hosts[host].flags |= HOST_ALIVE;
   }
+  app_open_rts (i);
 }
 
 static void app_listen (void)

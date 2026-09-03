@@ -1,5 +1,6 @@
 """NCP (Network Control Program) daemon controller."""
 
+import os
 import time
 from typing import Optional, Callable, List
 from dataclasses import dataclass
@@ -119,6 +120,14 @@ class NCPController:
         if self._state == ProcessState.STARTING:
             self._set_state(ProcessState.RUNNING)
             self._restart_policy.record_success()
+        # Log output for debugging
+        log_path = os.path.join(
+            self.process_manager.working_dir,
+            "logfiles",
+            f"ncp{self.config.host_str}.log"
+        )
+        with open(log_path, "ab") as f:
+            f.write(data)
 
     def _handle_exit(self, status: int):
         """Handle process exit."""
