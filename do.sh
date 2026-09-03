@@ -11,13 +11,39 @@ else
     echo "SESSION_NUMBER not set (argument or environment)" >&2
     exit 1
 fi
-# Use a single known-good source NCP for browser TELNET sessions.  Rotating
-# through historical TIP sources makes hosted-browser behavior depend on source
-# NCPs that are absent or unreliable in the DigitalOcean deployment.
-IMP_NUMBER=31
-HOST_NUMBER=0
 
-#echo "S-$SESSION_NUMBER I-$IMP_NUMBER H-$HOST_NUMBER"
+# TIP-side source NCPs that browser sessions rotate across, one per
+# SESSION_NUMBER. Each entry is "IMP HOST_NUMBER FULLHOST", where FULLHOST
+# is the ARPANET host number whose NCP socket (mini/ncpFULLHOST) actually
+# answers for that IMP/host-index pair -- see the NCPS table in
+# mini/arpanet. Most IMPs host a single NCP at host index 0, where FULLHOST
+# is just the (zero-padded) IMP number; IMP 10 and IMP 14 each also host a
+# second NCP at host index 1 (LL-TX2 on host 74, CMU-10A on host 78) whose
+# FULLHOST is not derivable from the IMP number alone.
+imp_host_pairs=(
+    "12 0 12"
+    "31 0 31"
+    "4 0 04"
+    "10 0 10"
+    "10 1 74"
+    "13 0 13"
+    "14 0 14"
+    "14 1 78"
+)
+
+# Bounds check (important!)
+if (( SESSION_NUMBER < 0 || SESSION_NUMBER >= ${#imp_host_pairs[@]} )); then
+    echo "Invalid SESSION_NUMBER: $SESSION_NUMBER" >&2
+    exit 1
+fi
+
+# Get the pair
+pair="${imp_host_pairs[$SESSION_NUMBER]}"
+
+# Split into variables
+read -r IMP_NUMBER HOST_NUMBER FULLHOST <<< "$pair"
+
+#echo "S-$SESSION_NUMBER I-$IMP_NUMBER H-$HOST_NUMBER F-$FULLHOST"
 
 
 # ==================================================
@@ -42,23 +68,19 @@ if [[ -z "${DEST-}" ]]; then
 fi
 #echo "---> connect $DEST"
 
-# TIP-side NCP used as the visitor's source host. Host 11 is only reachable
-# from AMES ncp16 today (see docs/hosted-terminal-fixes.md, open issue).
+# Host 11 is only reachable from AMES ncp16 today (see
+# docs/hosted-terminal-fixes.md, open issue); override the rotated source.
 case "$DEST" in
-    11|013) IMP_NUMBER=16 ;;
-    *)      IMP_NUMBER=31 ;;
+    11|013)
+        IMP_NUMBER=16
+        HOST_NUMBER=0
+        FULLHOST=16
+        ;;
 esac
-HOST_NUMBER=0
-if [[ ! -S "mini/ncp$IMP_NUMBER" ]]; then
-    echo "TIP NCP ncp$IMP_NUMBER is not running; cannot reach host $DEST over the ARPANET" >&2
+if [[ ! -S "mini/ncp$FULLHOST" ]]; then
+    echo "TIP NCP ncp$FULLHOST is not running; cannot reach host $DEST over the ARPANET" >&2
     exit 1
 fi
-
-# DEST: either 2nd argument or prompt
-#DEST="${2:-}"
-#if [[ -z "$DEST" ]]; then
-#    read -r DEST
-#fi
 
 cd ./mini
 exec ./dotelnet.sh "$IMP_NUMBER" "$HOST_NUMBER" "$DEST" "$COMMAND"
