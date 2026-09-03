@@ -1,0 +1,604 @@
+diff --git a/PDP10/kx10_imp.c b/PDP10/kx10_imp.c
+index f97aec5..320ecf4 100644
+--- a/PDP10/kx10_imp.c
++++ b/PDP10/kx10_imp.c
+@@ -26,6 +26,7 @@
+ 
+ #include "kx10_defs.h"
+ #include "sim_ether.h"
++#include "imp_udp.h"            /* authentic 1822-over-UDP host interface (ncp mode) */
+ 
+ #if NUM_DEVS_IMP > 0
+ #define IMP_DEVNUM      0460
+@@ -41,6 +42,11 @@
+ #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
+ #define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
+ 
++#define UNIT_V_NCP      (UNIT_V_UF + 3)         /* authentic 1822-over-UDP (ncp) mode */
++#define UNIT_NCP        (1 << UNIT_V_NCP)
++#define PFLG_FINAL      00001                   /* H316 hi flag: last word of message */
++#define PFLG_READY      00002                   /* H316 hi flag: host/imp ready line   */
++
+ #define TYPE_MIT        0              /* MIT Style KAIMP ITS */
+ #define TYPE_BBN        1              /* BBN style interface TENEX */
+ #define TYPE_WAITS      2              /* IMP connected to waits system. */
+@@ -468,6 +474,11 @@ struct imp_device {
+     int               init_state;              /* Initialization state */
+     uint32            dhcp_xid;                /* Transaction ID */
+     int               padding;                 /* Type zero padding */
++    int               udp_link;                /* 1822/UDP link handle (ncp mode), or IMP_UDP_NOLINK */
++    int               imp_link_up;             /* ncp: input armed -- monitor issued IMP_STRIN, deliver 1 IMP msg */
++    int               host_ready;              /* ncp: host asserted host-ready (CONO 1B19); gates imp-ready line in CONI */
++    uint16            pending_buf[IMP_UDP_MAXDATA]; /* ncp: 1822 msg received before the host armed input */
++    int               pending_nw;               /* ncp: words in pending_buf (0 = empty); IMP holds msg for host */
+     uint64            obuf;                    /* Output buffer */
+     uint64            ibuf;                    /* Input buffer */
+     int               obits;                   /* Output bits */
+@@ -519,6 +530,8 @@ void           imp_timer_task(struct imp_device *imp);
+ void           imp_send_rfmn(struct imp_device *imp);
+ void           imp_packet_in(struct imp_device *imp);
+ void           imp_send_packet (struct imp_device *imp_data, int len);
++void           imp_udp_send(struct imp_device *imp, int len);
++void           imp_udp_packet_in(struct imp_device *imp);
+ void           imp_free_packet(struct imp_device *imp, struct imp_packet *p);
+ struct imp_packet * imp_get_packet(struct imp_device *imp);
+ void           imp_arp_update(struct imp_device *imp, in_addr_T ipaddr, ETH_MAC ethaddr, int age);
+@@ -555,6 +568,12 @@ uint16        imp_owcnt;
+ 
+ int       imp_mpx_lvl = 0;
+ double    last_coni;
++/* TEMP diagnostic lever (NOT in imp_data, so snapshot SAVEDATA layout is unchanged):
++   when set via `deposit IMP FORCEDOWN 1`, the BBN/NCP CONI surfaces bit 1B22 (0020000),
++   the imp-ready-line-OFF / imp-down indication TENEX watches (IMPSTT -> IMPRDT -> IMPDRQ).
++   Used to drive ONE clean host69-side IMP down/up cycle after RESTORE so TENEX runs its
++   own NETDWN/IMPRSN recovery and flushes stale RFNM-waiting links. Default 0 = no change. */
++int       imp_force_down = 0;
+ 
+ UNIT imp_unit[] = {
+     {UDATA(imp_srv,     UNIT_IDLE+UNIT_ATTABLE+UNIT_DHCP, 0)},  /* 0 */
+@@ -593,6 +612,10 @@ MTAB imp_mod[] = {
+            "Don't aquire address from DHCP"},
+     { UNIT_DHCP, UNIT_DHCP, "DHCP", "DHCP", NULL, NULL, NULL,
+            "Use DHCP to set IP address"},
++    { UNIT_NCP, 0, NULL, "NONCP", NULL, NULL, NULL,
++           "Use the modern IP/Ethernet IMP backend"},
++    { UNIT_NCP, UNIT_NCP, "NCP", "NCP", NULL, NULL, NULL,
++           "Authentic 1822 host interface over UDP to an H316 IMP"},
+     { MTAB_XTD|MTAB_VDV, 0, "DHCPIP", NULL,
+       NULL, &imp_show_dhcpip, NULL, "DHCP info" },
+ #if KS
+@@ -652,6 +675,7 @@ DEBTAB              imp_debug[] = {
+ 
+ REG                 imp_reg[] = {
+     {SAVEDATA(DATA, imp_data) },
++    {DRDATA(FORCEDOWN, imp_force_down, 32), REG_HIDDEN},
+     {0}
+ };
+ 
+@@ -855,9 +879,33 @@ static void check_interrupts (UNIT *uptr)
+             set_interrupt(DEVNUM, imp_data.pia);
+         else
+             set_interrupt_mpx(DEVNUM, imp_data.pia, imp_mpx_lvl);
++    } else if ((uptr->flags & UNIT_NCP) && (uptr->STATUS & IMPLW)) {
++        /* End-of-input is a SEPARATE 1822 interrupt from input-word-ready.  TENEX's
++           PI dispatch (impdv.mac IMPSV) runs IMPEIN -- which clears IMIB and re-arms
++           input via IMISRT -- only on an interrupt where IMPINB(=IMPID) is CLEAR and
++           IMPEIB(=IMPLW) is SET.  Once the host has read the last data word (IMPID
++           cleared) but the end-of-input latch (IMPLW) still stands, raise that
++           standalone interrupt; otherwise IMPEIN never runs, input is never re-armed,
++           and the next RFC is held forever. */
++        set_interrupt(DEVNUM, imp_data.pia);
+     }
+-    if (uptr->STATUS & IMPOD)
+-       set_interrupt_mpx(DEVNUM, imp_data.pia >> 3, imp_mpx_lvl + 1);
++    if (uptr->STATUS & IMPOD) {
++       /* TENEX's BBN IMP driver assigns ONE PI channel (via CONO ODPIEN -> pia
++          bits 0-2) and sets the separate "output" PIA field (bits 3-5) to 0, i.e.
++          it expects output-done to interrupt on the SAME channel as input.  Use
++          the output PIA if the monitor set one, else fall back to the input PIA so
++          the output-done interrupt actually fires and impsvx can dispatch it. */
++       int opia = (imp_data.pia >> 3) & 7;
++       if (opia == 0)
++           opia = imp_data.pia & 7;
++       set_interrupt_mpx(DEVNUM, opia, imp_mpx_lvl + 1);
++    }
++    sim_debug(DEBUG_IRQ, &imp_dev,
++        "IMP chkint STATUS=%06o pia=%03o in=%o out=%o (ID=%d OD=%d RDY=%d)\n",
++        (uint32)uptr->STATUS, imp_data.pia, imp_data.pia & 7,
++        (imp_data.pia >> 3) & 7,
++        (uptr->STATUS & IMPID) != 0, (uptr->STATUS & IMPOD) != 0,
++        (uptr->STATUS & IMPR) != 0);
+ }
+ 
+ t_stat imp_devio(uint32 dev, uint64 *data)
+@@ -904,12 +952,83 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+              break;
+         case TYPE_BBN:
+         case TYPE_WAITS:
++             if (uptr->flags & UNIT_NCP) {
++                 /* TENEX-faithful BBN IMP CONO, decoded against the real driver
++                    impdv.mac (build-tenex/install/monitor).  TENEX assigns the
++                    PI channels with:
++                      IMPION = <10+chan>B27 + <10+chan>  (input,  chan in low 3)
++                      IMPOON = <10+chan>B31              (output, chan in B28-31)
++                    and drives the transfer with BLKI/BLKO, ending output with
++                      IMPEOB 020000 (send end bit -> ship the 1822 message)
++                    IMPSTO 040000 stop, IMPGEB 010000 clear-end-input,
++                    1B19 0200000 clear error / set host ready. */
++                 if (*data & 0000010) {        /* IMPION/IMPIOF: input PI */
++                     imp_data.pia &= ~07;
++                     if (*data & 07) {         /* IMPION: assign + arm input */
++                         imp_data.pia |= *data & 07;
++                         imp_data.imp_link_up = 1;
++                     } else {                  /* IMPIOF: clear input PI */
++                         imp_data.imp_link_up = 0;
++                     }
++                 } else if ((*data >> 4) & 010) { /* IMPOON/IMPOOF: output PI */
++                     imp_data.pia &= ~070;
++                     imp_data.pia |= ((*data >> 4) & 07) << 3;
++                 }
++                 if (*data & 0040000)          /* IMPSTO stop output */
++                     uptr->STATUS &= ~IMPOD;
++                 if (*data & 0010000)          /* IMPGEB clear end of input */
++                     uptr->STATUS &= ~IMPLW;
++                 if (*data & 0200000) {        /* 1B19 clear error flop + assert host ready */
++                     uptr->STATUS &= ~(IMPERR|IMPHER);
++                     /* The monitor has enabled the interface (IMPRSS does
++                        CONO IMP,1B19 as it brings the link up).  Only NOW may we
++                        surface the imp-ready line (1B22) in CONI -- the real 1822
++                        IMP asserts ready only after the host enables.  Surfacing
++                        it earlier makes IMPRSS (CONSZ IMP,1B22 / RET) think the
++                        link is already up and bail before assigning the PI
++                        channels, which is why pia stayed 0. */
++                     imp_data.host_ready = 1;
++                 }
++                 if (*data & 0020000) {        /* IMPEOB end of output -> send */
++                     if (uptr->OPOS > 0) {
++                         imp_send_packet(&imp_data, (uptr->OPOS + 7) >> 3);
++                         memset(imp_data.sbuffer, 0, ETH_FRAME_SIZE);
++                         uptr->OPOS = 0;
++                     }
++                     /* 1822-fidelity: shipping the end bit COMPLETES the message, and the
++                        real BBN interface raises output-done once more so the driver's
++                        IMODN end-of-message step (CONO I.EOM -> set IMODSP=IMODN2, then wait
++                        for the next output-done) can run IMODN2 to start the next queued
++                        message or, if none, stop output and clear the software IMPOB flag.
++                        Clearing IMPOD here (the old behavior) stranded the driver: it issued
++                        the end bit, armed IMODN2, and never got the completion interrupt, so
++                        IMPOB stayed set forever and EVERY subsequent host->IMP message (the
++                        host-ready NOPs, all RSTs, and the connection RRP) was never sent.
++                        Output-side analog of the input re-arm fix (e7c64e7). */
++                     uptr->STATUS |= IMPOD;
++                 }
++                 sim_debug(DEBUG_CONO, dptr,
++                    "IMP TENEXCONO data=%06o -> pia=%03o (ION=%d OON=%d EOB=%d "
++                    "STO=%d GEB=%d)\n", (uint32)*data, imp_data.pia,
++                    (*data & 010) != 0, (((*data >> 4) & 010) != 0),
++                    (*data & 020000) != 0, (*data & 040000) != 0,
++                    (*data & 010000) != 0);
++                 check_interrupts(uptr);
++                 break;
++             }
+              if (*data & IMP_ODPIEN) {
+                  imp_data.pia &= ~07;
+                  imp_data.pia |= *data & 07;
+                  uptr->STATUS &= ~(IMPO32|IMPLHW|IMPOD);
+                  if (*data & IMP_O32)
+                      uptr->STATUS |= IMPO32;
++                 /* Arm input here (the PI channel is now assigned) rather than on
++                    STRIN.  TENEX's bring-up sets up the input channel via this CONO
++                    (ODPIEN, e.g. 206415) only AFTER it has confirmed IMP_IDONE is
++                    clear (136221-136224); delivering input on the earlier STRIN
++                    races that check and makes the monitor skip the channel setup,
++                    leaving pia=0 and the output unable to dispatch. */
++                 imp_data.imp_link_up = 1;  /* input armed: deliver 1 IMP msg */
+              }
+              if (*data & IMP_IDPIEN) {
+                  imp_data.pia &= ~070;
+@@ -943,6 +1062,12 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+                  uptr->STATUS &= ~IMPID;
+                  uptr->ILEN = 0;
+              }
++             sim_debug(DEBUG_CONO, dptr,
++                 "IMP BBNCONO data=%06o -> pia=%03o (ODPIEN=%d IDPIEN=%d IEPIEN=%d "
++                 "FINO=%d STROUT=%d STRIN=%d)\n", (uint32)*data, imp_data.pia,
++                 (*data & IMP_ODPIEN)!=0, (*data & IMP_IDPIEN)!=0,
++                 (*data & IMP_IEPIEN)!=0, (*data & IMP_FINO)!=0,
++                 (*data & IMP_STROUT)!=0, (*data & IMP_STRIN)!=0);
+              check_interrupts(uptr);
+              break;
+         }
+@@ -955,6 +1080,129 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+              break;
+         case TYPE_BBN:
+         case TYPE_WAITS:
++             if (uptr->flags & UNIT_NCP) {
++                 /* TENEX-faithful BBN IMP CONI layout, per impdv.mac.  The
++                    monitor polls (IMPSV/IMPRSS/IMISRT):
++                      low 3 bits  input PI channel assigned
++                      0000010     IMPINB  input word ready  (input done)
++                      0000160     output PI channel (bits 29-31)
++                      0000200     IMPOUB  output word ready (output done)
++                      0004000     IMPEIB  end of input
++                      0020000     1B22    imp ready line up (imp up)
++                      0040000     1B21    error flop
++                      0100000     1B20    host not ready
++                      0200000     1B19    power on / imp ready
++                    IMPRSS proceeds ONLY when power (0200000) is on AND the imp
++                    ready line (0020000) is OFF (CONSZ IMP,1B19 / CONSZ IMP,1B22 /
++                    RET, impdv.mac:4321).  So power must be on at boot, but the
++                    ready line must stay OFF until the host enables the interface
++                    (CONO IMP,1B19 -> host_ready).  Otherwise IMPRSS sees the link
++                    "already up", bails, and never assigns the PI channels (pia=0).
++                    Once host_ready is set the real IMP responds ready and we
++                    surface 1B22, putting IMPSTT on its normal up path. */
++                 *data = (uint64)(imp_data.pia & 07);              /* input chan */
++                 *data |= (uint64)(((imp_data.pia >> 3) & 07) << 4); /* out chan */
++                 if (uptr->STATUS & IMPID)
++                     *data |= 0000010;   /* IMPINB input word ready */
++                 if (uptr->STATUS & IMPLW)
++                     *data |= 0004000;   /* IMPEIB end of input */
++                 if (uptr->STATUS & IMPOD)
++                     *data |= 0000200;   /* IMPOUB output word ready */
++                 if (uptr->STATUS & IMPR) {
++                     *data |= 0200000;   /* 1B19 power on / imp reachable */
++                     /* 1B22 (0020000) is the IMP "ready line", and in TENEX's
++                        polarity 1B22 SET means the ready line is OFF / imp not
++                        ready: IMPRSS (impdv.mac:4212) only proceeds when 1B22 is
++                        OFF, and IMPSTT (impdv.mac:4073) marks the imp DOWN when
++                        1B22 is ON (-> IMPRDT -> IMPDRQ ~20s later).  So during
++                        normal up-operation TENEX wants 1B22 CLEAR.  The lab IMP is
++                        always up, so we leave 1B22 clear and never surface it.
++                        (The earlier code raised 1B22 on host_ready, which is what
++                        dropped the imp ~20s after IMPRSS asserted host-ready.) */
++                 } else
++                     *data |= 0100000;   /* 1B20 host not ready */
++                 if (imp_force_down)
++                     *data |= 0020000;   /* 1B22 forced: imp-down indication (post-RESTORE recycle) */
++                 if (uptr->STATUS & (IMPERR|IMPHER))
++                     *data |= 0040000;   /* 1B21 error flop */
++                 sim_debug(DEBUG_CONI, dptr,
++                    "IMP TENEXCONI %06o pia=%03o (ID=%d OD=%d LW=%d RDY=%d)\n",
++                    (uint32)*data, imp_data.pia, (uptr->STATUS & IMPID) != 0,
++                    (uptr->STATUS & IMPOD) != 0, (uptr->STATUS & IMPLW) != 0,
++                    (uptr->STATUS & IMPR) != 0);
++                 {  /* TEMP probe: dump TENEX bring-up gate vars from monitor memory */
++                     extern uint64 M[];
++                     static uint64 pm[5];
++                     uint64 cm[5];
++                     cm[0]=M[070203]; cm[1]=M[070204]; cm[2]=M[070225];
++                     cm[3]=M[070224]; cm[4]=M[070214];
++                     if (cm[0]!=pm[0]||cm[1]!=pm[1]||cm[2]!=pm[2]||cm[3]!=pm[3]||cm[4]!=pm[4]) {
++                         sim_debug(DEBUG_CONI, dptr,
++                            "    [GATE] imprdy=%012llo neton=%012llo nettch=%012llo impdrq=%012llo imprdl=%012llo impord=%012llo impob=%012llo nopcnt=%012llo\n",
++                            (unsigned long long)cm[0],(unsigned long long)cm[1],(unsigned long long)cm[2],
++                            (unsigned long long)cm[3],(unsigned long long)cm[4],
++                            (unsigned long long)M[070213],(unsigned long long)M[070330],(unsigned long long)M[070361]);
++                         pm[0]=cm[0];pm[1]=cm[1];pm[2]=cm[2];pm[3]=cm[3];pm[4]=cm[4];
++                     }
++                 }
++                 {  /* NCP-dispatch probe: after a delivered RFC is queued by IMPEIN,
++                       does process-level service drain it and run RECSTR?  Watch the
++                       IMP->NCP input handoff state (impdv.mac/netwrk.mac symbols from
++                       tenex.dis).  impflg = "request job-0 service" counter (AOS'd by
++                       IMPEIN); impibi/impibo = IMP input buffer in/out queue ptrs
++                       (IMPEIN appends to impibi, job-0 drains via impibo); impnfi =
++                       free input bufs; impncl = #control-input conns. */
++                     extern uint64 M[];
++                     extern unsigned long ncp_q_impibi, ncp_aos_impncl, ncp_recstr;
++                     extern unsigned long ncp_e_nobuf, ncp_e_flush, ncp_e_nomsg, ncp_e_irreg;
++                     extern unsigned long ncp_badhost, ncp_forcerst, ncp_imsrst;
++                     extern unsigned long ncp_dispatch, ncp_recrts, ncp_reccls, ncp_disp_handler;
++                     extern unsigned long ncp_im8rst, ncp_im8rrp, ncp_im8nop;
++                     static uint64 qm[5];
++                     static unsigned long cm[13];
++                     uint64 qc[5];
++                     unsigned long cc[13];
++                     int i;
++                     qc[0]=M[070216]; qc[1]=M[070321]; qc[2]=M[070322];
++                     qc[3]=M[070227]; qc[4]=M[070336];
++                     cc[0]=ncp_q_impibi; cc[1]=ncp_aos_impncl; cc[2]=ncp_recstr;
++                     cc[3]=ncp_e_nobuf; cc[4]=ncp_e_flush; cc[5]=ncp_e_nomsg; cc[6]=ncp_e_irreg;
++                     cc[7]=ncp_badhost; cc[8]=ncp_forcerst; cc[9]=ncp_imsrst;
++                     cc[10]=ncp_dispatch; cc[11]=ncp_recrts; cc[12]=ncp_reccls;
++                     {
++                         int chg = (qc[0]!=qm[0]||qc[1]!=qm[1]||qc[2]!=qm[2]||qc[3]!=qm[3]||qc[4]!=qm[4]);
++                         for (i=0;i<13;i++) if (cc[i]!=cm[i]) chg=1;
++                         if (chg) {
++                             sim_debug(DEBUG_CONI, dptr,
++                                "    [NCP] RFCq=%lu ctlconn=%lu | dispatch=%lu RECSTR=%lu RECRTS=%lu RECCLS=%lu | IM8: rst=%lu rrp=%lu nop=%lu | forcerst=%lu imsrst=%lu\n",
++                                cc[0],cc[1],cc[10],cc[2],cc[11],cc[12],ncp_im8rst,ncp_im8rrp,ncp_im8nop,cc[8],cc[9]);
++                             qm[0]=qc[0];qm[1]=qc[1];qm[2]=qc[2];qm[3]=qc[3];qm[4]=qc[4];
++                             for (i=0;i<13;i++) cm[i]=cc[i];
++                         }
++                     }
++                 }
++                 {  /* OUTPUT-engine probe: is the host->IMP send path enabled and idle?
++                       impord(70213)=master output-enable (SETOM in IMPRSS up, SETZM in
++                       down); impdrq(70224)=reset-cycle-requested; impob(70330)=output-in-
++                       progress flag (IMPXOU won't start a new msg if set); nopcnt(70361)=
++                       host-ready NOPs pending; impobo(70324)/imphbo(70326)=lo/hi-pri output
++                       queue heads.  If impord=0 every queued RST/RRP is stranded. */
++                     extern uint64 M[];
++                     static uint64 om[6] = {~0ULL,~0ULL,~0ULL,~0ULL,~0ULL,~0ULL};
++                     uint64 oc[6];
++                     int i;
++                     oc[0]=M[070213]; oc[1]=M[070224]; oc[2]=M[070330];
++                     oc[3]=M[070361]; oc[4]=M[070324]; oc[5]=M[070326];
++                     if (oc[0]!=om[0]||oc[1]!=om[1]||oc[2]!=om[2]||oc[3]!=om[3]||oc[4]!=om[4]||oc[5]!=om[5]) {
++                         sim_debug(DEBUG_CONI, dptr,
++                            "    [OUT] impord=%012llo impdrq=%012llo impob=%012llo nopcnt=%012llo impobo=%012llo imphbo=%012llo\n",
++                            (unsigned long long)oc[0],(unsigned long long)oc[1],(unsigned long long)oc[2],
++                            (unsigned long long)oc[3],(unsigned long long)oc[4],(unsigned long long)oc[5]);
++                         for (i=0;i<6;i++) om[i]=oc[i];
++                     }
++                 }
++                 break;
++             }
+              *data = (uint64)(imp_data.pia & 0777);
+              if (uptr->STATUS & IMPOD)
+                  *data |= IMP_ODONE;
+@@ -982,6 +1230,12 @@ t_stat imp_devio(uint32 dev, uint64 *data)
+         break;
+     case DATAI:
+         *data = imp_data.ibuf;
++        if (uptr->flags & UNIT_NCP)
++            /* Reading a data word clears only input-word-ready (IMPID).  Leave the
++               end-of-input latch (IMPLW) set so TENEX takes a separate end-of-input
++               interrupt and runs IMPEIN; IMPLW is cleared there by CONO IMPGEB. */
++            uptr->STATUS &= ~IMPID;
++        else
+             uptr->STATUS &= ~(IMPID|IMPLW);
+         sim_debug(DEBUG_DATAIO, dptr, "IMP %03o DATI %012llo %08x PC=%o\n",
+                  dev, *data, (uint32)(*data >> 4), PC);
+@@ -1213,8 +1467,12 @@ t_stat imp_srv(UNIT * uptr)
+         check_interrupts (uptr);
+     }
+ #endif
+-    if (uptr->ILEN == 0 && (uptr->STATUS & (IMPIB|IMPID)) == 0)
++    if (uptr->ILEN == 0 && (uptr->STATUS & (IMPIB|IMPID)) == 0) {
++        if (uptr->flags & UNIT_NCP)
++            imp_udp_packet_in(&imp_data);
++        else
+             imp_packet_in(&imp_data);
++    }
+     return SCPE_OK;
+ }
+ 
+@@ -1296,6 +1554,28 @@ t_stat imp_eth_srv(UNIT * uptr)
+ {
+     sim_clock_coschedule(uptr, 1000);              /* continue poll */
+ 
++    /* In authentic ncp mode the receiver is a UDP datagram socket to the H316
++       IMP; the DHCP/IP/Nop-handshake machinery below does not apply (the real
++       IMP performs the 1822 Nop handshake over the wire). */
++    if (imp_unit[0].flags & UNIT_NCP) {
++        imp_udp_packet_in(&imp_data);
++        /* The H316 IMP asserts its host-ready line only as a one-shot burst at
++           startup; if the host wasn't fully booted then, it is missed and the
++           bring-up deadlocks (host won't transmit until it sees ready, IMP won't
++           re-assert ready until the host transmits).  In the lab the IMP is always
++           up, so treat an attached UDP link as "IMP ready" -- this lets TENEX's
++           IMPRSS proceed, assign the PI channels and send its own host-ready Nops,
++           which in turn elicits the IMP's response and completes the handshake. */
++        if (imp_data.udp_link != IMP_UDP_NOLINK)
++            imp_unit[0].STATUS |= IMPR;
++        /* Re-arm with a clock-INDEPENDENT activation: sim_clock_coschedule (the
++           top of this routine) stops firing once TENEX finishes booting and the
++           calibrated clock settles, which silently halts inbound UDP polling.
++           A fixed-cycle sim_activate keeps the UDP receiver alive for the link. */
++        sim_activate(uptr, 10000);
++        return SCPE_OK;
++    }
++
+     imp_timer_task(&imp_data);
+     if (uptr->ILEN == 0 && (uptr->STATUS & (IMPIB|IMPID)) == 0)
+         imp_packet_in(&imp_data);
+@@ -1608,6 +1888,133 @@ imp_packet_in(struct imp_device *imp)
+    }
+ }
+ 
++/*
++ * Authentic 1822-over-UDP host interface (ncp mode).
++ *
++ * These two routines relay the raw 1822 host<->IMP message between the PDP-10
++ * host-facing side (sbuffer/rbuffer) and an H316 IMP simulator's host
++ * interface ("hi") over a UDP datagram socket, using R.Armstrong's framing
++ * (imp_udp.c).  The datagram carries an array of 16-bit words: data[0] is an
++ * out-of-band flags word (PFLG_READY = host/imp ready line, PFLG_FINAL = end
++ * of message); data[1..] are the message words.  Because udp_send/udp_receive
++ * htons() each word, the on-the-wire byte order is exactly the sbuffer byte
++ * order, so packing is a plain big-endian byte<->word pairing.
++ */
++void
++imp_udp_send(struct imp_device *imp, int len)
++{
++    uint16 buf[IMP_UDP_MAXDATA];
++    int    i, nw;
++
++    if (imp->udp_link == IMP_UDP_NOLINK)
++        return;
++    /* A complete 1822 message is assembled per call. */
++    buf[0] = PFLG_FINAL | PFLG_READY;
++    nw = 1;
++    for (i = 0; i < len && nw < IMP_UDP_MAXDATA; i += 2) {
++        uint16 w = (uint16)imp->sbuffer[i] << 8;
++        if (i + 1 < len)
++            w |= imp->sbuffer[i + 1];
++        buf[nw++] = w;
++    }
++    sim_debug(DEBUG_DETAIL, &imp_dev, "IMP ncp send %d bytes (%d words)\n", len, nw);
++    (void)udp_send(&imp_dev, imp->udp_link, buf, (uint16)nw);
++}
++
++void
++imp_udp_packet_in(struct imp_device *imp)
++{
++    uint16 buf[IMP_UDP_MAXDATA];
++    int32  nw;
++    int    i, nb;
++
++    if (imp->udp_link == IMP_UDP_NOLINK)
++        return;
++    {
++        static uint32 gate_cnt = 0;
++        if ((++gate_cnt & 0x3ff) == 0)
++            sim_debug(DEBUG_IRQ, &imp_dev,
++                "IMP ncp gate#%u ILEN=%d STATUS=%06o pending=%d link_up=%d\n",
++                gate_cnt, imp_unit[0].ILEN, (uint32)imp_unit[0].STATUS,
++                imp->pending_nw, imp->imp_link_up);
++    }
++    /* Don't fetch a new message while one is still being delivered. */
++    if (imp_unit[0].ILEN != 0 || (imp_unit[0].STATUS & (IMPIB|IMPID)) != 0)
++        return;
++    /* If a message is HELD (received before the host armed input) and the host
++       has now armed (STRIN), deliver the held message instead of receiving a new
++       one.  A real 1822 IMP holds its host-output message until the host takes
++       it; the H316 IMP only sends its startup NOPs once, so we must not drop them
++       just because the monitor had not armed input yet. */
++    if (imp->pending_nw > 0 && imp->imp_link_up) {
++        nw = imp->pending_nw;
++        for (i = 0; i < nw; i++)
++            buf[i] = imp->pending_buf[i];
++        imp->pending_nw = 0;
++    } else {
++        static uint32 ncp_poll_cnt = 0;
++        nw = udp_receive(&imp_dev, imp->udp_link, buf, IMP_UDP_MAXDATA);
++        if ((++ncp_poll_cnt & 0x3ff) == 0 || nw > 0)
++            sim_debug(DEBUG_IRQ, &imp_dev,
++                "IMP ncp recv poll#%u nw=%d buf0=%o link=%d\n",
++                ncp_poll_cnt, nw, nw > 0 ? buf[0] : 0, imp->udp_link);
++        if (nw <= 0)
++            return;
++    }
++    /* buf[0] = out-of-band flags.  ALWAYS surface the IMP-ready line (a status
++       bit the monitor polls via CONI): without it the monitor never sees the IMP
++       come ready, so it never brings up its interface and the host->IMP handshake
++       deadlocks. */
++    if (buf[0] & PFLG_READY)
++        imp_unit[0].STATUS |= IMPR;
++    else
++        imp_unit[0].STATUS &= ~IMPR;
++    /* Deliver a message body ONLY when the monitor has armed input via IMP_STRIN
++       (imp_link_up = "input armed", set in the CONO IMP_STRIN handler).  Matches
++       real 1822 hardware: the host arms an input buffer (STRIN), the IMP delivers
++       one message, then the host re-arms.  This also keeps IMP_IDONE CLEAR until
++       the monitor is ready -- TENEX's bring-up (137143-137145) bails if input-done
++       is already set, so delivering too early aborts the IMP bring-up.  When not
++       armed, surface the ready line and HOLD the body (don't drop it) so the IMP's
++       one-shot startup NOP survives until the monitor arms input. */
++    if (!imp->imp_link_up) {
++        if (nw > 1) {           /* has a body: hold it for the host */
++            for (i = 0; i < nw; i++)
++                imp->pending_buf[i] = buf[i];
++            imp->pending_nw = nw;
++        }
++        check_interrupts(&imp_unit[0]);
++        return;
++    }
++    /* Unpack the message words (after the flags word) into rbuffer bytes. */
++    nb = 0;
++    for (i = 1; i < nw; i++) {
++        imp->rbuffer[nb++] = (buf[i] >> 8) & 0xff;
++        imp->rbuffer[nb++] = buf[i] & 0xff;
++    }
++    sim_debug(DEBUG_DETAIL, &imp_dev, "IMP ncp recv %d words (%d msg bytes) flags=%o\n",
++              nw, nb, buf[0]);
++    if (nb == 0) {              /* ready-status datagram only, no message body:
++                                   surface the ready line but do NOT consume the
++                                   host's armed input buffer.  A bare 1822 line-
++                                   ready / NOP keepalive is not a host-input message;
++                                   eating the arm here left imp_link_up stuck at 0
++                                   (TENEX got no input-done, never ran IMPEIN, never
++                                   re-armed via IMISRT), so the next real ICP RFC was
++                                   held in pending_buf forever and NETLIT never saw
++                                   it.  Keep the arm so the held RFC delivers next. */
++        check_interrupts(&imp_unit[0]);
++        return;
++    }
++    imp->imp_link_up = 0;       /* consume the arm; monitor must STRIN again */
++    imp_unit[0].STATUS |= IMPIB;
++    imp_unit[0].IPOS = 0;
++    imp_unit[0].ILEN = nb * 8;
++    check_interrupts(&imp_unit[0]);
++    if (!sim_is_active(&imp_unit[0]))
++        sim_activate(&imp_unit[0], 100);
++}
++
+ void
+ imp_send_packet (struct imp_device *imp, int len)
+ {
+@@ -1619,6 +2026,12 @@ imp_send_packet (struct imp_device *imp, int len)
+     int        lk;
+     int        mt;
+ 
++    /* Authentic ncp mode: relay the raw 1822 message to the H316 IMP. */
++    if (imp_unit[0].flags & UNIT_NCP) {
++        imp_udp_send(imp, len);
++        return;
++    }
++
+     lk = 0;
+     n = len;
+     switch (imp->sbuffer[0] & 0xF) {
+@@ -3103,6 +3516,9 @@ t_stat imp_reset (DEVICE *dptr)
+         /* Clear ARP table. */
+         memset(imp_data.arp_table, 0, sizeof(imp_data.arp_table));
+         imp_data.dhcp_state = DHCP_STATE_OFF;
++        imp_data.udp_link = IMP_UDP_NOLINK;   /* no authentic 1822/UDP link yet */
++        imp_data.imp_link_up = 0;             /* gate IMP input until host drives it */
++        imp_data.host_ready = 0;              /* imp-ready line stays off until host enables (CONO 1B19) */
+     }
+     /* Clear queues. */
+     imp_data.sendq = NULL;
+@@ -3146,6 +3562,31 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
+                    break;
+     }
+ #endif
++    /* Authentic ncp mode: open a UDP datagram link to the H316 IMP's host
++       interface instead of an Ethernet device.  cptr is the udp connect
++       string, e.g. "21052:localhost:21051" (local:host:remote). */
++    if (imp_unit[0].flags & UNIT_NCP) {
++        int32 link;
++        status = udp_create(&imp_dev, cptr, &link);
++        if (status != SCPE_OK)
++            return status;
++        imp_data.udp_link = link;
++        imp_data.imp_link_up = 0;             /* gate IMP input until host drives it */
++        imp_data.host_ready = 0;              /* imp-ready line stays off until host enables (CONO 1B19) */
++        tptr = (char *) malloc(strlen(cptr) + 1);
++        if (tptr == NULL) {
++            udp_release(&imp_dev, link);
++            imp_data.udp_link = IMP_UDP_NOLINK;
++            return SCPE_MEM;
++        }
++        strcpy(tptr, cptr);
++        uptr->filename = tptr;
++        uptr->flags |= UNIT_ATT;
++        imp_data.init_state = 0;
++        sim_activate_after(&imp_unit[1], 1000);       /* start UDP receiver poll */
++        sim_activate_after(&imp_unit[2], 1000000);    /* start timer service     */
++        return SCPE_OK;
++    }
+     if (!(uptr->flags & UNIT_DHCP) && imp_data.ip == 0)
+       return sim_messagef (SCPE_NOATT, "%s: An IP Address must be specified when DHCP is disabled\n",
+                imp_dev.name);
+@@ -3229,6 +3670,18 @@ t_stat imp_detach(UNIT* uptr)
+ {
+ 
+     if (uptr->flags & UNIT_ATT) {
++        if (uptr->flags & UNIT_NCP) {       /* authentic 1822/UDP link */
++            sim_cancel (uptr+1);            /* stop the UDP receiver poll */
++            sim_cancel (uptr+2);            /* stop the clock timer service */
++            if (imp_data.udp_link != IMP_UDP_NOLINK) {
++                udp_release (&imp_dev, imp_data.udp_link);
++                imp_data.udp_link = IMP_UDP_NOLINK;
++            }
++            free(uptr->filename);
++            uptr->filename = NULL;
++            uptr->flags &= ~UNIT_ATT;
++            return SCPE_OK;
++        }
+         /* If DHCP, release our IP address */
+         if (uptr->flags & UNIT_DHCP) {
+           imp_dhcp_release(&imp_data);

@@ -35,3 +35,10 @@ mini/src/waits-ncpd/waitsconnect
 mini/topol/venv
 web-terminals/*/venv
 mini/imp62.local.simh
+mini/host69-bbn-tenex/snap/*
+# crown jewel: the booted-TENEX snapshot is small (2.4M) and irreplaceable — keep it in git
+!mini/host69-bbn-tenex/snap/host69-live.state
+civitae-import/
+
+# pre-event-driven noc backup (content is in git history)
+mini/noc-server.py.bak-preEventDriven

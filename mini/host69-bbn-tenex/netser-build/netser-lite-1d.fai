@@ -1,0 +1,271 @@
+	TITLE NETLIT
+; NETSER-lite 1d (REAL LOGIN): 1c's ICP socket-swap, then hand the connection to
+; TENEX's own login path via ATPTY -- exactly like NETSER DOLGC (netser.fai:927).
+;   - listen socket 1, accept RFC, ICP socket-swap (build data sockets) -- as 1c
+;   - OPENF send + recv data connections                                 -- as 1c
+;   - ATPTY (recv JFN in AC1, send JFN in AC2): the monitor assigns a Network
+;     Virtual Terminal bound to the connection (netwrk.mac .ATPTY:: -> ASNNVT),
+;     raises carrier -> ttysrv TT7CX/TTCON -> TTC7SJ "START JOB" -> runs EXEC ->
+;     the "@" prompt and LOGIN flow back over the ARPANET.  Gated by ENTFLG<0
+;     (deposited =-1 at restore).  ATPTY RELEASES both JFNs -- the MONITOR pumps
+;     bytes between the connection and the TTY, so NO byte-shuttle is needed here.
+;   - STI to kick the line, then loop back to accept the next login.
+; All primitive JSYS -- sidesteps the NETSER/FAIL-v11 assembly wall.
+
+	OPDEF GTJFN [104B8+20]
+	OPDEF RLJFN [104B8+23]
+	OPDEF OPENF [104B8+21]
+	OPDEF CLOSF [104B8+22]
+	OPDEF PSOUT [104B8+76]
+	OPDEF NOUT  [104B8+224]
+	OPDEF SOUT  [104B8+53]
+	OPDEF MTOPR [104B8+77]
+	OPDEF GDSTS [104B8+145]
+	OPDEF BOUT  [104B8+51]
+	OPDEF CVSKT [104B8+275]
+	OPDEF DISMS [104B8+167]
+	OPDEF HALTF [104B8+170]
+	OPDEF ATPTY [104B8+274]
+	OPDEF STI   [104B8+114]
+
+	P__17
+	A__1
+	B__2
+	C__3
+	D__4
+	LCLSK0__100		; chosen local data socket (octal, even)
+
+START:	MOVE P,[IOWD PDLEN,PDLST]
+	HRROI A,MSG1
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+; ---- listen on socket 1 ----
+	MOVSI A,400001
+	HRROI B,FNAME
+	GTJFN
+	 JRST GJERR
+	MOVEM A,SOCKJ
+	MOVE B,[XWD 400000,100000]
+	OPENF
+	 JRST OPERR
+	MOVE A,SOCKJ
+	MOVEI B,24
+	MOVSI C,777723
+	MTOPR
+	 JFCL
+	HRROI A,MSG3
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+; ---- wait for RFC (foreign host appears in GDSTS) ----
+WATCH:	MOVE A,SOCKJ
+	GDSTS
+	MOVEM C,FHST
+	MOVEM D,FSKT
+	MOVE 5,FHST
+	CAIN 5,777
+	 JRST WSLP
+	JUMPN 5,DOICP
+WSLP:	MOVEI A,2000
+	DISMS
+	JRST WATCH
+
+; ================= ICP =================
+DOICP:	HRROI A,MRF		; RFC RECEIVED
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+; build NET:<LCLSK0>.<FHST>-<FSKT+2>;T  (octal numbers)
+	MOVEI 1,STRING
+	HRLI 1,(<POINT 7,0>)
+	HRROI 2,NETPFX
+	SETZ 3,
+	SOUT
+	MOVEI 2,LCLSK0
+	MOVEI 3,10		; octal radix
+	NOUT
+	 JFCL
+	MOVEI 2,"."
+	IDPB 2,1
+	MOVE 2,FHST
+	MOVEI 3,10
+	NOUT
+	 JFCL
+	MOVEI 2,"-"
+	IDPB 2,1
+	MOVE 2,FSKT
+	ADDI 2,2
+	MOVEI 3,10
+	NOUT
+	 JFCL
+	HRROI 2,SEMIT
+	SETZ 3,
+	SOUT
+; GTJFN the two data sockets
+	MOVSI 1,1
+	HRROI 2,STRING
+	GTJFN
+	 JRST FAILJ
+	MOVEM 1,SJFN
+	MOVSI 1,1
+	HRROI 2,STRING
+	GTJFN
+	 JRST FAILJ
+	MOVEM 1,RJFN
+	CVSKT
+	 JRST FAILJ
+	MOVEM 2,LCLSKT
+; accept the contact RFC (RFCR -> OPND)
+	MOVE A,SOCKJ
+	MOVEI B,20
+	MTOPR
+	 JFCL
+	HRROI A,MRA		; ACCEPTED
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+; let the allocate arrive, then send the data-socket number on the contact
+	MOVEI A,3000
+	DISMS
+	HRROI A,MRS		; SEND SOCKET#
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	MOVE 1,SOCKJ
+	MOVE 2,LCLSKT
+	BOUT
+	HRROI A,MRSD		; SOCKET# SENT
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+; close the contact connection
+	MOVE 1,SOCKJ
+	CLOSF
+	 JFCL
+; open the data connections (these block until the client connects)
+	HRROI A,MRO		; OPEN DATA
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	MOVE 1,SJFN
+	MOVE 2,[XWD 103000,100000]
+	OPENF
+	 JRST FAILS
+	MOVE 1,RJFN
+	MOVE 2,[XWD 100000,200000]
+	OPENF
+	 JRST FAILR
+	HRROI A,MROD		; DATA OPEN
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+; ================= LOGIN HANDOFF (NETSER DOLGC) =================
+; Hand the open send/recv data connection to the monitor as a Network Virtual
+; Terminal.  ATPTY: recv JFN in AC1, send JFN in AC2.  (Old-style NVT: no 1B2.
+; If echo/negotiation is wrong with the client, set 1B2 in AC1 for new NVT.)
+	HRROI A,MRP		; ATTACH NVT
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	MOVE 1,RJFN
+	MOVE 2,SJFN
+	ATPTY
+	 JRST FAILP
+	MOVEM 1,PTY		; tty designator returned
+; kick the line so the login job starts (NETSER DOLGC: MOVEI 2,3 / STI).
+; The monitor now owns the NVT; the EXEC's herald + @ flow to the client.
+	MOVE 1,PTY
+	MOVEI 2,3
+	STI
+	 JFCL
+	HRROI A,MRL		; (console only) LOGIN STARTED ON NVT
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+; PERSISTENT: the login job is a separate job and runs independently; loop back
+; and re-listen on socket 1 for the next visitor.
+	MOVEI A,3000
+	DISMS
+	JRST START
+
+FAILP:	MOVEM 1,ATPERR		; ATPTY left the ATPXn error code in AC1
+	HRROI A,EAP
+	PSOUT
+	MOVE 2,ATPERR
+	MOVEI 3,10
+	NOUT
+	 JFCL
+	HRROI A,CRLF
+	PSOUT
+; release the JFNs ATPTY didn't consume, then re-listen
+	MOVE 1,SJFN
+	CLOSF
+	 JFCL
+	MOVE 1,RJFN
+	CLOSF
+	 JFCL
+	MOVEI A,3000
+	DISMS
+	JRST START
+
+FAILJ:	HRROI A,EFJ
+	PSOUT
+	HALTF
+	JRST START
+FAILS:	HRROI A,EFS
+	PSOUT
+	HALTF
+	JRST START
+FAILR:	HRROI A,EFR
+	PSOUT
+	HALTF
+	JRST START
+GJERR:	HRROI A,EGJ
+	PSOUT
+	HALTF
+	JRST START
+; OPENF (listen) failed -- usually socket 1 still settling right after a handoff.
+; Persistent server: wait and retry the listen rather than dying.
+OPERR:	HRROI A,EOP
+	PSOUT
+	HRROI A,CRLF
+	PSOUT
+	MOVEI A,5000
+	DISMS
+	JRST START
+
+FNAME:	ASCIZ /NET:1#./
+NETPFX:	ASCIZ /NET:/
+SEMIT:	ASCIZ /;T/
+MSG1:	ASCIZ /NETLIT 1D LOGIN SERVER LISTEN SOCKET 1/
+MSG3:	ASCIZ /LISTENING/
+MRF:	ASCIZ /RFC RECEIVED/
+MRA:	ASCIZ /CONTACT ACCEPTED/
+MRS:	ASCIZ /SEND SOCKET NUMBER/
+MRSD:	ASCIZ /SOCKET NUMBER SENT/
+MRO:	ASCIZ /OPEN DATA SOCKETS/
+MROD:	ASCIZ /DATA SOCKETS OPEN/
+MRP:	ASCIZ /ATTACH NVT (ATPTY)/
+MRL:	ASCIZ /LOGIN STARTED ON NVT/
+PMSG:	ASCIZ /[NETLIT NVT READY]/
+EAP:	ASCIZ /ATPTY FAILED, CODE /
+EFJ:	ASCIZ /GTJFN DATA FAILED/
+EFS:	ASCIZ /OPENF SEND FAILED/
+EFR:	ASCIZ /OPENF RECV FAILED/
+EGJ:	ASCIZ /GTJFN FAILED/
+EOP:	ASCIZ /OPENF FAILED/
+CRLF:	BYTE (7) 15,12,0
+
+	PDLEN__40
+PDLST:	BLOCK PDLEN
+SOCKJ:	0
+SJFN:	0
+RJFN:	0
+FHST:	0
+FSKT:	0
+LCLSKT:	0
+PTY:	0
+ATPERR:	0
+STRING:	BLOCK 24
+	END START

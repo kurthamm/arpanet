@@ -1,6 +1,7 @@
 """NCP (Network Control Program) daemon controller."""
 
 import os
+import signal
 import time
 from typing import Optional, Callable, List
 from dataclasses import dataclass
@@ -59,10 +60,53 @@ class NCPController:
             if self.on_state_change:
                 self.on_state_change(self, old_state, new_state)
 
+    def _reap_stray_daemons(self):
+        """Kill any live ncpdov already bound to THIS NCP's port pair.
+
+        A PTY EOF/EIO on the daemon's master fd makes ProcessManager declare the
+        process dead (_handle_pty_read -> _cleanup_process -> on_exit) even when
+        the ncpdov is still running -- _handle_exit then nulls self._process, so
+        the state/_process guards can no longer see the live daemon. A subsequent
+        restart or re-fired IMP-RUNNING event would then spawn a SECOND ncpdov on
+        the same ports (the observed ncp31 double-spawn on 20311/20312). Before we
+        spawn, sweep /proc for any stray ncpdov holding our exact (tx,rx) pair and
+        SIGKILL it, so there is ever only one daemon per NCP.
+        """
+        mine = self._process.pid if self._process else None
+        tx, rx = str(self.config.tx_port), str(self.config.rx_port)
+        try:
+            pids = [p for p in os.listdir("/proc") if p.isdigit()]
+        except OSError:
+            return
+        for pid_s in pids:
+            pid = int(pid_s)
+            if pid == mine:
+                continue
+            try:
+                with open(f"/proc/{pid_s}/cmdline", "rb") as f:
+                    parts = f.read().split(b"\0")
+            except OSError:
+                continue
+            argv = [p.decode("utf-8", "replace") for p in parts if p]
+            if not argv:
+                continue
+            if os.path.basename(argv[0]) != "ncpdov":
+                continue
+            # Match the exact port pair so we never touch another NCP's daemon.
+            if tx in argv[1:] and rx in argv[1:]:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except OSError:
+                    pass
+
     def start(self):
         """Start the NCP daemon."""
         if self._state not in (ProcessState.STOPPED, ProcessState.CRASHED):
             return
+
+        # Guarantee exactly one ncpdov per NCP: clear any stray daemon left alive
+        # by a false PTY-EOF before spawning a fresh one (see _reap_stray_daemons).
+        self._reap_stray_daemons()
 
         self._set_state(ProcessState.STARTING)
 

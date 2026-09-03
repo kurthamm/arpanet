@@ -1,0 +1,93 @@
+
+KI-10 simulator Open SIMH V4.1-0 Current        git commit id: a483514b+uncommitted-changes
+Memory size changed: CPU0 = 512KW
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/diag-buffers.do-4> restore -F /home/deltaprism/arpanet/mini/host69-bbn-tenex/snap/host69-live.state
+%SIM-INFO: MTA0: unit is read only
+%SIM-INFO: MTA0: Tape Image 'media/system.tap' scanned as SIMH format
+%SIM-INFO: DT0: unit is read only
+DT0: 18b/36b format, buffering file in memory
+%SIM-INFO: Listening on port 16945
+%SIM-INFO: Listening on port 16946
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/diag-buffers.do-11> attach -u dc 16945 speed=2400
+%SIM-INFO: Listening on port 16945
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/diag-buffers.do-12> attach -u tym 16946
+%SIM-INFO: Listening on port 16946
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/diag-buffers.do-15> set console telnet=2323,nomessage
+%SIM-INFO: Listening on port 2323
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/diag-buffers.do-15> set console telnet=2323,nomessage
+No settable parameters
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/diag-buffers.do-16> set debug stdout
+%SIM-INFO: Debug output to "STDOUT"
+Debug output to "STDOUT" at Sun Jun 28 01:05:39 2026
+KI-10 simulator Open SIMH V4.1-0 Current        git commit id: a483514b+uncommitted-changes
+=== SETTLE (no forcedown) ===
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/diag-buffers.do-20> step 250000000
+%SIM-INFO: Waiting for console Telnet connection
+/home/deltaprism/arpanet/mini/host69-bbn-tenex/runtime/diag-buffers.do-20> step 250000000
+%SIM-INFO: Running
+DBG(5527211652)> IMP IRQ: IMP chkint STATUS=002000 pia=000 in=0 out=0 (ID=0 OD=0 RDY=1)
+DBG(5608320371)> same as above (7 times)
+DBG(5608320374)> IMP IRQ: IMP chkint STATUS=002000 pia=050 in=0 out=5 (ID=0 OD=0 RDY=1)
+DBG(5608320374)> same as above (1 time)
+DBG(5608335528)> IMP IRQ: IMP chkint STATUS=002400 pia=050 in=0 out=5 (ID=0 OD=0 RDY=1)
+DBG(5608335628)> IMP IRQ: IMP chkint STATUS=002100 pia=050 in=0 out=5 (ID=0 OD=1 RDY=1)
+DBG(5608335751)> same as above (3 times)
+DBG(5608335763)> IMP IRQ: IMP chkint STATUS=002000 pia=050 in=0 out=5 (ID=0 OD=0 RDY=1)
+DBG(6128968715)> same as above (43 times)
+DBG(6128968718)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(6220163814)> same as above (77 times)
+DBG(6222827041)> IMP IRQ: IMP ncp gate#1024 ILEN=0 STATUS=002000 pending=0 link_up=1
+DBG(6222827041)> IMP IRQ: IMP ncp recv poll#1024 nw=0 buf0=0 link=0
+DBG(6223890996)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(6367776767)> same as above (117 times)
+
+Step expired, PC: 115224
+=== STATE A buffers: IMPNFI(70227) IMPFRI(70226) IMPINP(70331) IMINFB(70335) ===
+70227:	000000000010
+70226:	000000524144
+70331:	777402520004
+70335:	000000000000
+=== FORCEDOWN cycle ===
+DBG(6371228768)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(6828549841)> same as above (418 times)
+DBG(6828549851)> IMP IRQ: IMP chkint STATUS=002000 pia=050 in=0 out=5 (ID=0 OD=0 RDY=1)
+DBG(6873385646)> same as above (11 times)
+DBG(6996437657)> IMP IRQ: IMP ncp gate#2048 ILEN=0 STATUS=002000 pending=0 link_up=0
+DBG(6996437657)> IMP IRQ: IMP ncp recv poll#2048 nw=0 buf0=0 link=0
+DBG(7273515650)> IMP IRQ: IMP chkint STATUS=002000 pia=050 in=0 out=5 (ID=0 OD=0 RDY=1)
+DBG(7766086536)> same as above (5 times)
+DBG(7828900387)> IMP IRQ: IMP ncp gate#3072 ILEN=0 STATUS=002000 pending=0 link_up=0
+DBG(7828900387)> IMP IRQ: IMP ncp recv poll#3072 nw=0 buf0=0 link=0
+DBG(8261528086)> IMP IRQ: IMP chkint STATUS=002000 pia=050 in=0 out=5 (ID=0 OD=0 RDY=1)
+DBG(8261528286)> same as above (2 times)
+
+Step expired, PC: 104754
+DBG(8311736225)> IMP IRQ: IMP chkint STATUS=002000 pia=050 in=0 out=5 (ID=0 OD=0 RDY=1)
+DBG(8311741395)> same as above (8 times)
+DBG(8721631434)> IMP IRQ: IMP ncp gate#4096 ILEN=0 STATUS=002000 pending=0 link_up=0
+DBG(8721631434)> IMP IRQ: IMP ncp recv poll#4096 nw=0 buf0=0 link=0
+DBG(8813736298)> IMP IRQ: IMP chkint STATUS=002000 pia=050 in=0 out=5 (ID=0 OD=0 RDY=1)
+DBG(8884207158)> same as above (9 times)
+DBG(8884224587)> IMP IRQ: IMP chkint STATUS=002400 pia=050 in=0 out=5 (ID=0 OD=0 RDY=1)
+DBG(8884224687)> IMP IRQ: IMP chkint STATUS=002100 pia=050 in=0 out=5 (ID=0 OD=1 RDY=1)
+DBG(8884224810)> same as above (3 times)
+DBG(8884224822)> IMP IRQ: IMP chkint STATUS=002000 pia=050 in=0 out=5 (ID=0 OD=0 RDY=1)
+DBG(9417968323)> same as above (36 times)
+DBG(9417968326)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(9630255310)> same as above (185 times)
+DBG(9630771017)> IMP IRQ: IMP ncp gate#5120 ILEN=0 STATUS=002000 pending=0 link_up=1
+DBG(9630771017)> IMP IRQ: IMP ncp recv poll#5120 nw=0 buf0=0 link=0
+DBG(9632329362)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(9896503974)> same as above (189 times)
+DBG(9899170172)> IMP IRQ: IMP chkint STATUS=002000 pia=055 in=5 out=5 (ID=0 OD=0 RDY=1)
+DBG(9965388229)> same as above (53 times)
+
+Step expired, PC: 102724
+=== STATE B buffers: IMPNFI(70227) IMPFRI(70226) IMPINP(70331) IMINFB(70335) ===
+70227:	000000000010
+70226:	000000524144
+70331:	777402520004
+70335:	000000000000
+=== DONE ===
+Goodbye
+%SIM-INFO: Debug output disabled

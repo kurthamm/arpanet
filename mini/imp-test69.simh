@@ -1,0 +1,23 @@
+; ISOLATED test IMP for host69 BBN-TENEX ncp bring-up.
+; NO modem links to the live ARPANET — only host 69 on hi2, throwaway ports.
+set debug stdout
+do impconfig.simh
+set imp num=5
+do impcode.simh
+
+; Strip ALL network links so this IMP cannot touch the live ARPANET.
+set mi1 disabled
+set mi2 disabled
+set mi3 disabled
+set mi4 disabled
+set mi5 disabled
+set hi1 disabled
+set hi3 disabled
+set hi4 disabled
+
+; Host 1 = BBN-TENEX (host 69) on hi2, isolated test ports.
+set hi2 enabled
+set hi2 debug
+attach -u hi2 41051:localhost:41052
+
+go

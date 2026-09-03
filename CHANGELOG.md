@@ -127,3 +127,87 @@ Remaining flakiness: acceptance is intermittent across boots
 and should be avoided. Note: open-simh PR #522 (H316 host port 3/4
 device address swap) is also needed for hosts on IMP ports 3-4
 (MIT-AI 134, MIT-ML 198); host126 (port 2) is unaffected.
+
+## 2026-06 — ARPANET infrastructure & BBN-TENEX host #69
+
+Summary log for the larger efforts since 06-10; full detail in the per-effort
+notebooks (`docs/journal/README.md` is the index).
+
+### Added: event-driven per-IMP NCP startup (`mini/noc-server.py`)
+Replaced a fixed 35 s `NCP_START_DELAY` timer that raced IMP boot speed on the
+faster droplet (IMPs came up before 35 s and sat peerless). Each NCP now starts
+the instant *its* IMP reaches RUNNING (old timer kept as a backstop). Also fixed
+an `ncpdov` double-spawn (a PTY EOF mis-read as process death) by reaping any
+stray daemon on the NCP's port pair before spawning (`noc/server/ncp.py`).
+
+### Added: BBN-TENEX host #69 — native-NCP login (`@L 69`)
+A real BBN-TENEX (SIMH `pdp10-ki`, built via Lars Brinkhoff's build-tenex) made
+to answer `@L 69` with an authentic credentialed login. Highlights (full journal:
+`docs/host69-ncp-login-investigation.md` §3–§10):
+- **Persistence**: TENEX reboot-from-disk is upstream-unfinished, so we don't
+  reboot — SIMH SAVE a fully-booted monitor and RESTORE forever.
+- **1822 host-IMP emulator fidelity fixes** (`kx10_imp.c`): host-ready CONI gate +
+  FORCEDOWN lever, IMP input re-arm, output-done (`IMPOB`). In
+  `netser-build/emulator-fork/` (TODO: land in tracked `src/sims/`).
+- **Login server = NETLIT** (we built it; real NETSER is bootstrap-blocked). The
+  key insight: **`ATPTY` (JSYS 274)** hands the NCP connection to TENEX's own
+  dial-up login path — no NETSER needed. `@L 69` → `BBN-TENEX … EXEC` →
+  `LOGIN DEMO DEMO 1` → real session.
+
+### Changed: NETLIT-1e — re-listen hardening
+NETLIT-1d dropped to the `!` monitor EXEC after ~2 logins (a JFN leak in the
+OPENF-retry loop → exhaustion → `HALTF`; contact socket closed without `RLJFN`).
+NETLIT-1e adds a `CLRJ` close+release on every path, releases the listen JFN
+before each retry, and removes all `HALTF` (matches real `netser.fai`). Re-listen
+dropped from ~2.5 min to 0 s; survives unlimited sessions (5/5 gate).
+
+### Added: golden-snapshot service (`arpanet-host69.service`, `host69ctl.sh`)
+Login state (DEMO + NETLIT-1e LISTENING) baked into a SIMH SAVE snapshot; the
+service just `restore -F`s it (no console "séance"). Phase 1 durability: daemon
+waits for imp05+hi2 before host-ready (boot-ordering), sweeps stray `pdp10-ki`,
+uses a per-boot marker (fixes a `Type=exec` stale-health-check race). Service
+**enabled**. Reboot-survival test + the 1972-booklet scenarios are the remaining
+go-live work (`docs/host69-go-live-plan.md`).
+
+### Known issue: lab mesh routing islands under connection/ping load
+Rapid `ncp-telnet`/`ncp-ping` and heavy restart churn degrade inter-IMP routing
+(recover-in-place sometimes won't reconverge → reboot resets it). Recovery:
+`mini/arpanet-recover.sh recover` then WAIT for convergence; never restart an IMP
+to "nudge" it. The deeper robustness follow-up before advertising multi-user load.
+
+## 2026-06-30 — host69 utilization + Phase 2 scenario sourcing
+
+### Fixed: lab CPU utilization (the host69 ki + imp62 pegged the box)
+Post-reboot the 4-vCPU box ran at load ~6-8. Recon found two unthrottled hogs we
+had added (the upstream 35-IMP farm is throttled to 15% and was NOT the problem):
+- **imp62** had `set nothrottle` (~92% of a core) → removed it so it inherits the
+  farm's 15% (`mini/imp62.local.simh`). imp62 carries host126/HILTON-KA1 **and**
+  the PiDP-10 (host41) Tailscale bridge — load-bearing, kept but throttled.
+- **the host69 ki** busy-spun TENEX's idle loop at ~one core. `SET THROTTLE`
+  self-disables on this host (documented); a deep `SET CPU IDLE` effort hit a wall
+  (below). Pragmatic fix: a **systemd `CPUQuota=40%`** cgroup cap, applied by
+  `host69ctl.sh` *after* host-ready (so the boot stays full-speed) — host-side, no
+  effect on guest authenticity. ki dropped ~91%→~37%, load ~9.6→~7.0.
+
+### Added (emulator, staged): TENEX idle support — `netser-build/emulator-fork/host69-tenex-idle.patch`
+First-of-kind work: rcornwell's KI10 idle detector knew TOPS-10/ITS idle idioms but
+**not TENEX**. Added a TENEX clause to `kx10_cpu.c` (TENEX idles in the scheduler
+wait-list scan `SCHEDA`=0102713, derived from `build-tenex/tenex.dis`) + an adaptive
+re-arm to `kx10_imp.c`'s UDP poll. Both **login-verified**, but did **not** drop CPU:
+while the host-IMP link is up TENEX executes ~99% of the time (sim_idle sleeps <1% —
+`TYM2`'s 1 ms re-arm + near-continuous execution dominate). Correct groundwork, but
+idle doesn't bite yet → the `CPUQuota` cap is the shipping answer. Full notebook:
+`docs/host69-tenex-idle-patch.md`. **Lesson logged:** probing against the live imp05
+islanded the mesh and forced a full `arpanet-recover.sh recover`; future emulator
+probing must use an isolated throwaway IMP pair, never the live mesh.
+
+### Phase 2: exact scenario software identified + sourced (`docs/host69-go-live-plan.md`)
+Read the 1972 booklet for the four BBN-TENEX #69 scenarios' exact programs:
+- **#3 BBN Tenex** (EXEC/TECO/F40/SNDMSG/TELNET) — **all software in the kit**
+  (prebuilt `f40.sav.3`/`sndmsg.sav.8` in `imsss/files/subsys/`, `telnet` in cusps,
+  `teco` already on #69). **Buildable now** — the authentic anchor.
+- **#11 BBN LIFE** = **Ray Tomlinson's** Conway Life; exact BBN source **lost**
+  (only ITS MLIFE survives) → faithful FORTRAN-40 reconstruction (booklet specifies it).
+- **#15 BBN Chess** = **Greenblatt's MacHack VI**; exact BBN binary **lost**, source
+  survives as OCM `github.com/PDP-10/its:src/chprog/ocm.470` (MIDAS) → needs a TENEX port.
+- **#18 BBN DOCTOR** = ELIZA; already covered by the 18A adaptation on MIT-AI #134.
