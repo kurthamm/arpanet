@@ -420,23 +420,16 @@ static void telnet_client (int host, int sock,
   DEBUG_PRINTF("DEBUG: client shutdown complete.\n");
 }
 
-static void telnet_server (int host, int sock,
-                           void (*process) (unsigned char, int, int),
-                           const unsigned char *options)
+static char **server_cmd;          /* set from argv after "--" */
+
+static void serve_connection (int host, int connection,
+                              void (*process) (unsigned char, int, int),
+                              const unsigned char *options)
 {
-  int connection, size;
+  int size;
   int reader_fd, writer_fd;
-  char *banner;
   pid_t shell_pid; // Declare shell_pid here
   int fd; // Declare fd here
-
-  fprintf (stderr, "Listening to socket %d.\n", sock);
-
-  size = 8;
-  if (ncp_listen (sock, &size, &host, &connection) == -1) {
-    fprintf (stderr, "NCP listen error.\n");
-    exit (1);
-  }
 
   reader_fd = reader (connection);
   writer_fd = writer (connection);
@@ -447,15 +440,7 @@ static void telnet_server (int host, int sock,
     exit (1);
   }
 
-  banner = "Welcome to Unix.\r\n";
-  size = strlen (banner);
-  if (write (writer_fd, banner, size) == -1) {
-    fprintf (stderr, "write error.\n");
-    exit (1);
-  }
-
-  char *cmd[] = { "sh", NULL };
-  shell_pid = tty_run (cmd, &fd);
+  shell_pid = tty_run (server_cmd, &fd);
 
   int flags = fcntl (fd, F_GETFL);
   fcntl (fd, F_SETFL, flags | O_NONBLOCK);
@@ -516,10 +501,41 @@ static void telnet_server (int host, int sock,
   DEBUG_PRINTF("DEBUG: server shutdown complete.\n");
 }
 
+static void telnet_server (int host, int sock,
+                           void (*process) (unsigned char, int, int),
+                           const unsigned char *options)
+{
+  for (;;) {
+    int connection, size;
+
+    fprintf (stderr, "Listening to socket %d.\n", sock);
+
+    size = 8;
+    if (ncp_listen (sock, &size, &host, &connection) == -1) {
+      fprintf (stderr, "NCP listen error.\n");
+      exit (1);
+    }
+
+    pid_t pid = fork ();
+    if (pid < 0) {
+      perror ("fork");
+      exit (1);
+    }
+    if (pid == 0) {
+      serve_connection (host, connection, process, options);
+      _exit (0);
+    }
+
+    /* parent: reap finished children without blocking, then go back to
+       listening for the next visitor. */
+    while (waitpid (-1, NULL, WNOHANG) > 0) ;
+  }
+}
+
 static void usage (const char *argv0, int code)
 {
   fprintf (stderr, "Usage: %s -c[bno] [-d] host\n"
-           "or %s -s[bno] [-d]\n", argv0, argv0);
+           "or %s -s[bno] [-d] -- command [args]\n", argv0, argv0);
   if (code >= 0)
     exit (code);
 }
@@ -607,8 +623,17 @@ int main (int argc, char **argv)
   if (telnet == telnet_client)
     host = atoi (argv[optind++]);
 
-  if (argc != optind)
+  if (telnet == telnet_server) {
+    if (optind < argc && strcmp (argv[optind], "--") == 0)
+      optind++;
+    if (optind >= argc) {
+      fprintf (stderr, "%s: -s requires -- <command> [args]\n", argv[0]);
+      exit (1);
+    }
+    server_cmd = &argv[optind];
+  } else if (argc != optind) {
     usage(argv[0], 1);
+  }
 
   if (ncp_init (NULL) == -1) {
     fprintf (stderr, "NCP initialization error: %s.\n", strerror (errno));
