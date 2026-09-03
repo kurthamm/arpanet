@@ -42,48 +42,16 @@ if [[ -z "${DEST-}" ]]; then
 fi
 #echo "---> connect $DEST"
 
-# Several ITS hosts reject or stall ARPANET TELNET from the only reliable
-# browser-side source NCP (host 037). Route browser terminal sessions through
-# SIMH terminal lines while NCP ping remains the ARPANET health check.
-if [[ "$COMMAND" =~ ^[lL]$ ]]; then
-    case "$DEST" in
-        1|001)
-            cd ./mini
-            exec ./local-host-terminal.py 001 4003 --no-init --send-break --max-simh-line 7
-            ;;
-        6|006)
-            cd ./mini
-            exec ./local-host-terminal.py 006 6180 --no-init --select-first-line --max-simh-line 7
-            ;;
-        70|106)
-            cd ./mini
-            exec ./local-host-terminal.py 106 17015
-            ;;
-        126|176)
-            cd ./mini
-            exec ./local-host-terminal.py 176 10015
-            ;;
-        198|306)
-            cd ./mini
-            exec ./local-host-terminal.py 306 19015
-            ;;
-        134|206)
-            cd ./mini
-            exec ./local-host-terminal.py 206 18015
-            ;;
-        41|051)
-            cd ./mini
-            exec ./local-host-terminal.py 051 10015 --connect-host 100.105.230.31
-            ;;
-        65|101)
-            cd ./mini
-            exec ./local-host-terminal.py 101 16515 --no-init
-            ;;
-        11|013)
-            cd ./mini
-            exec env NCP=ncp16 ./ncp-telnet -c 11
-            ;;
-    esac
+# TIP-side NCP used as the visitor's source host. Host 11 is only reachable
+# from AMES ncp16 today (see docs/hosted-terminal-fixes.md, open issue).
+case "$DEST" in
+    11|013) IMP_NUMBER=16 ;;
+    *)      IMP_NUMBER=31 ;;
+esac
+HOST_NUMBER=0
+if [[ ! -S "mini/ncp$IMP_NUMBER" ]]; then
+    echo "TIP NCP ncp$IMP_NUMBER is not running; cannot reach host $DEST over the ARPANET" >&2
+    exit 1
 fi
 
 # DEST: either 2nd argument or prompt

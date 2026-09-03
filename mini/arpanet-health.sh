@@ -145,7 +145,7 @@ check_ncp_pings() {
 
 check_relay() {
     section "Browser Terminal Relay"
-    local relay_count telnet_count local_terminal_count
+    local relay_count telnet_count
     relay_count="$(process_count 'simh_server.py')"
     if [[ "$relay_count" == "1" ]]; then
         ok "one simh_server.py relay running"
@@ -162,13 +162,22 @@ check_relay() {
         ps -eo pid,ppid,pgid,sid,stat,args | grep '[n]cp-telnet' || true
     fi
 
-    local_terminal_count="$(pgrep -fc 'local-host-terminal.py' 2>/dev/null || true)"
-    if [[ "$local_terminal_count" == "0" ]]; then
-        ok "no active local hosted terminal sessions"
-    else
-        warn "$local_terminal_count local hosted terminal process(es) active; this is OK only during an intentional browser/direct terminal session"
-        ps -eo pid,ppid,pgid,sid,stat,args | grep '[l]ocal-host-terminal.py' || true
-    fi
+    # Every @L/@O session now routes through a TIP-side NCP to a FEP
+    # (mini/fepctl.sh), not a direct SIMH terminal-line bypass, so verify
+    # each configured FEP host is up rather than checking for the retired
+    # local-host-terminal.py process.
+    local fep_status fep_line fep_host
+    fep_status="$(cd "$ROOT" && ./fepctl.sh status all)"
+    printf '%s\n' "$fep_status"
+    while IFS= read -r fep_line; do
+        [[ -n "$fep_line" ]] || continue
+        fep_host="${fep_line%%:*}"
+        if [[ "$fep_line" == *": up" ]]; then
+            ok "$fep_host up (ARPANET TELNET bridge)"
+        else
+            fail "$fep_host not up: $fep_line"
+        fi
+    done <<<"$fep_status"
 }
 
 check_imp_links() {

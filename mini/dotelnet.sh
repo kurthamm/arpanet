@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 #echo $1 $2
 #echo -----
@@ -42,4 +43,4 @@ if [[ "${4-}" =~ ^[oO]$ || "$DEST" == "70" || "$DEST" == "106" || "$DEST" == "41
 fi
 
 #echo "NCP=ncp$IMP ./ncp-telnet -c $TELNET_MODE $HOST $DEST"
-exec env NCP="ncp$IMP" ./ncp-telnet -c $TELNET_MODE $HOST $DEST
+exec env NCP="ncp$IMP" ./ncp-telnet -c $TELNET_MODE $HOST "$DEST"

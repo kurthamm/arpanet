@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/host06-multics"
-REPO_ROOT="$(cd "$ROOT/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SIM_REPO="https://gitlab.com/dps8m/dps8m.git"
 SIM_TAG="R3.1.0"
 QUICKSTART_URL="https://s3.amazonaws.com/eswenson-multics/public/releases/MR12.8/QuickStart_MR12.8.zip"

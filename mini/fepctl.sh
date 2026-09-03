@@ -18,7 +18,15 @@ start_one() {
     screen -dmS "fep$host" env NCP="$ncp" ./ncp-telnet -s -- ./fep-line.py "$host" "$port" $flags
     echo "fep$host: ARPANET TELNET server on $ncp -> line port $port"
 }
-stop_one() { IFS=: read -r host _ <<<"$1"; screen -S "fep$host" -X quit 2>/dev/null || true; echo "fep$host stopped"; }
+stop_one() {
+    IFS=: read -r host _ <<<"$1"
+    if screen -ls | grep -q "[.]fep$host[[:space:]]"; then
+        screen -S "fep$host" -X quit
+        echo "fep$host stopped"
+    else
+        echo "fep$host: not running"
+    fi
+}
 status_one() { IFS=: read -r host _ <<<"$1"; screen -ls | grep -q "[.]fep$host[[:space:]]" && echo "fep$host: up" || echo "fep$host: down"; }
 
 if [[ "$target" == all ]]; then list=$(rows); else list=$(row_for "$target"); [[ -n "$list" ]] || { echo "no FEP entry for host $target" >&2; exit 1; }; fi

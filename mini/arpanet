@@ -157,7 +157,7 @@ start_ncpds() {
     #screen -dmS ncp$fullhost ./ncpd localhost $porttx $portrx 2>./logfiles/ncp$fullhost.log
   done
 
-  echo "Started 36 NCP daemons"
+  echo "Started ${#NCPS[@]} NCP daemons"
   echo ""
   echo "Use \"screen -ls\" to list all sessions"
   echo "Use \"screen -r ncp2\" to attach to NCP daemon for host 2"
@@ -312,6 +312,7 @@ stop_network() {
   # Stop hosted PDP-10s first through the lifecycle manager.
   ./host65-ucla-ccnctl.sh stop || true
   ./host06-multicsctl.sh stop || true
+  ./host01-sigma/host01-sigmactl.sh stop
   ./hostctl.sh stop all
   ./host11ctl.sh stop 11 || true
 
