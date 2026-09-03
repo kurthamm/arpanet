@@ -522,6 +522,30 @@ static void telnet_server (int host, int sock,
       exit (1);
     }
     if (pid == 0) {
+      /* Detach from the parent's session/process group. Without this,
+         this child (and the reader()/writer() grandchildren it is about
+         to fork, which inherit whatever session they're born into) stays
+         in the same session as the long-lived listening parent and its
+         controlling terminal (e.g. the pty screen(1) allocated for it).
+         If that parent process exits for any reason while still the
+         foreground process group of that terminal -- including hitting
+         the existing "already listening" collision on its own repeat
+         ncp_listen() call once a connection index it used is never freed
+         -- the kernel sends SIGHUP to every other process left in that
+         group. SIGHUP's default disposition is immediate termination
+         (ncp_init() installs handlers for SIGINT/SIGTERM/SIGQUIT, not
+         SIGHUP), which kills this connection's reader/writer/serve loop
+         out from under an otherwise perfectly healthy session -- their
+         NCP control sockets get closed without unlinking (bypassing
+         atexit cleanup, same as SIGKILL would), which is exactly the
+         "sendto ... Connection refused" signature seen once the daemon
+         later tries to deliver their queued reply. setsid() makes this
+         child its own session leader, so a sibling's or the parent's
+         terminal-driven SIGHUP can never reach it.
+       */
+      if (setsid () == -1)
+        perror ("setsid");
+
       /* The forked child inherited the parent's single NCP app-control
          socket (a connected AF_UNIX datagram fd created once in main()).
          If it kept using that fd, its own ncp_close() at teardown would

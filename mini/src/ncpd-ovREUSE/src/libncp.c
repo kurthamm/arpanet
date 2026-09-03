@@ -15,7 +15,7 @@
 #include "ncp.h"
 #include "wire.h"
 
-static int fd;
+static int fd = -1;
 static struct sockaddr_un addr;
 static uint8_t message[1000];
 
@@ -33,6 +33,16 @@ static void quit (int x)
 int ncp_init (const char *path)
 {
   struct sockaddr_un server;
+
+  // If this process already had a socket open (a forked reader()/writer()/
+  // connection-handling child calling ncp_init() again to get its own,
+  // private one -- see telnet.c), close the old one first instead of
+  // leaking it. An open-but-unused duplicate fd here is harmless on its
+  // own, but it accumulates across every layer of forking a long-lived
+  // server does, and is unnecessary: only the freshly created fd is ever
+  // used again.
+  if (fd != -1)
+    close (fd);
 
   fd = socket (AF_UNIX, SOCK_DGRAM, 0);
   if (fd == -1)

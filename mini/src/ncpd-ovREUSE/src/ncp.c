@@ -766,18 +766,52 @@ static void reply_open (uint8_t host, uint32_t socket, uint8_t i,
   reply[6] = i;
   reply[7] = size;
   reply[8] = e;
-  if (sendto (fd, reply, sizeof reply, 0, (struct sockaddr *)&client, len) == -1)
+  // Send to the client address recorded for this connection (set by
+  // app_open() when the request first arrived), not the transient global
+  // `client`, which reflects whichever application datagram the daemon
+  // most recently happened to process on its control socket -- and by the
+  // time an async RTS/STR handshake finally completes (this reply is
+  // deferred, not synchronous), that can easily be a *different*
+  // application's request (e.g. another connection's reader/writer),
+  // misdelivering this reply to it instead of the actual opener. Every
+  // caller passes the real connection index in `i`, including the
+  // error-reply call sites (the wire "connection" field they send is
+  // conventionally 0/unused there, but the client-side ncp_open() never
+  // reads it when error==255, so passing the real index here is safe and
+  // lets addressing use the right connection's recorded client).
+  if (sendto (fd, reply, sizeof reply, 0,
+              (struct sockaddr *)&connection[i].client.addr,
+              connection[i].client.len) == -1)
     fprintf (stderr, "NCP: sendto %s error: %s.\n",
-             client.sun_path, strerror (errno));
+             connection[i].client.addr.sun_path, strerror (errno));
 }
 
 static void reply_listen (uint8_t host, uint32_t socket, uint8_t i,
                           uint8_t size)
 {
   uint8_t reply[8];
+  const struct sockaddr_un *target_addr;
+  socklen_t target_len;
   fprintf (stderr, "NCP: Application listen reply socket %u on host %03o: "
            "connection %u.\n", socket, host, i);
-  connection[i].flags &= ~CONN_LISTEN;
+  // i == CONNECTIONS is the sentinel used by app_listen's synchronous
+  // error replies ("already listening" / "table full"), where there is no
+  // real connection to attribute this reply to -- addressing must fall
+  // back to the transient global `client`/`len`, which at this exact
+  // point in app_listen still correctly reflects the application that
+  // just sent *this* listen request. Using i's normal meaning
+  // (connection[i].client, propagated from an existing listener/
+  // connection at accept time) here would misdeliver the rejection to
+  // whatever unrelated party -- possibly a stale, already-exited one --
+  // last happened to occupy that connection slot.
+  if (i < CONNECTIONS) {
+    connection[i].flags &= ~CONN_LISTEN;
+    target_addr = &connection[i].client.addr;
+    target_len = connection[i].client.len;
+  } else {
+    target_addr = &client;
+    target_len = len;
+  }
   reply[0] = WIRE_LISTEN+1;
   reply[1] = host;
   reply[2] = socket >> 24;
@@ -786,16 +820,10 @@ static void reply_listen (uint8_t host, uint32_t socket, uint8_t i,
   reply[5] = socket;
   reply[6] = i;
   reply[7] = size;
-  // Send to the client address recorded for this connection (propagated
-  // from the listener at accept time), not the transient global `client`,
-  // which reflects whichever application datagram the daemon most
-  // recently happened to process and may belong to an unrelated (and by
-  // now exited) process once a second connection is in flight.
   if (sendto (fd, reply, sizeof reply, 0,
-              (struct sockaddr *)&connection[i].client.addr,
-              connection[i].client.len) == -1)
+              (struct sockaddr *)target_addr, target_len) == -1)
     fprintf (stderr, "NCP: sendto %s error: %s.\n",
-             connection[i].client.addr.sun_path, strerror (errno));
+             target_addr->sun_path, strerror (errno));
 }
 
 static void reply_close (uint8_t i)
@@ -840,7 +868,7 @@ static void cls_timeout (int i)
 {
   fprintf (stderr, "NCP: Timeout waiting for CLS, connection %d.\n", i);
   if (connection[i].flags & CONN_OPEN)
-    reply_open (connection[i].host, connection[i].listen, 0, 0, 255);
+    reply_open (connection[i].host, connection[i].listen, i, 0, 255);
   else if (connection[i].flags & CONN_READ)
     reply_read (i, packet, 0);
   else if (connection[i].flags & CONN_WRITE)
@@ -983,6 +1011,12 @@ static int process_rts (uint8_t source, uint8_t *data)
       connection[j].rcv.link = alloc_client_link (source);
       connection[j].flags |= CONN_OPEN | CONN_GOT_RTS;
       connection[j].listen = connection[i].rcv.rsock;
+      connection[j].client = connection[i].client; // Propagate the opening
+        // application's reply address (recorded by app_open on the
+        // initial ICP-control connection, i) to the actual data
+        // connection, so the deferred open-reply (reply_open) reaches the
+        // right process instead of whatever client last happened to talk
+        // to the daemon.
       fprintf (stderr, "NCP: New connection %d sockets %d:%d %d:%d link %u\n",
                j,
                connection[j].rcv.lsock, connection[j].rcv.rsock,
@@ -1062,6 +1096,12 @@ static int process_str (uint8_t source, uint8_t *data)
       connection[j].snd.size = connection[i].data_size;
       connection[j].flags |= CONN_OPEN | CONN_GOT_STR;
       connection[j].listen = connection[i].rcv.rsock;
+      connection[j].client = connection[i].client; // Propagate the opening
+        // application's reply address (recorded by app_open on the
+        // initial ICP-control connection, i) to the actual data
+        // connection, so the deferred open-reply (reply_open) reaches the
+        // right process instead of whatever client last happened to talk
+        // to the daemon.
       fprintf (stderr, "NCP: New connection %d sockets %d:%d %d:%d link %d\n",
                j,
                connection[j].rcv.lsock, connection[j].rcv.rsock,
@@ -1123,7 +1163,7 @@ static int process_cls (uint8_t source, uint8_t *data)
 
   if (connection[i].flags & CONN_OPEN) {
     fprintf (stderr, "NCP: Connection %u refused.\n", i);
-    reply_open (source, rsock, 0, 0, 255);
+    reply_open (source, rsock, i, 0, 255);
   } else if (connection[i].flags & CONN_READ) {
     reply_read (i, packet, 0);
   } else if (connection[i].flags & CONN_WRITE) {
@@ -1144,7 +1184,7 @@ static void just_drop (int i)
 {
   fprintf (stderr, "NCP: RFNM timeout, drop connection %d.\n", i);
   if (connection[i].flags & CONN_OPEN)
-    reply_open (connection[i].host, connection[i].listen, 0, 0, 255);
+    reply_open (connection[i].host, connection[i].listen, i, 0, 255);
   else if (connection[i].flags & CONN_READ)
     reply_read (i, packet, 0);
   else if (connection[i].flags & CONN_WRITE)
@@ -1380,7 +1420,7 @@ static int process_err (uint8_t source, uint8_t *data)
     if (i != -1) {
       if ((rsock & 1) == 0)
         rsock--;
-      reply_open (source, rsock, 0, 0, 255);
+      reply_open (source, rsock, i, 0, 255);
       destroy (i);
     }
   }
@@ -1525,6 +1565,12 @@ static void process_regular (uint8_t *packet, int length)
                        connection[i].rcv.lsock+3, s);
         connection[j].snd.size = connection[i].data_size;
         connection[j].rcv.link = alloc_client_link (source);
+        connection[j].client = connection[i].client; // Propagate the
+          // opening application's reply address (recorded by app_open on
+          // the initial ICP-control connection, i) to the actual data
+          // connection, so the deferred open-reply (reply_open, sent once
+          // ICP completes) reaches the right process instead of whatever
+          // client last happened to talk to the daemon.
         fprintf (stderr, "NCP: New connection %d.\n", j);
         when_rfnm (j, send_str_and_rts, rfnm_timeout);
       }
@@ -1733,7 +1779,7 @@ static void app_echo (void)
 static void app_open_rfc_failed (int i)
 {
   fprintf (stderr, "NCP: Timed out completing RFC for connection %d.\n", i);
-  reply_open (connection[i].host, connection[i].rcv.rsock, 0, 0, 255);
+  reply_open (connection[i].host, connection[i].rcv.rsock, i, 0, 255);
   when_rfnm (i, send_cls_rcv, just_drop);
 }
 
@@ -1749,7 +1795,7 @@ static void app_open_rts (int i)
 static void app_open_fail (int i)
 {
   fprintf (stderr, "NCP: Timed out waiting for RRP.\n");
-  reply_open (connection[i].host, connection[i].rcv.rsock, 0, 0, 255);
+  reply_open (connection[i].host, connection[i].rcv.rsock, i, 0, 255);
 }
 
 static void app_open (void)
@@ -1782,6 +1828,27 @@ static void app_open (void)
   app_open_rts (i);
 }
 
+// Probe whether a recorded client control-socket address still has a
+// live process bound to it. connect()ing a scratch AF_UNIX datagram
+// socket to that path validates the peer without transmitting any data
+// (so it cannot corrupt a genuinely live application's protocol stream,
+// unlike sending it a real/empty probe packet would): ENOENT means the
+// path is gone (owner exited cleanly), ECONNREFUSED means the path
+// exists but nothing is bound there (owner was killed, e.g. SIGKILL,
+// which skips the atexit cleanup that would have unlinked it).
+static int client_is_alive (const client_t *who)
+{
+  int probe = socket (AF_UNIX, SOCK_DGRAM, 0);
+  int rc;
+  if (probe == -1)
+    return 1; // Can't probe; assume alive rather than risk evicting a live listener.
+  rc = connect (probe, (struct sockaddr *)&who->addr, who->len);
+  close (probe);
+  if (rc == -1 && (errno == ENOENT || errno == ECONNREFUSED))
+    return 0;
+  return 1;
+}
+
 static void app_listen (void)
 {
   uint32_t socket;
@@ -1793,16 +1860,29 @@ static void app_listen (void)
            socket, size);
   fprintf(stderr, "DEBUG: app_listen: Received listen request for socket %u.\n", socket);
   if ((i = find_listen (socket)) != -1) {
-    fprintf(stderr, "DEBUG: app_listen: find_listen(%u) found a stale entry at index %d. ERROR: Already listening.\n", socket, i);
-    fprintf (stderr, "NCP: Alreay listening to %d.\n", socket);
-    reply_listen (0, socket, 0, 0);
-    debug_print_listeners();
-    return;
+    if (!client_is_alive (&connection[i].client)) {
+      // The previous listener's owning process is gone (e.g. killed while
+      // its ncp_listen() was still blocked, which happens with no way to
+      // deregister first -- there is no "unlisten" wire message). Reclaim
+      // the slot instead of rejecting every future listener on this
+      // socket forever.
+      fprintf (stderr, "NCP: Listener for socket %u at index %d is stale "
+               "(owner gone); clearing it.\n", socket, i);
+      listening[i].sock = 0;
+      listening[i].size = 0;
+      listening[i].client.len = 0;
+    } else {
+      fprintf(stderr, "DEBUG: app_listen: find_listen(%u) found a stale entry at index %d. ERROR: Already listening.\n", socket, i);
+      fprintf (stderr, "NCP: Alreay listening to %d.\n", socket);
+      reply_listen (0, socket, CONNECTIONS, 0);
+      debug_print_listeners();
+      return;
+    }
   }
   i = find_listen (0);
   if (i == -1) {
     fprintf (stderr, "NCP: Table full.\n");
-    reply_listen (0, socket, 0, 0);
+    reply_listen (0, socket, CONNECTIONS, 0);
     debug_print_listeners();
     return;
   }
