@@ -57,7 +57,7 @@ declare -a IMPS=(
 # ============================================================
 declare -a NCPS=(
   "01:0:01:20011:20012:UCLA-NMC"
-#  "01:1:65:21011:21012:UCLA-CCn"
+  "01:1:65:21011:21012:UCLA-CCn"
   "02:0:02:20021:20022:SRI-ARC"
 #  "02:1:66:21021:21022:SRI-AI"
   "03:0:03:20031:20032:UCSB-MOD75"
@@ -65,7 +65,7 @@ declare -a NCPS=(
   "04:0:04:20041:20042:UTAH-10"
 #  "05:0:05:20051:20052:BBN-NCC"
 #  "05:1:69:21051:21052:BBN-TENEX"
-#  "06:0:06:20061:20062:MIT-MULTICS"
+  "06:0:06:20061:20062:MIT-MULTICS"
 #  "06:1:70:21061:21062:MIT-DMS"
 #  "06:2:134:22061:22062:MIT-AI"
 #  "06:3:198:23061:23062:MIT-ML"
@@ -157,7 +157,7 @@ start_ncpds() {
     #screen -dmS ncp$fullhost ./ncpd localhost $porttx $portrx 2>./logfiles/ncp$fullhost.log
   done
 
-  echo "Started 34 NCP daemons"
+  echo "Started 36 NCP daemons"
   echo ""
   echo "Use \"screen -ls\" to list all sessions"
   echo "Use \"screen -r ncp2\" to attach to NCP daemon for host 2"
@@ -175,14 +175,15 @@ start_network() {
   # have peers available when the NOC boots the IMPs.
   ./host06-multicsctl.sh start
   ./host65-ucla-ccnctl.sh start
+  ./host01-sigma/host01-sigmactl.sh start
   ./hostctl.sh start 70
   ./hostctl.sh start 126
   ./hostctl.sh start 134
   ./hostctl.sh start 198
 
   # new Network Operation Center
- 
-  screen -dmS noc ./noc-server.py 
+
+  screen -dmS noc ./noc-server.py
   sleep 3
 
   # old style screen setup, now disabled
@@ -197,6 +198,23 @@ start_network() {
 
   # Start NCPs
 #  start_ncpds
+
+  # Wait for the NOC to have created the FEP hosts' NCP sockets, then bring
+  # up the ncp-telnet/ncp-line bridges (hosts without their own NCP).
+  echo "Waiting for FEP NCP sockets (ncp01, ncp06, ncp65)..."
+  waited=0
+  while :; do
+    if [[ -S ncp01 && -S ncp06 && -S ncp65 ]]; then
+      break
+    fi
+    if (( waited >= 60 )); then
+      echo "ERROR: FEP NCP sockets did not appear within 60s (ncp01/ncp06/ncp65)" >&2
+      exit 1
+    fi
+    sleep 2
+    waited=$((waited + 2))
+  done
+  ./fepctl.sh start all
 
   echo "ARPANET network started successfully!"
   echo ""
@@ -264,6 +282,9 @@ stop_ncpds() {
 stop_hosts() {
   echo "Stopping hosts..."
   echo ""
+
+  # Stop the FEP telnet bridges before killing the simulators they front.
+  ./fepctl.sh stop all
 
   # Stop all pdp10-ka processes
   echo "Stopping host processes..."
