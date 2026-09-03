@@ -37,10 +37,6 @@ class NOCServer:
     DEFAULT_CONFIG = "./arpanet"
     DEFAULT_SOCKET = "/tmp/noc.sock"
     LOGFILE = "./logfiles/noc.audit.log"
-    # Some IMPs take about 30 seconds to reach RUNNING after a cold NOC
-    # restart. Starting NCP daemons too early leaves source NCP sockets alive
-    # but unable to pass traffic, so wait for the routers to settle.
-    NCP_START_DELAY = 35.0
 
     def __init__(
         self,
@@ -184,16 +180,6 @@ class NOCServer:
 
         self.logger.info(f"Started {len(self.ncps)} NCP daemons")
 
-    def _schedule_ncp_start(self):
-        """Schedule NCP start shortly after IMPs begin booting.
-
-        The H316 host interfaces expect their host/NCP UDP peers to appear
-        quickly. Waiting for every IMP to reach RUNNING can leave HI ports
-        peerless long enough to trigger unrecoverable host-interface errors.
-        """
-        self.logger.info(f"Waiting {self.NCP_START_DELAY}s for IMPs to initialize...")
-        self.loop.call_later(self.NCP_START_DELAY, self._start_ncps)
-
     def _handle_quit(self):
         """Handle quit command - graceful shutdown."""
         if self._shutting_down:
@@ -264,11 +250,16 @@ class NOCServer:
         # Kill any rogue processes from previous runs
         self._kill_rogue_processes()
 
+        # Start NCP daemons first so their host UDP sockets are already
+        # listening when the IMPs attach and begin transmitting on their
+        # host interfaces. An H316 host interface treats a send to a
+        # peerless UDP port as an unrecoverable I/O error and permanently
+        # detaches (see hi_link_error() in h316_hi.c) with no retry, so the
+        # NCP side must exist before the IMP side starts talking to it.
+        self._start_ncps()
+
         # Start IMPs
         self._start_imps()
-
-        # Schedule NCP start
-        self._schedule_ncp_start()
 
         # Run event loop
         try:

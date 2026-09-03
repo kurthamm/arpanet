@@ -75,7 +75,7 @@ class NCPController:
         ]
 
         # NCP daemon needs NCP environment variable for socket path
-        env = {"NCP": f"{self.process_manager.working_dir}/ncp{self.config.full_host}"}
+        env = {"NCP": f"{self.process_manager.working_dir}/ncp{self.config.host_str}"}
 
         self._process = self.process_manager.spawn(
             name=name,
