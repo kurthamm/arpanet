@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bridge stdin/stdout to a hosted simulator terminal line."""
+"""FEP console side: bridge an NCP Telnet session (stdin/stdout) to a local simulator terminal line."""
 
 import argparse
 import os
@@ -101,7 +101,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("host_label")
     parser.add_argument("port", type=int)
-    parser.add_argument("--connect-host", default="127.0.0.1")
     parser.add_argument(
         "--no-init",
         action="store_true",
@@ -133,11 +132,10 @@ def main():
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
 
-    sock = socket.create_connection((args.connect_host, args.port), timeout=5)
+    sock = socket.create_connection(("127.0.0.1", args.port), timeout=5)
     sock.setblocking(False)
     os.set_blocking(0, False)
 
-    print(f"TELNET to host {args.host_label}.", flush=True)
     initial_output = drain_initial_output(sock, duration=0.4)
     if args.max_simh_line is not None:
         if line_exceeds_limit(initial_output, args.max_simh_line):
@@ -203,5 +201,5 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as exc:
-        print(f"local hosted terminal error: {exc}", file=sys.stderr)
+        print(f"fep-line error: {exc}", file=sys.stderr)
         sys.exit(1)
