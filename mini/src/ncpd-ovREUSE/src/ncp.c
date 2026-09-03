@@ -394,6 +394,130 @@ static void send_ncp (uint8_t destination, uint8_t byte, uint16_t count,
   send_imp (0, IMP_REGULAR, destination, 0, 0, 0, NULL, (count + 9 + 1)/2);
 }
 
+// Allocate a local socket pair (s, s+1) for a new server-side ICP data
+// connection to `host` that is not already in use by another connection
+// to that host.  The ICP data socket used to be the hardcoded constant
+// 0200/0201, which meant two concurrent RFCs to the same listener both
+// got assigned sockets 128:129: the second connection's RTS/STR then
+// matched (via find_rcv_sockets/find_snd_sockets) the *first*
+// connection's slot instead of its own, so the second connection never
+// completed its handshake and timed out.
+// Allocate a base local ICP socket for a new client-initiated connection
+// (app_open) to `host`.  The initial RFC handshake derives several
+// related local socket numbers from this base via fixed offsets (base,
+// base+2, base+3 -- see process_rts/process_str/process_regular); pick a
+// base spaced far enough from every other connection to this host that
+// those derived sockets can't collide with another connection's.  This
+// used to be the hardcoded constant 1002, so two concurrent app_opens to
+// the same host (even to different remote sockets) shared identical
+// local socket numbers and find_rcv_sockets/find_snd_sockets matched
+// incoming ICP replies to the wrong connection.
+static uint32_t alloc_icp_socket (int host)
+{
+  uint32_t base;
+  int i, used;
+  for (base = 1002; base < 2002; base += 8) {
+    used = 0;
+    for (i = 0; i < CONNECTIONS; i++) {
+      if (connection[i].host != host)
+        continue;
+      if ((connection[i].rcv.lsock >= base - 3 && connection[i].rcv.lsock <= base + 3) ||
+          (connection[i].snd.lsock >= base - 3 && connection[i].snd.lsock <= base + 3)) {
+        used = 1;
+        break;
+      }
+    }
+    if (!used)
+      return base;
+  }
+  return 0;
+}
+
+static uint32_t alloc_socket (int host)
+{
+  uint32_t s;
+  int i, used;
+  for (s = 0200; s < 01000; s += 2) {
+    used = 0;
+    for (i = 0; i < CONNECTIONS; i++) {
+      if (connection[i].host != host)
+        continue;
+      if (connection[i].rcv.lsock == s || connection[i].rcv.lsock == s + 1 ||
+          connection[i].snd.lsock == s || connection[i].snd.lsock == s + 1) {
+        used = 1;
+        break;
+      }
+    }
+    if (!used)
+      return s;
+  }
+  return 0;
+}
+
+// Allocate a receive link for a new connection to `host` that is not
+// already in use by another connection to that host.  Every place that
+// establishes a connection's receive link (the value this host tells the
+// remote side to tag data for this connection with) used to hardcode one
+// of a handful of constants (42, 45, 46, 47, 49) for its protocol phase.
+// That is fine for one connection at a time, but as soon as two
+// connections to the same host are concurrently in the same phase (e.g.
+// two clients on this host each calling app_open, or two accepts on the
+// same listener), they get the SAME receive link, and process_regular's
+// find_link(host, link) then delivers incoming data for the second
+// connection to the first connection's slot instead (dropped there with
+// "Wrong byte size" since the first connection's rcv.size does not
+// match), so the second connection's handshake or data never arrives.
+//
+// find_link() matches a link against EITHER end of a connection (rcv.link,
+// which this host chose, or snd.link, which is whatever link value the
+// *remote* host chose and told us about via its own RTS). Since every NCP
+// daemon runs this same code and each side allocates its own rcv.link
+// independently (no cross-host coordination is possible), a link this
+// host picks for a connection it accepted (server role) could otherwise
+// collide with a link value the remote picked for a connection *it*
+// opened (client role) and reflected to us as our snd.link -- find_link
+// cannot tell those apart, so whichever connection is first in the array
+// wins and the other's control/data messages get silently misrouted.
+// Reserving disjoint numeric bands per role, honored identically by every
+// instance of this daemon, keeps a locally-chosen rcv.link from ever
+// landing on a value the remote could have chosen for the opposite role.
+#define LINK_CLIENT_MIN  LINK_MIN
+#define LINK_CLIENT_MAX  ((LINK_MIN + LINK_MAX) / 2)
+#define LINK_SERVER_MIN  (LINK_CLIENT_MAX + 1)
+#define LINK_SERVER_MAX  LINK_MAX
+
+static int alloc_link_in_range (int host, int lo, int hi)
+{
+  int link, i, used;
+  for (link = lo; link <= hi; link++) {
+    used = 0;
+    for (i = 0; i < CONNECTIONS; i++) {
+      if (connection[i].host != host)
+        continue;
+      if (connection[i].rcv.link == link || connection[i].snd.link == link) {
+        used = 1;
+        break;
+      }
+    }
+    if (!used)
+      return link;
+  }
+  return -1;
+}
+
+// For connections *we* initiated (app_open, and the RTS/STR/regular-data
+// completions of it, all gated on CONN_CLIENT).
+static int alloc_client_link (int host)
+{
+  return alloc_link_in_range (host, LINK_CLIENT_MIN, LINK_CLIENT_MAX);
+}
+
+// For connections we *accepted* (the listener branch of process_rts).
+static int alloc_server_link (int host)
+{
+  return alloc_link_in_range (host, LINK_SERVER_MIN, LINK_SERVER_MAX);
+}
+
 static int make_open (int host,
                       uint32_t rcv_lsock, uint32_t rcv_rsock,
                       uint32_t snd_lsock, uint32_t snd_rsock)
@@ -662,9 +786,16 @@ static void reply_listen (uint8_t host, uint32_t socket, uint8_t i,
   reply[5] = socket;
   reply[6] = i;
   reply[7] = size;
-  if (sendto (fd, reply, sizeof reply, 0, (struct sockaddr *)&client, len) == -1)
+  // Send to the client address recorded for this connection (propagated
+  // from the listener at accept time), not the transient global `client`,
+  // which reflects whichever application datagram the daemon most
+  // recently happened to process and may belong to an unrelated (and by
+  // now exited) process once a second connection is in flight.
+  if (sendto (fd, reply, sizeof reply, 0,
+              (struct sockaddr *)&connection[i].client.addr,
+              connection[i].client.len) == -1)
     fprintf (stderr, "NCP: sendto %s error: %s.\n",
-             client.sun_path, strerror (errno));
+             connection[i].client.addr.sun_path, strerror (errno));
 }
 
 static void reply_close (uint8_t i)
@@ -763,8 +894,16 @@ static int process_rts (uint8_t source, uint8_t *data)
        initial part of ICP, which is to send the server data
        connection socket. */
     uint8_t tmp[4];
-    uint32_t s = 0200;
+    // Allocate a local data socket pair not already used by another
+    // in-flight connection to this host, so concurrent RFCs to the same
+    // listener don't collide (see alloc_socket() above).
+    uint32_t s = alloc_socket (source);
     int size = listening[i].size;
+    int listener = i; // Remember the listener's slot: 'i' is about to be
+                       // reassigned to a fresh connection index, and the
+                       // listening application's reply address (recorded
+                       // in connection[listener].client by app_listen) is
+                       // only reachable via this saved index.
     i = make_open (source, 0, 0, lsock, rsock);
     fprintf (stderr, "NCP: Listening to %u: new connection %d, link %u.\n",
              lsock, i, link);
@@ -791,9 +930,14 @@ static int process_rts (uint8_t source, uint8_t *data)
                    s+1, connection[i].snd.rsock+2);
     connection[j].flags |= CONN_LISTEN;
     connection[j].snd.size = size;
-    connection[j].rcv.link = 46;
+    connection[j].rcv.link = alloc_server_link (source);
     connection[j].rcv.size = connection[j].snd.link = 0;
     connection[j].listen = lsock;
+    connection[j].client = connection[listener].client; // Propagate the
+      // listening application's reply address to the actual data
+      // connection, so the deferred listen-reply (reply_listen, sent once
+      // ICP completes) reaches the right process instead of whatever
+      // client last happened to talk to the daemon.
     fprintf (stderr, "NCP: New connection %d sockets %d:%d %d:%d link %d\n",
              j,
              connection[j].rcv.lsock, connection[j].rcv.rsock,
@@ -836,7 +980,7 @@ static int process_rts (uint8_t source, uint8_t *data)
       j = make_open (source, lsock-1, rsock+1, lsock, rsock);
       connection[j].snd.size = connection[i].data_size;
       connection[j].snd.link = link;
-      connection[j].rcv.link = 49;
+      connection[j].rcv.link = alloc_client_link (source);
       connection[j].flags |= CONN_OPEN | CONN_GOT_RTS;
       connection[j].listen = connection[i].rcv.rsock;
       fprintf (stderr, "NCP: New connection %d sockets %d:%d %d:%d link %u\n",
@@ -914,7 +1058,7 @@ static int process_str (uint8_t source, uint8_t *data)
     } else {
       j = make_open (source, lsock, rsock, lsock+1, rsock-1);
       connection[j].rcv.size = size;
-      connection[j].rcv.link = 47;
+      connection[j].rcv.link = alloc_client_link (source);
       connection[j].snd.size = connection[i].data_size;
       connection[j].flags |= CONN_OPEN | CONN_GOT_STR;
       connection[j].listen = connection[i].rcv.rsock;
@@ -1380,7 +1524,7 @@ static void process_regular (uint8_t *packet, int length)
                        connection[i].rcv.lsock+2, s+1,
                        connection[i].rcv.lsock+3, s);
         connection[j].snd.size = connection[i].data_size;
-        connection[j].rcv.link = 45;
+        connection[j].rcv.link = alloc_client_link (source);
         fprintf (stderr, "NCP: New connection %d.\n", j);
         when_rfnm (j, send_str_and_rts, rfnm_timeout);
       }
@@ -1620,8 +1764,8 @@ static void app_open (void)
            socket, size, host);
 
   // Initiate a connection.
-  i = make_open (host, 1002, socket, 0, 0);
-  connection[i].rcv.link = 42; //Receive link.
+  i = make_open (host, alloc_icp_socket (host), socket, 0, 0);
+  connection[i].rcv.link = alloc_client_link (host); //Receive link.
   connection[i].data_size = size; //Byte size for data connection.
   connection[i].flags |= CONN_CLIENT | CONN_OPEN;
   connection[i].listen = socket;
