@@ -17,7 +17,7 @@ usage() {
 Usage: $(basename "$0") <prepare|start|stop|restart|status|verify|console>
 
 Runs DPS8M/MR12.8 Multics for MIT-MULTICS host #6.
-This is real Multics media, not recovered 1972 MIT H645 storage.
+Generic recreation: public Multics MR12.8 media under DPS8M, not recovered 1972 MIT H-645 Multics.
 USAGE
 }
 
@@ -55,7 +55,7 @@ fetch_quickstart() {
 customize_site_setup() {
     perl -0pi -e '
         s/SYSTEM_NAME="Yoyodyne Propulsion Systems"/SYSTEM_NAME="MIT Project MAC Multics"/;
-        s/PROJECT_ADMINISTRATOR="Chiclitz, Clayton"/PROJECT_ADMINISTRATOR="Saltzer, Jerome"/;
+        s/PROJECT_ADMINISTRATOR="Chiclitz, Clayton"/PROJECT_ADMINISTRATOR="Administrator, System"/;
         s/ORGANIZATION_ADMINISTRATOR="Yoyodyne"/ORGANIZATION_ADMINISTRATOR="MIT Project MAC"/;
         s/ACCOUNT_NAME="Clayton"/ACCOUNT_NAME="Iccc"/;
         s/ACCOUNT_PASSWORD="password"/ACCOUNT_PASSWORD="iccc2026"/;
