@@ -522,6 +522,20 @@ static void telnet_server (int host, int sock,
       exit (1);
     }
     if (pid == 0) {
+      /* The forked child inherited the parent's single NCP app-control
+         socket (a connected AF_UNIX datagram fd created once in main()).
+         If it kept using that fd, its own ncp_close() at teardown would
+         race the parent's next ncp_listen() call on the very same fd:
+         whichever process's recv() happens to unblock first steals
+         whatever reply is pending, regardless of which of them it was
+         meant for. reader()/writer() already avoid this by calling
+         ncp_init() again right after their own fork(); do the same here
+         so this child gets its own private socket (bound to a path keyed
+         on its own, guaranteed-unique pid) before touching NCP at all. */
+      if (ncp_init (NULL) == -1) {
+        fprintf (stderr, "NCP re-init error in connection child.\n");
+        exit (1);
+      }
       serve_connection (host, connection, process, options);
       _exit (0);
     }
@@ -624,9 +638,7 @@ int main (int argc, char **argv)
     host = atoi (argv[optind++]);
 
   if (telnet == telnet_server) {
-    if (optind < argc && strcmp (argv[optind], "--") == 0)
-      optind++;
-    if (optind >= argc) {
+    if (optind < 2 || strcmp (argv[optind - 1], "--") != 0 || optind >= argc) {
       fprintf (stderr, "%s: -s requires -- <command> [args]\n", argv[0]);
       exit (1);
     }

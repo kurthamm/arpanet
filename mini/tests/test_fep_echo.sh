@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 # the brief's concurrency check) and a shared literal name races between instances.
 sess="fep-test-$$"
 screen -dmS "$sess" env NCP=ncp02 ./ncp-telnet -s -- cat
-trap 'screen -S "$sess" -X quit 2>/dev/null || true' EXIT
+trap 'if screen -ls 2>/dev/null | grep -q "[.]${sess}[[:space:]]"; then screen -S "$sess" -X quit; fi' EXIT
 sleep 2
 # ncp-telnet -c exits as soon as its stdin hits EOF, which can happen before the
 # server's echo has made the round trip back over the (multi-hop, sometimes multi-
