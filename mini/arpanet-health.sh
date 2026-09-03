@@ -166,8 +166,13 @@ check_relay() {
     # (mini/fepctl.sh), not a direct SIMH terminal-line bypass, so verify
     # each configured FEP host is up rather than checking for the retired
     # local-host-terminal.py process.
-    local fep_status fep_line fep_host
+    local fep_status fep_line fep_host fep_rc
     fep_status="$(cd "$ROOT" && ./fepctl.sh status all)"
+    fep_rc=$?
+    if [[ $fep_rc -ne 0 ]]; then
+        fail "fepctl.sh status all exited rc=$fep_rc"
+        return
+    fi
     printf '%s\n' "$fep_status"
     while IFS= read -r fep_line; do
         [[ -n "$fep_line" ]] || continue
