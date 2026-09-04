@@ -121,7 +121,28 @@ def main():
         type=int,
         help="close with a busy message if SIMH assigns a line above this number",
     )
+    parser.add_argument(
+        "--delay",
+        type=float,
+        default=0.0,
+        help="after connect, discard console output for N seconds before "
+             "--send-after-connect (e.g. WAITS needs ~1s to settle)",
+    )
+    parser.add_argument(
+        "--send-after-connect",
+        help="send this string to the line after connect (+ --delay); C-style "
+             "escapes like \\r are honored (e.g. WAITS login: 'login\\r')",
+    )
+    parser.add_argument(
+        "--logout-on-close",
+        help="send this string to the line when the session ends "
+             "(e.g. WAITS: 'logout\\r\\n')",
+    )
     args = parser.parse_args()
+
+    def unescape(s):
+        # Turn a conf-file literal like "login\\r" into bytes b"login\r".
+        return s.encode().decode("unicode_escape").encode("latin-1")
 
     running = True
 
@@ -167,6 +188,13 @@ def main():
                 sock.close()
                 return
 
+    # Post-connect login injection (WAITS: discard ~1s of stale console output,
+    # then send "login\r" -- the behavior the bespoke waitsconnect bridge did).
+    if args.delay > 0:
+        drain_initial_output(sock, duration=args.delay)
+    if args.send_after_connect:
+        sock.sendall(unescape(args.send_after_connect))
+
     while running:
         readable, _, _ = select.select([0, sock], [], [], 0.5)
         if 0 in readable:
@@ -194,6 +222,11 @@ def main():
                         break
                 os.write(1, data)
 
+    if args.logout_on_close:
+        try:
+            sock.sendall(unescape(args.logout_on_close))
+        except OSError:
+            pass
     sock.close()
 
 

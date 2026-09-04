@@ -158,7 +158,7 @@ build_waitsconnect() {
 }
 
 status_host() {
-    for name in host11 waitsconnect; do
+    for name in host11; do
         if screen_exists "$name"; then
             echo "host 11: screen $name present"
         else
@@ -185,12 +185,12 @@ start_host() {
     fi
     ensure_waits_files
     backup_packs_once
-    build_waitsconnect
+    # WAITS now reaches the ARPANET through the generic FEP (ncp11 ncpdov +
+    # ncp-telnet -s -- fep-line.py 11 1025, see fep-hosts.conf / arpanet-fep),
+    # exactly like Sigma/Multics/OS-360 -- the bespoke waitsconnect bridge is
+    # retired. host11ctl only runs the WAITS simulator now.
     echo "host 11: starting screen host11"
     (cd "$ROOT/host11" && screen -dmS host11 ./pdp10-ka ./waits.ini)
-    sleep 5
-    echo "host 11: starting screen waitsconnect"
-    (cd "$ROOT/host11" && screen -dmS waitsconnect ./waitsconnect)
 }
 
 verify_host() {
