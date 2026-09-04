@@ -178,8 +178,12 @@ Done:
       FEP bridges.
 - [x] **Health/diagnostic tool** — `mini/arpanet-health.sh` (real `@L` truth + per-layer localization).
 
-Open:
-- [ ] **Task 9** — host 41 (PiDP-10) native NCP.
+In process — OWNER: Kurt (do not worry about these here):
+- [~] **host 41 (local PiDP-10)** — native NCP is Kurt's in-flight work (external PiDP-10 over
+      Tailscale). Reachable today; native-NCP conversion (was "Task 9") is his to drive.
+- [~] **TENEX (#69)** — in-flight under its own host69 knowledge spine. Serving `@L` now; Kurt owns it.
+
+Open (this effort):
 - [ ] **Task 10 (needs rework)** — `mini/verify-imp-routing.sh` is STALE: it still says "WAITS via
       waitsconnect" and checks host 11 via `ncp16` ncp-ping (a known false-positive). Rebuild the gate
       on `arpanet-health.sh`'s real-`@L` probe so `make check` reflects reality.
@@ -193,6 +197,3 @@ Decision needed:
       depended on was REVERTED (be6f99e); `arpanet-reconcile` now covers "IMP interface detached" at the
       orchestration layer. Either re-do the emulator resilience and roll it fleet-wide, or formally close
       this task in favor of reconcile.
-
-Not this effort:
-- [ ] **TENEX (#69)** — in-flight under its own host69 knowledge spine; do not fold in here.
