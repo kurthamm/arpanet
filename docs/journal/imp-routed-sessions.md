@@ -183,14 +183,22 @@ In process — OWNER: Kurt (do not worry about these here):
       Tailscale). Reachable today; native-NCP conversion (was "Task 9") is his to drive.
 - [~] **TENEX (#69)** — in-flight under its own host69 knowledge spine. Serving `@L` now; Kurt owns it.
 
+Done (2026-09-04 improvements pass):
+- [x] **Task 10 — gate on the real signal** — `verify-imp-routing.sh` now delegates its live check to
+      `arpanet-health.sh` (real `@L` probe); dropped the `ncp16` ncp-ping false-positive and the retired
+      waitsconnect reference. `make check` = 9 passed. host 69/41 reported INFO-only (in-flight).
+- [x] **noc force-restart spacing** — `IMPController`/`NCPController.force_restart` now leave a 10s gap
+      before respawn so UDP sockets release first (the imp62 crash-on-restart). Effective next NOC restart.
+
 Open (this effort):
-- [ ] **Task 10 (needs rework)** — `mini/verify-imp-routing.sh` is STALE: it still says "WAITS via
-      waitsconnect" and checks host 11 via `ncp16` ncp-ping (a known false-positive). Rebuild the gate
-      on `arpanet-health.sh`'s real-`@L` probe so `make check` reflects reality.
-- [ ] **noc per-IMP restart flakiness** — `impctl restart <imp>` is less reliable than a manual
-      spaced stop/start; worth hardening in `noc-server.py`/`impctl`. reconcile leans on it.
-- [ ] **imp06 hi4 boot-race, root cause (optional)** — reconcile auto-heals it every boot; the
-      underlying emulator attach-race still occurs. Optional emulator-level fix so reconcile never has to.
+- [ ] **reconcile @L blind spot (partial)** — reconcile ensures a FEP bridge is RUNNING but not that it
+      SERVES `@L`. An auto-`@L`-recycle was attempted and REVERTED: the probe false-negatived and a rapid
+      stop/start broke all 4 working bridges (had to restore by hand). Needs a reliable probe + spaced
+      recycle before re-attempting. Documented limitation, not landmined.
+- [ ] **imp06 hi4 boot-race, root cause + lifecycle unify (deferred, high-risk)** — reconcile auto-heals
+      the race every boot, so this is low-urgency. A true root fix is emulator-level (`h316_hi`, reverted)
+      + fleet mesh restart; unifying the 4 host lifecycles is a broad refactor. Both need a dedicated,
+      validated effort with mesh churn — not a live-system quick change.
 
 Decision needed:
 - [ ] **"Fleet-wide `h316ov` activation" is superseded** — the `h316_hi.c` peer-loss resilience it
