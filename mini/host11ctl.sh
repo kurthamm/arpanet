@@ -194,16 +194,21 @@ start_host() {
 }
 
 verify_host() {
-    local deadline=$((SECONDS + 120)) output
+    # Verify the actual WAITS SIM is up, NOT ncp-ping: the IMP answers an NCP echo
+    # even when WAITS is dead, so ncp-ping is a false-positive that let the systemd
+    # unit believe WAITS was running and skip starting it. Ground truth = the WAITS
+    # KA screen is present AND the sim's console line (1025, the FEP line) is
+    # listening. The FEP bridge / NCP reachability is a separate layer (arpanet-fep
+    # + arpanet-recover reconcile).
+    local deadline=$((SECONDS + 120))
     while (( SECONDS < deadline )); do
-        if output="$(cd "$ROOT" && timeout 10 env NCP=ncp16 ./ncp-ping -c1 11 2>&1)"; then
-            printf '%s\n' "$output"
-            echo "host 11: NCP verified"
+        if screen_exists host11 && ss -Hltn 2>/dev/null | grep -qE '[:.]1025\b'; then
+            echo "host 11: WAITS sim up (screen host11 + line 1025 listening)"
             return 0
         fi
         sleep 5
     done
-    printf '%s\n' "${output:-}"
+    echo "host 11: WAITS sim NOT up (no host11 screen or line 1025 not listening)"
     return 1
 }
 
