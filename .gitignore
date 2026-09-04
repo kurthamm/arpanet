@@ -45,3 +45,6 @@ mini/noc-server.py.bak-preEventDriven
 
 # emulator binary backups (manual, not tracked)
 mini/h316ov.bak-*
+
+# host69 idle-rig disposable disk copy (relaunchable, not tracked)
+mini/host69-bbn-tenex/idle-rig/install/

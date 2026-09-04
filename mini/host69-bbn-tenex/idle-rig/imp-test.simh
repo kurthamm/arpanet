@@ -1,0 +1,15 @@
+# Isolated test IMP for the host69 idle root-cause. Same firmware/identity as imp05
+# (num=5, so host69 talks to "its" IMP), but NO modem/trunk lines (mi*) -> fully
+# isolated from the live mesh, and hi2 on PRIVATE ports (41051/41052) so it can never
+# collide with the live imp05 (21051/21052). Completes the host-ready handshake so
+# TENEX sees "link up" and the idle-time spin reproduces.
+set debug stdout
+do impconfig.simh
+set imp num=5
+do impcode.simh
+# HOST INTERFACE (host69 only):
+set hi2 enabled
+set hi2 nodebug
+attach -u hi2 41051:127.0.0.1:41052
+# Host 1: BBN-TENEX (host #69)
+go
