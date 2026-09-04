@@ -330,9 +330,26 @@ reconcile() {
         fi
     done < <(its_topology)
 
-    # FEP-bridged hosts self-reconnect; just nudge their controller if down.
-    "$ROOT/host06-multicsctl.sh" verify >/dev/null 2>&1 && ok "host 6 Multics on the net" \
-        || { warn "host 6 Multics down -> restart"; sudo systemctl restart arpanet-host06-multics.service || fail "host 6 restart"; }
+    # FEP bridges: arpanet-fep can run before the sims expose their line ports (the
+    # sim units are After=arpanet-fep), so on a cold boot fepctl skips them. Now that
+    # the sims are up, ensure each FEP bridge is running. Only starts a bridge when its
+    # sim line is actually listening -- never fights a sim that is still booting.
+    log ""
+    log "== FEP bridges =="
+    local fh fncp fport frest
+    while IFS=: read -r fh fncp fport frest; do
+        [[ "$fh" =~ ^[0-9]+$ ]] || continue
+        if ! ss -Hltn 2>/dev/null | grep -qE "[:.]$fport\b"; then
+            warn "host $fh: sim line $fport not listening (sim not up yet) -- bridge skipped"
+            continue
+        fi
+        if screen -ls 2>/dev/null | grep -qE "[.]fep$fh[[:space:]]"; then
+            ok "host $fh FEP bridge up"
+        else
+            log "host $fh: sim up but FEP bridge down -> fepctl start $fh"
+            "$ROOT/fepctl.sh" start "$fh" >/dev/null 2>&1 || warn "host $fh: fepctl start failed"
+        fi
+    done < "$ROOT/fep-hosts.conf"
 }
 
 usage() {
