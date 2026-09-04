@@ -349,6 +349,10 @@ reconcile() {
             log "host $fh: sim up but FEP bridge down -> fepctl start $fh"
             "$ROOT/fepctl.sh" start "$fh" >/dev/null 2>&1 || warn "host $fh: fepctl start failed"
         fi
+        # NOTE: this checks the bridge is RUNNING, not that it SERVES @L. An @L probe
+        # here is the right idea but must (a) use a reliable prove and (b) recycle with
+        # spacing -- a rapid stop/start breaks a working bridge. Left as a known
+        # limitation rather than shipping a destructive auto-recycle.
     done < "$ROOT/fep-hosts.conf"
 }
 
