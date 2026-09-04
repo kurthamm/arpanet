@@ -285,28 +285,15 @@ void hi_update_dmc (uint32 dmc, uint32 count)
 }
 
 // Link error recovery ...
-//   A UDP host/modem link is CONNECTIONLESS: the peer simulator can restart, or
-// its host can go down and come back. Real 1822 hardware treated a dropped line
-// as "host not ready" and recovered when the line returned -- it did NOT require
-// re-cabling. The original code here permanently DETACHED the interface on any
-// I/O error ("UNRECOVERABLE"), which (a) crashed a freshly-restarted IMP whose
-// peer wasn't up yet and (b) forced the manual "reboot IMP & host together"
-// dance. Instead we treat it as a transient link-down: reset the line once, KEEP
-// it attached, and let the rx service (self-rescheduling) and the RTC tx service
-// keep running so the link re-establishes automatically when the peer returns.
-// hi_poll_rx clears hi_link_down[] and logs recovery on the next good packet.
-t_bool hi_link_down[HI_NUM+1] = { FALSE };
-
 void hi_link_error (uint16 line)
 {
-  if (!hi_link_down[line]) {
-    sim_printf("HI%d - host link down (peer unreachable); keeping interface up, will auto-recover\n", line);
-    hi_reset_rx(line);  hi_reset_tx(line);   // clean slate once, on the down transition
-    hi_link_down[line] = TRUE;
-  }
-  //   Deliberately do NOT sim_cancel / hi_detach / clear PHIDB(line)->link: a UDP
-  // peer can come back, and dropping the interface is what made restarts fragile.
-  // The failed packet is simply dropped; traffic resumes when the peer returns.
+  //   Any physical I/O error, either for the UDP link or a COM port, prints a
+  // message and detaches the modem.  It's up to the user to decide what to do
+  // after that...
+  sim_printf("HI%d - UNRECOVERABLE I/O ERROR!\n", line);
+  hi_reset_rx(line);  hi_reset_tx(line);
+  sim_cancel(PUNIT(line));  hi_detach(PUNIT(line));
+  PHIDB(line)->link = NOLINK;
 }
 
 
@@ -587,11 +574,6 @@ void hi_poll_rx (uint16 line)
     PHIDB(line)->rxsize = count;
     if (count == 0) { return; }
     if (count < 0) { hi_link_error(line); return; }
-    // A good packet arrived: if the link had been marked down, it has recovered.
-    if (hi_link_down[line]) {
-      sim_printf("HI%d - host link recovered\n", line);
-      hi_link_down[line] = FALSE;
-    }
     // Make note of the host ready bit.
     PHIDB(line)->ready = !! (PHIDB(line)->rxdata[0] & PFLG_READY);
     // Exclude the flags from the count.
