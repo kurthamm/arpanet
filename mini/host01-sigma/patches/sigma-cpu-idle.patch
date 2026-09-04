@@ -1,0 +1,26 @@
+diff --git a/sigma/sigma_cpu.c b/sigma/sigma_cpu.c
+index e7469bbb..a35d037d 100755
+--- a/sigma/sigma_cpu.c
++++ b/sigma/sigma_cpu.c
+@@ -316,6 +316,8 @@ REG cpu_reg[] = {
+     };
+ 
+ MTAB cpu_mod[] = {
++    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle, NULL, "Enable idle detection (sleep host while CP-V waits for an interrupt)" },
++    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL, NULL, "Disable idle detection" },
+     { CPUF_MODEL, CPUF_S5, "Sigma 5", "SIGMA5", &cpu_set_type },
+     { CPUF_MODEL, CPUF_S6, "Sigma 6", "SIGMA6", &cpu_set_type },
+     { CPUF_MODEL, CPUF_S7, "Sigma 7", "SIGMA7", &cpu_set_type },
+@@ -476,8 +478,10 @@ while (reason == 0) {                                   /* loop until stop */
+             }
+         else reason = tr2;                              /* normal status code */
+         }
+-    else if (wait_state != 0)                           /* wait state? don't fetch */
+-         continue;
++    else if (wait_state != 0) {                          /* wait state? don't fetch */
++         sim_idle (TMR_RTC, TRUE);                        /* CP-V idle (OP_WAIT): sleep the host */
++         continue;                                        /* until the next event/interrupt */
++         }
+     else {                                              /* normal instruction */
+         if (sim_brk_summ &&
+             sim_brk_test (PC, SWMASK ('E'))) {          /* breakpoint? */
