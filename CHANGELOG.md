@@ -211,3 +211,38 @@ Read the 1972 booklet for the four BBN-TENEX #69 scenarios' exact programs:
 - **#15 BBN Chess** = **Greenblatt's MacHack VI**; exact BBN binary **lost**, source
   survives as OCM `github.com/PDP-10/its:src/chprog/ocm.470` (MIDAS) → needs a TENEX port.
 - **#18 BBN DOCTOR** = ELIZA; already covered by the 18A adaptation on MIT-AI #134.
+
+## 2026-09-04 — IMP-routed sessions restored (Oscar's mail) + emulator restart resilience
+
+Full notebook: `docs/journal/imp-routed-sessions.md`. Branch `feature/imp-routed-sessions`.
+
+Prompted by Oscar Vermeulen's 2026-08-29 email: since the DigitalOcean migration, `@L` to most
+hosts had been wired straight to each simulator's terminal line (`local-host-terminal.py`) — the
+IMP network ran but user sessions bypassed it. Put every host back THROUGH the IMPs and removed
+the bypass. (Engineering only — no rebranding; this repo stays Kurt's.)
+
+### Changed: every visitor session now crosses the IMP network
+- **ITS native NCP** on all four (#70/134/198/126). #198 (MIT-ML) had been special-cased in
+  `hostctl.sh` onto the unfixed `./pdp10-ka`, so it never answered `@L`; now runs `pdp10-ka-fixed`
+  like the rest (H316 port-4 fix already in `h316ov`). 12/12 native logins across 3 TIP sources.
+- **FEP** (Oscar's front-end method — `ncpdov` + `ncp-telnet -s -- fep-line.py`) for the hosts
+  without their own NCP: Sigma #1, Multics #6, OS/360 #65 — all reachable through the IMPs.
+- **host 65 (OS/360)** brought online (the turnover's "hercules not installed" note was stale from
+  the old server) → `@L 65` → "UCLA CCN 360/91 SERVER TELNET".
+- **TIP source rotation** restored in `do.sh` (8 sources; the dead LL-TX2 #74 / CMU-10A #78 NCPS
+  entries uncommented + `dotelnet.sh` FULLHOST map).
+- **FEPs under systemd** — `deploy/systemd/arpanet-fep.service` + `mini/fep-wait-and-start.sh`;
+  `fepctl start all` skips (non-fatal) a host whose simulator isn't running.
+
+### Fixed: H316 host interface survives transient peer loss (`src/simh-REUSE/H316/h316_hi.c`)
+`hi_link_error()` permanently detached the (UDP) host interface on any I/O error, which crashed a
+freshly-restarted IMP whose peer was down and forced the manual "reboot IMP & host together"
+dance. Now it logs once, resets the line once, and keeps the interface attached so it auto-recovers
+when the peer returns (`hi_poll_rx` clears the flag on the next good packet). Guest-invisible, more
+1822-faithful, and the durable fix for the restart fragility. Rebuilt `h316ov`, deployed via atomic
+`mv` (old kept as `mini/h316ov.bak-predetachfix`); fleet-wide on the next coordinated recover.
+
+### Restart policy (`hostctl.sh`)
+`restart <its-host>` is the reliable ITS-only reboot into the live IMP (the supported direction).
+The plan's "restart the IMP too" is the exact recipe that trips `hi_link_error`; IMP-level recovery
+stays the coordinated `arpanet-recover.sh`.

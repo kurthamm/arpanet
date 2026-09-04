@@ -62,20 +62,23 @@ bug that stopped ITS from answering network logins). The work spans two lines: t
 | **#69 BBN** | **BBN-TENEX** (SIMH PDP-10 KI) | **no dir** (not even planned) | no | **NATIVE-NCP LOGIN DONE + HARDENED + DEPLOYED** — `@L 69` → real BBN-TENEX `@` EXEC, credentialed DEMO login via **`ATPTY`** (JSYS 274; NETSER not needed). Login server **NETLIT-1e** (re-listen hardened: 0 s, no crash; 5/5 gate). Baked into a **golden SIMH snapshot**; `arpanet-host69.service` restores it and is **enabled**. Going live in phases (`docs/host69-go-live-plan.md`); full journal `docs/host69-ncp-login-investigation.md` §10. |
 
 ### Network seam — how each host actually reaches visitors (the honesty that matters)
-Running a real OS is *not* the same as being an authentic ARPANET host. By integration method:
-- **Native period NCP** (the host's own OS speaks 1822/NCP on its IMP — the authentic path):
-  **ITS** (#6/70/134/198/126) and **BBN-TENEX** (#69 — login done + hardened + deployed).
-- **NCP bridge** (a Linux NCP daemon stands in for the host's network stack): **WAITS** (#11)
-  via `waitsconnect`.
-- **Terminal / front-door bridge** (real OS, but reached through the web terminal or a shim —
-  **not** a native ARPANET NCP host): **Sigma 7 / CP-V** (#1) via `local-host-terminal.py`
-  (its own README: *"not attached to IMP #1 as a working NCP host yet"*); **Multics** (#6) via
-  the TCP-6180 terminal; **OS/360 MVT** (#65) via `ccn_frontdoor.py` + `s3270`.
+Running a real OS is *not* the same as being an authentic ARPANET host. **As of 2026-09-04
+(`feature/imp-routed-sessions`) every visitor session flows THROUGH the IMP network — the
+terminal-line bypass is gone** (`docs/journal/imp-routed-sessions.md`). By integration method:
+- **Native period NCP** (the host's own OS speaks 1822/NCP on its IMP — the golden route):
+  **ITS** (#70/134/198/126 — all four verified) and **BBN-TENEX** (#69).
+- **FEP** (Oscar's period-correct front-end: a Linux `ncpdov` + `ncp-telnet -s -- fep-line.py`
+  bridges the host onto its IMP port, so session data still crosses the IMPs): **Sigma 7 / CP-V**
+  (#1), **Multics** (#6), **OS/360 MVT** (#65). Supervised by `arpanet-fep.service`.
+- **NCP bridge (legacy one-off)** — **WAITS** (#11) via `waitsconnect`; to be folded into the
+  generic FEP (Task 6).
 - **No real OS** — the ~18 `ncpdov` map stubs.
 
-So our work splits cleanly: ITS and **TENEX (#69)** we **activated as native NCP** (host69 login
-proven + hardened + deployed); Sigma/Multics/OS-360 are **authentic OSes wired in via bridges**, with
-native-NCP attach still future work. Don't let "it runs `@L 1`" be read as "it's an authentic NCP host."
+Earlier this file said Sigma/Multics/OS-360 were reached "via terminal/front-door bridges, **not**
+native ARPANET NCP hosts, native-NCP attach still future" — that was the pre-restoration bypass
+state and is **superseded**: they now cross the IMPs via the FEP (the authentic period technique
+for a host without its own NCP). The restart fragility that made this finicky is fixed at the root
+in the emulator (`h316_hi.c` no longer permanently detaches on a transient host-link loss).
 
 ### Subsystems & engineering we added
 - **ITS network logins** (Civitae `feature/its-ncp-debug`): `pdp10-ka-fixed` (KAIMP interrupt
@@ -117,6 +120,9 @@ native-NCP attach still future work. Don't let "it runs `@L 1`" be read as "it's
       + `docs/host69-go-live-plan.md` (4-phase go-live) + `netser-build/` (NETLIT source, `emulator-fork/`,
       `investigation-2026-06-28/` artifacts). Login DONE + hardened + deployed; going live in phases.
 - [x] **its-network-login** — `docs/journal/its-network-login.md` (the activation story for #70/134/198/126).
+- [x] **imp-routed-sessions** — `docs/journal/imp-routed-sessions.md` (2026-09-04: every host put back
+      THROUGH the IMPs — native NCP for ITS, FEP for Sigma/Multics/OS-360; bypass removed; source
+      rotation restored; FEP under systemd; `h316_hi.c` peer-loss resilience. Prompted by Oscar's mail).
 - [x] **host06-multics** — `mini/host06-multics/README.md` (was undocumented).
 - [x] **host01-sigma** — `mini/host01-sigma/README.md` (honest: CP-V via terminal bridge, not yet native NCP).
 - [x] **host65-ucla-ccn** — `mini/host65-ucla-ccn/README.md` (OS/360 MVT via front-door bridge).

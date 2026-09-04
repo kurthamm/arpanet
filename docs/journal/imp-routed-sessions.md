@@ -1,0 +1,94 @@
+# IMP-routed sessions — put every visitor session back through the IMP network
+
+**Effort:** `feature/imp-routed-sessions`. **State: ✅ core done** (all hosts route through the
+IMPs; emulator restart-fragility fixed at the root). Prompted by Oscar Vermeulen's 2026-08-29
+email (full text in `docs/superpowers/2026-09-03-turnover.md` §1).
+
+## Why this exists
+During the 2026-06 DigitalOcean migration (`do.sh`, commit 110ac57) `@L` to most hosts was wired
+**straight to each simulator's terminal-line TCP port** via `local-host-terminal.py` — the IMP
+network was up but **user session data no longer flowed through it**. Only Stanford WAITS (#11)
+still went through the IMPs. Oscar (rightly) flagged this as losing the whole point. Kurt's call:
+put every host back on IMP-routed sessions and remove the bypass entirely.
+
+Two routes, both through the IMPs (no third "bypass" option):
+- **Native period NCP** — the host's own OS speaks 1822/NCP on its IMP (the golden route): the
+  ITS machines (#70/126/134/198).
+- **FEP** (Oscar's own period-correct method) — a Linux front-end (`ncpdov` + `ncp-telnet -s --
+  fep-line.py`) bridges a host that has no working NCP: UCLA Sigma #1, MIT Multics #6, UCLA-CCN
+  OS/360 #65.
+
+> Scope note (Kurt, 2026-09-03): take **only the engineering** from Oscar's mail. Do **not**
+> rebrand to his project name / credits / links; this implementation stays clearly Kurt's. See
+> the `kurt-keep-project-his-own` memory.
+
+## What we did (2026-09-03/04, all on `feature/imp-routed-sessions`)
+- **Merged** `origin/host69-tenex-ncp-imp` (the droplet's production branch, incl. the host69
+  BBN-TENEX node) into this branch so restoring IMP routing didn't drop host69. Both NCP-startup
+  fixes compose: `run()` starts NCPs before IMPs (H316 `hi_link_error` avoidance) **and**
+  `_on_imp_state_change` fires the idempotent per-IMP NCP start as a backstop.
+- **Task 5b — TIP source rotation restored.** `do.sh` rotates browser sessions over the 8 TIP
+  sources again; the two dead ones (LL-TX2 #74 on imp10:1, CMU-10A #78 on imp14:1) were
+  NCPS-commented while their IMP host ports were attached — uncommented + `dotelnet.sh` FULLHOST
+  map fix. Verified: all 8 sources reach `@L 1` through the IMPs.
+- **Task 7 — ITS native NCP on all four** (#70/126/134/198). These were already `pdp10-ka-fixed`
+  (Lars's KAIMP fix) except **#198 (MIT-ML), which `hostctl.sh` special-cased onto the unfixed
+  `./pdp10-ka`** → it never answered `@L`. Removed the special-case; 198 now native like the
+  rest. (The H316 port-3/4 device fix it also needs — Lars's `c26fd74` — was already built into
+  `h316ov`.) 12/12 native logins across 3 sources.
+- **host 65 (OS/360) brought online.** The turnover (written on the old Civitae box) said
+  "hercules not installed"; **stale** — Hercules is here, host 65 runs, and `@L 65` now reaches
+  "UCLA CCN 360/91 SERVER TELNET" through the IMPs. (See `turnover-blocked-status-stale` memory.)
+- **Task 4b — FEPs under systemd.** `deploy/systemd/arpanet-fep.service` +
+  `mini/fep-wait-and-start.sh` (bounded wait for the FEP NCP sockets, then `fepctl start all`).
+  `fepctl` now *skips* (not fatal) a host whose backing simulator isn't up, so the unit comes up
+  clean with whatever hosts are present.
+- **Task 8 — restart policy.** The plan's coupled restart (stop ITS hosts → restart their IMP →
+  start hosts) is the exact recipe that trips `hi_link_error`: restarting a live IMP while a host
+  interface has no peer **crashed** the fresh IMP (reproduced repeatedly on imp62) and islanded
+  it from the mesh ~1 min. So `hostctl restart <its-host>` is kept as the **reliable ITS-only
+  reboot into the live IMP** (the supported direction; ~15× clean this session). IMP-level
+  recovery stays the coordinated `arpanet-recover.sh`.
+- **Emulator resilience (the root fix).** `src/simh-REUSE/H316/h316_hi.c` `hi_link_error()` no
+  longer permanently detaches on a transient UDP peer loss — it logs once, resets the line once,
+  and keeps the interface attached so it auto-recovers when the peer returns (`hi_poll_rx` clears
+  the flag on the next good packet). This removes the restart fragility at the source: an IMP now
+  survives a host being down, and ITS can reboot and re-marry without an IMP restart. Rebuilt
+  `h316ov` (`-Werror` clean); validated (new binary runs imp62 with its host DOWN for 20s+ with
+  no crash/detach; old binary would detach). Deployed to `mini/h316ov` (atomic `mv`; old kept as
+  `mini/h316ov.bak-predetachfix`). **Fleet-wide activation = next restart of each IMP** (one
+  coordinated `arpanet-recover.sh` in a maintenance window).
+
+## Accuracy line (Kurt's rule; congruent with Oscar/Lars)
+Everything here is host-side: `do.sh`/`hostctl`/`fepctl`/systemd orchestration and the SIMH
+**emulator** UDP bridge (`h316_hi.c`). The **guest** artifacts (ITS, IMP firmware, 1822/NCP) are
+untouched. The `h316_hi.c` change is exactly the kind of emulator maintenance Lars does (he wrote
+that UDP host interface and fixed its port-3/4 addressing); the guest sees unchanged — actually
+more faithful — 1822 behavior. Patching ITS's broken reconnect code (the vintage guest) was
+considered and **rejected** — Lars/Oscar themselves worked around it rather than modify ITS.
+
+## Gotchas / lessons (cost real time)
+- **Orphaned processes** repeatedly broke things: a stale `waitsconnect` (from the original boot)
+  fighting the fresh one over ncp16; duplicate host emulators. Always hunt orphans first
+  (`lab-duplicate-orphan-cleanup` memory). `pgrep -x` for true counts (an args-grep double-counts
+  the `SCREEN -dmS …` wrapper line).
+- **Zero-gap `impctl stop; start <imp>` crashes the IMP** (old UDP sockets not released); a spaced
+  stop → ~12s → start is reliable. (The `h316_hi.c` fix reduces how often an IMP restart is
+  needed at all.)
+- **Restarting an IMP islands it from the mesh ~60s** until routing reconverges; `ncp-ping` reads
+  "IMP cannot be reached" during that window — wait it out, don't re-restart.
+- The live `simh-server` reads `do.sh` from the working tree, so a branch checkout changes routing
+  behavior immediately — mind that on the production droplet.
+
+## Status / remaining
+- [x] Merge; Task 5b (8 sources); Task 7 (ITS native ×4); host 65 online; Task 4b (FEP systemd);
+      Task 8 (reliable ITS-only restart); `h316_hi.c` peer-loss resilience (built/validated/deployed).
+- [ ] **Fleet-wide `h316ov` activation** — coordinated `arpanet-recover.sh` in a window so every IMP
+      picks up the resilient binary; then confirm an IMP survives a host-down restart end-to-end.
+- [ ] **Task 6** — fold WAITS (#11) into the generic FEP (`fep-line.py`), retire the bespoke
+      `waitsconnect`. WAITS routing was restored via `waitsconnect` this session but is the last
+      one-off bridge.
+- [ ] **Task 9** — host 41 (PiDP-10) native NCP.
+- [ ] **Task 10** — `make check` / `mini/verify-imp-routing.sh` (assert no bypass; every host routes).
+- [ ] **noc per-IMP restart flakiness** — `impctl restart <imp>` is less reliable than a manual
+      spaced stop/start; worth hardening in `noc-server.py`/`impctl` (separate from the emulator fix).
