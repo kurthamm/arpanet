@@ -91,14 +91,43 @@ preflight_cleanup() {
     assert_no_duplicate_screens
 }
 
+# Load gate for staged startup: don't launch the next host until the 1-minute
+# load average falls back to this, so we never cold-start every heavy guest OS at
+# once (that boot-storm saturates a small box and stalls IMP mesh convergence).
+# Scaled to the box (cores + half); override with ARPANET_LOAD_GATE.
+LOAD_GATE="${ARPANET_LOAD_GATE:-$(( $(nproc) + $(nproc)/2 ))}"
+
+# Wait until the 1-min load average is <= LOAD_GATE, or until a bounded cap (so a
+# genuinely busy box still makes progress rather than hanging forever).
+wait_load_settle() {
+    local max="${1:-150}" waited=0 load
+    while (( waited < max )); do
+        load="$(cut -d. -f1 /proc/loadavg)"
+        (( load <= LOAD_GATE )) && return 0
+        sleep 5; waited=$((waited + 5))
+    done
+    warn "load still >${LOAD_GATE} after ${max}s (now $(cut -d' ' -f1 /proc/loadavg)); proceeding"
+    return 0
+}
+
+# Start one host, then wait for the box to settle before returning.
+start_host_staged() {
+    local label="$1"; shift
+    log "  staged start: ${label} (load $(cut -d' ' -f1 /proc/loadavg), gate ${LOAD_GATE})"
+    "$@" || true
+    wait_load_settle 150
+}
+
 start_hosts() {
-    "$ROOT/host01-sigma/host01-sigmactl.sh" start || true
-    "$ROOT/host06-multicsctl.sh" start || true
-    "$ROOT/hostctl.sh" start 70 || true
-    "$ROOT/hostctl.sh" start 126 || true
-    "$ROOT/hostctl.sh" start 134 || true
-    "$ROOT/hostctl.sh" start 198 || true
-    "$ROOT/host11ctl.sh" start 11 || true
+    # Staged: each heavy guest OS boots and the box re-settles before the next,
+    # so N guests + the IMP farm never all cold-start simultaneously.
+    start_host_staged "UCLA Sigma #1"       "$ROOT/host01-sigma/host01-sigmactl.sh" start
+    start_host_staged "MIT Multics #6"      "$ROOT/host06-multicsctl.sh" start
+    start_host_staged "MIT-DM #70 (ITS)"    "$ROOT/hostctl.sh" start 70
+    start_host_staged "HILTON-KA1 #126"     "$ROOT/hostctl.sh" start 126
+    start_host_staged "MIT-AI #134 (ITS)"   "$ROOT/hostctl.sh" start 134
+    start_host_staged "MIT-ML #198 (ITS)"   "$ROOT/hostctl.sh" start 198
+    start_host_staged "Stanford WAITS #11"  "$ROOT/host11ctl.sh" start 11
 }
 
 wait_imp_running() {
@@ -197,6 +226,7 @@ case "$action" in
         run_step "Start hosted endpoint systems" start_hosts
         run_step "Start NOC/IMP service" sudo systemctl start arpanet-noc.service
         try_step "NOC service active" systemctl is-active --quiet arpanet-noc.service
+        run_step "Let the IMP farm settle before verifying" wait_load_settle 180
         try_step "IMP 06 MIT running" wait_imp_running 6
         try_step "IMP 11 Stanford running" wait_imp_running 11
         try_step "IMP 31 CCA running" wait_imp_running 31
