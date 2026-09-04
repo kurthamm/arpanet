@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-09-04
+
+### Fixed: fragile post-reboot recovery — hosts left down, wrong up/down signals
+
+**Problem:** After a reboot, hosts 70/126/134/198/6 came up unreliably or not at
+all. `arpanet-host@6` ran the ITS PDP-10 KA template though host 6 is MIT-MULTICS,
+so it died on an unbound `$dest` and spun holding the single global `flock`,
+starving the real ITS hosts until they timed out and stayed `failed`. MIT-MULTICS
+had no systemd unit at all (started by hand → gone on reboot). imp06 (four MIT
+hosts) could lose the boot-race attaching its last host interface (hi4), leaving a
+host unable to marry its IMP.
+
+**Fix (host-side orchestration only; guests untouched):**
+- Per-host locks (`/tmp/arpanet-hostctl-%i.lock`) — hosts start in parallel; one
+  bad host can't starve the rest.
+- Fast `isup` probe in `hostctl.sh` so the unit adopts an already-up host instead
+  of paying the 240s `verify` loop first; `host_dest()` shared; unknown host fails
+  clean instead of spinning on nounset.
+- `arpanet-host06-multics.service` for MIT-MULTICS; `arpanet-host@6` masked.
+- `arpanet-recover.sh reconcile` + `arpanet-reconcile.service`: post-boot self-heal
+  that re-marries a host to its IMP, restarting the IMP (crash-safe, all peers
+  present) only when its host interface actually detached.
+- `deploy/README.md` corrected: host 6 uses its own unit; 134/198 and reconcile
+  enabled.
+
+### Added: WAITS (host 11) routes through the generic FEP; `waitsconnect` retired
+
+`fep-line.py` gains `--delay` / `--send-after-connect` / `--logout-on-close`;
+`fep-hosts.conf` adds `11:ncp11:1025`. Host 11 now bridges like Sigma/Multics/OS-360.
+
 ## 2026-06-09
 
 ### Fixed: IMP host interface IPv4/IPv6 mismatch (silent connection failure)

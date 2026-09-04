@@ -59,6 +59,30 @@ Two routes, both through the IMPs (no third "bypass" option):
   `mini/h316ov.bak-predetachfix`). **Fleet-wide activation = next restart of each IMP** (one
   coordinated `arpanet-recover.sh` in a maintenance window).
 
+## 2026-09-04 — reboot recovery + reliability hardening (all 7 hosts durable)
+A full reboot exposed how fragile recovery was; hardened it end-to-end (host-side only).
+Root causes and fixes:
+- **`arpanet-host@6` was the ITS KA template, but host 6 is MIT-MULTICS (DPS8M).** It died on an
+  unbound `$dest` and spun every 5s holding the *single global* `flock`, starving the real ITS
+  hosts (70/126) so they timed out and stayed `failed`. Fix: **per-host locks**
+  (`/tmp/arpanet-hostctl-%i.lock`) so hosts start in parallel and can't starve each other; host 6
+  gets its own `arpanet-host06-multics.service`; `arpanet-host@6` masked.
+- **The unit ran `verify` (240s loop) *before* starting a down host** → 4 min wasted per cold host.
+  Fix: fast `isup` probe (single ping) to adopt an already-up host; the long `verify` runs only
+  after a real start.
+- **imp06 (busiest IMP — all four MIT hosts hi1-4 = MULTICS/DMS/AI/ML) lost the boot-race attaching
+  hi4**, so host 198 booted fine but could never marry. The IMP-side UDP socket was simply absent.
+  Fix: **`arpanet-recover.sh reconcile`** self-heal — for a down host, if the IMP interface is up it
+  fresh-boots the host; if the interface detached it restarts the IMP *with all host peers present*
+  (crash-safe) then re-marries. `arpanet-reconcile.service` runs it once at boot; a healthy boot is
+  a fast no-op. Verified live: no-op and light (fresh-boot) paths.
+- Diagnosis lesson: **`ncp-ping` conflates OS-down / IMP-link-dead / IMP-unreachable**; a console
+  "IN OPERATION" ≠ on-the-net. Ground truth for the host↔IMP link is `sudo ss -unap` (UDP, both
+  ends must be ESTAB). See the `arpanet-recovery-fragility` / `imp06-hi4-boot-race` memories.
+
+Result: hosts 6, 11, 69, 70, 126, 134, 198 all NCP-UP, systemd `active` + `enabled`. Residual:
+the imp06 hi4 cold-boot race can still recur, but `arpanet-reconcile.service` now auto-heals it.
+
 ## Accuracy line (Kurt's rule; congruent with Oscar/Lars)
 Everything here is host-side: `do.sh`/`hostctl`/`fepctl`/systemd orchestration and the SIMH
 **emulator** UDP bridge (`h316_hi.c`). The **guest** artifacts (ITS, IMP firmware, 1822/NCP) are
@@ -85,9 +109,9 @@ considered and **rejected** — Lars/Oscar themselves worked around it rather th
       Task 8 (reliable ITS-only restart); `h316_hi.c` peer-loss resilience (built/validated/deployed).
 - [ ] **Fleet-wide `h316ov` activation** — coordinated `arpanet-recover.sh` in a window so every IMP
       picks up the resilient binary; then confirm an IMP survives a host-down restart end-to-end.
-- [ ] **Task 6** — fold WAITS (#11) into the generic FEP (`fep-line.py`), retire the bespoke
-      `waitsconnect`. WAITS routing was restored via `waitsconnect` this session but is the last
-      one-off bridge.
+- [x] **Task 6** — WAITS (#11) folded into the generic FEP (`fep-line.py` gains `--delay` /
+      `--send-after-connect` / `--logout-on-close`; `fep-hosts.conf` adds `11:ncp11:1025`); the
+      bespoke `waitsconnect` is retired (commit 4880782). No one-off bridges remain.
 - [ ] **Task 9** — host 41 (PiDP-10) native NCP.
 - [ ] **Task 10** — `make check` / `mini/verify-imp-routing.sh` (assert no bypass; every host routes).
 - [ ] **noc per-IMP restart flakiness** — `impctl restart <imp>` is less reliable than a manual

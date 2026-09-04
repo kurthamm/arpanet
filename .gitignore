@@ -42,3 +42,6 @@ civitae-import/
 
 # pre-event-driven noc backup (content is in git history)
 mini/noc-server.py.bak-preEventDriven
+
+# emulator binary backups (manual, not tracked)
+mini/h316ov.bak-*
