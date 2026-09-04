@@ -1,8 +1,10 @@
 # IMP-routed sessions — put every visitor session back through the IMP network
 
-**Effort:** `feature/imp-routed-sessions`. **State: ✅ core done** (all hosts route through the
-IMPs; emulator restart-fragility fixed at the root). Prompted by Oscar Vermeulen's 2026-08-29
-email (full text in `docs/superpowers/2026-09-03-turnover.md` §1).
+**Effort:** `feature/imp-routed-sessions`. **State: ✅ core done** (all 9 hosts route `@L` through the
+IMPs on the new FEP/IMP config; reboot-durable with boot-time self-heal). Restart-fragility is
+handled at the orchestration layer (`arpanet-reconcile`), not the emulator — the earlier `h316_hi.c`
+resilience was reverted (be6f99e). Live status: `mini/arpanet-health.sh`. Prompted by Oscar
+Vermeulen's 2026-08-29 email (full text in `docs/superpowers/2026-09-03-turnover.md` §1).
 
 ## Why this exists
 During the 2026-06 DigitalOcean migration (`do.sh`, commit 110ac57) `@L` to most hosts was wired
@@ -160,14 +162,37 @@ considered and **rejected** — Lars/Oscar themselves worked around it rather th
   behavior immediately — mind that on the production droplet.
 
 ## Status / remaining
+_Authoritative live status: run `mini/arpanet-health.sh` (real `@L` probe, not ncp-ping). As of
+2026-09-04: **9 up / 0 down** — 6 MULTICS, 1 Sigma, 65 OS/360, 11 WAITS, 70/126/134/198 ITS, 69 TENEX._
+
+Done:
 - [x] Merge; Task 5b (8 sources); Task 7 (ITS native ×4); host 65 online; Task 4b (FEP systemd);
-      Task 8 (reliable ITS-only restart); `h316_hi.c` peer-loss resilience (built/validated/deployed).
-- [ ] **Fleet-wide `h316ov` activation** — coordinated `arpanet-recover.sh` in a window so every IMP
-      picks up the resilient binary; then confirm an IMP survives a host-down restart end-to-end.
+      Task 8 (reliable ITS-only restart).
 - [x] **Task 6** — WAITS (#11) folded into the generic FEP (`fep-line.py` gains `--delay` /
       `--send-after-connect` / `--logout-on-close`; `fep-hosts.conf` adds `11:ncp11:1025`); the
       bespoke `waitsconnect` is retired (commit 4880782). No one-off bridges remain.
+- [x] **Reboot durability (2026-09-04)** — every host has an enabled systemd unit incl. new
+      `arpanet-host06-multics` / `arpanet-host01-sigma` / `arpanet-host65-os360`; bogus `arpanet-host@6`
+      masked; per-host locks + fast `isup` in `hostctl`; `host11ctl verify` checks the real sim not
+      ncp-ping; boot-time `arpanet-reconcile.service` self-heals detached IMP interfaces AND missing
+      FEP bridges.
+- [x] **Health/diagnostic tool** — `mini/arpanet-health.sh` (real `@L` truth + per-layer localization).
+
+Open:
 - [ ] **Task 9** — host 41 (PiDP-10) native NCP.
-- [ ] **Task 10** — `make check` / `mini/verify-imp-routing.sh` (assert no bypass; every host routes).
+- [ ] **Task 10 (needs rework)** — `mini/verify-imp-routing.sh` is STALE: it still says "WAITS via
+      waitsconnect" and checks host 11 via `ncp16` ncp-ping (a known false-positive). Rebuild the gate
+      on `arpanet-health.sh`'s real-`@L` probe so `make check` reflects reality.
 - [ ] **noc per-IMP restart flakiness** — `impctl restart <imp>` is less reliable than a manual
-      spaced stop/start; worth hardening in `noc-server.py`/`impctl` (separate from the emulator fix).
+      spaced stop/start; worth hardening in `noc-server.py`/`impctl`. reconcile leans on it.
+- [ ] **imp06 hi4 boot-race, root cause (optional)** — reconcile auto-heals it every boot; the
+      underlying emulator attach-race still occurs. Optional emulator-level fix so reconcile never has to.
+
+Decision needed:
+- [ ] **"Fleet-wide `h316ov` activation" is superseded** — the `h316_hi.c` peer-loss resilience it
+      depended on was REVERTED (be6f99e); `arpanet-reconcile` now covers "IMP interface detached" at the
+      orchestration layer. Either re-do the emulator resilience and roll it fleet-wide, or formally close
+      this task in favor of reconcile.
+
+Not this effort:
+- [ ] **TENEX (#69)** — in-flight under its own host69 knowledge spine; do not fold in here.
