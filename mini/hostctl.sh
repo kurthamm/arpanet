@@ -186,8 +186,12 @@ stop_host() {
 start_host() {
     local host="$1" dir sim
     dir="$(host_dir "$host")"
+    # All ITS hosts run pdp10-ka-fixed (Lars's KAIMP interrupt fix, PDP-10/its
+    # #2376) so ITS actually services incoming NCP connections. host 198 was
+    # previously special-cased onto the unfixed ./pdp10-ka, which left MIT-ML
+    # unable to answer @L over the IMPs (the H316 port-4 device fix it also needs
+    # is already in h316ov). Removed so 198 is native-NCP like 70/126/134.
     sim="../pdp10-ka-fixed"
-    [[ "$host" == "198" ]] && sim="./pdp10-ka"
     [[ -z "$(port_pids "$host")" ]] || fail "host $host ports already owned; run stop first"
     if screen_exists "$host"; then
         fail "screen $(screen_name "$host") already exists; run stop first"
