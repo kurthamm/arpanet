@@ -201,14 +201,26 @@ start_host() {
     (cd "$ROOT/$dir" && screen -dmS "$(screen_name "$host")" "$sim" ./mini-run)
 }
 
-verify_host() {
-    local host="$1" dest deadline=$((SECONDS + 120))
-    case "$host" in
-        70) dest=70 ;;
-        126) dest=126 ;;
-        134) dest=134 ;;
-        198) dest=198 ;;
+host_dest() {
+    case "$1" in
+        70) echo 70 ;;
+        126) echo 126 ;;
+        134) echo 134 ;;
+        198) echo 198 ;;
+        *) fail "unknown host: $1 (not an ITS/NCP host managed by hostctl; FEP hosts are served by arpanet-fep)" ;;
     esac
+}
+
+# Fast liveness probe: a single NCP ping, ~10s worst case. Used by the systemd
+# unit to ADOPT an already-up host without paying verify_host's full boot-wait
+# loop. A down host returns quickly so the unit can go straight to (re)start.
+isup_host() {
+    local host="$1" dest; dest="$(host_dest "$host")"
+    (cd "$ROOT" && timeout 10 env NCP=ncp31 ./ncp-ping -c1 "$dest" >/tmp/hostctl-ncp.$host 2>&1)
+}
+
+verify_host() {
+    local host="$1" dest deadline=$((SECONDS + 240)); dest="$(host_dest "$host")"
     while (( SECONDS < deadline )); do
         if (cd "$ROOT" && timeout 10 env NCP=ncp31 ./ncp-ping -c1 "$dest" >/tmp/hostctl-ncp.$host 2>&1); then
             cat /tmp/hostctl-ncp.$host
@@ -242,7 +254,7 @@ restart_host() {
 
 [[ -n "$ACTION" && -n "$HOST" ]] || { usage; exit 2; }
 case "$ACTION" in
-    status|stop|start|restart|verify) ;;
+    status|stop|start|restart|verify|isup) ;;
     *) usage; exit 2 ;;
 esac
 
@@ -254,6 +266,7 @@ for host in $(hosts_for "$HOST"); do
         start) start_host "$host" ;;
         restart) restart_host "$host" ;;
         verify) verify_host "$host" || rc=1 ;;
+        isup) isup_host "$host" || rc=1 ;;
     esac
 done
 exit "$rc"

@@ -19,8 +19,11 @@ PiDP companion repository and its Pi-side runtime.
 The unit files live in `deploy/systemd/`:
 
 - `arpanet-noc.service`
-- `arpanet-host@.service`
+- `arpanet-host@.service` — ITS hosts only (`70`, `126`, `134`, `198`)
+- `arpanet-host06-multics.service` — MIT-MULTICS host `6` (DPS8M; NOT the ITS template)
 - `arpanet-host11.service`
+- `arpanet-reconcile.service` — post-boot self-heal (re-marry hosts to their IMPs)
+- `arpanet-fep.service`
 - `arpanet-terminal-client.service`
 - `arpanet-simh-server.service`
 - `arpanet-static.service`
@@ -39,20 +42,37 @@ Enable the hosted stack:
 
 ```sh
 sudo systemctl enable --now arpanet-noc.service
-sudo systemctl enable --now arpanet-host@6.service
+sudo systemctl enable --now arpanet-fep.service
+# MIT-MULTICS host 6 runs DPS8M via its own unit -- NOT arpanet-host@6 (that is the
+# ITS PDP-10 KA template, which has no host-6 config and must stay masked):
+sudo systemctl mask arpanet-host@6.service
+sudo systemctl enable --now arpanet-host06-multics.service
+# ITS PDP-10 hosts (MIT-DMS, HILTON-KA1, MIT-AI, MIT-ML):
 sudo systemctl enable --now arpanet-host@70.service
 sudo systemctl enable --now arpanet-host@126.service
+sudo systemctl enable --now arpanet-host@134.service
+sudo systemctl enable --now arpanet-host@198.service
 sudo systemctl enable --now arpanet-host11.service
+# Post-boot self-heal (re-marries any host whose IMP interface lost the boot race):
+sudo systemctl enable --now arpanet-reconcile.service
 sudo systemctl enable --now arpanet-terminal-client.service
 sudo systemctl enable --now arpanet-simh-server.service
 sudo systemctl enable --now arpanet-static.service
 sudo systemctl enable --now cloudflared-arpanet.service
-sudo systemctl enable --now arpanet-fep.service
 ```
 
 ## Notes
 
-- `arpanet-host@.service` is for the hosted trio only: `6`, `70`, and `126`.
+- `arpanet-host@.service` is for the ITS PDP-10 hosts only: `70`, `126`, `134`,
+  `198`. It uses a per-host lock (`/tmp/arpanet-hostctl-%i.lock`) so hosts start in
+  parallel and one slow/broken host can never starve another. **Host `6` is NOT an
+  ITS host** — it is MIT-MULTICS (DPS8M) and has its own `arpanet-host06-multics.service`;
+  `arpanet-host@6` must stay masked.
+- `arpanet-reconcile.service` runs once after the host lanes at boot. An ITS host is
+  only "on the net" once it has NCP-married its IMP; the busiest IMP (imp06, four MIT
+  hosts) can lose the boot-race attaching its last host interface. Reconcile detects a
+  host whose IMP-side interface is detached and restarts that IMP with all host peers
+  present (crash-safe), then re-boots its hosts to marry. A healthy boot is a fast no-op.
 - `arpanet-fep.service` starts the front-end-processor bridges (`fepctl.sh`) for
   hosts that route through the IMP network without a native NCP (UCLA Sigma #1,
   MIT Multics #6, UCLA-CCN OS/360 #65). It `After=`/`Requires=arpanet-noc` and

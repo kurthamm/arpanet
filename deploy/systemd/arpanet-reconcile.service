@@ -1,0 +1,19 @@
+[Unit]
+Description=ARPANET post-boot self-heal reconciliation (re-marry hosts to their IMPs)
+# Run after every host lane has had its turn to come up, so a healthy boot is a
+# fast no-op and only a genuinely-detached IMP interface triggers a heal.
+After=arpanet-noc.service arpanet-host06-multics.service arpanet-host11.service arpanet-host@70.service arpanet-host@126.service arpanet-host@134.service arpanet-host@198.service
+Wants=arpanet-host@70.service arpanet-host@126.service arpanet-host@134.service arpanet-host@198.service
+
+[Service]
+Type=oneshot
+User=deltaprism
+Group=deltaprism
+WorkingDirectory=/home/deltaprism/arpanet/mini
+# Idempotent: brings any down host back on the net, restarting an IMP (crash-safe,
+# peers-present) ONLY when its host interface actually detached. See arpanet-recover.sh.
+ExecStart=/home/deltaprism/arpanet/mini/arpanet-recover.sh reconcile
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target
