@@ -83,6 +83,52 @@ Root causes and fixes:
 Result: hosts 6, 11, 69, 70, 126, 134, 198 all NCP-UP, systemd `active` + `enabled`. Residual:
 the imp06 hi4 cold-boot race can still recur, but `arpanet-reconcile.service` now auto-heals it.
 
+## 2026-09-04 (pause) — HANDOFF: FEP @L login layer is broken (6 + 11)
+
+Paused mid-fix at Kurt's call. Read this before resuming.
+
+### Solid (do not re-litigate)
+- **Core NCP mesh: all 7 hosts `ncp-ping` UP** — 6, 11, 69, 70, 126, 134, 198.
+- **ITS hosts (70/126/134/198) + TENEX (69) route end-to-end** through the IMPs; `@L` works.
+  systemd `active`+`enabled`; per-host locks + `isup` + `arpanet-reconcile` self-heal in place.
+- MIT-MULTICS **OS** is up (6180 LISTEN, salutation verified).
+
+### Broken: the FEP `@L` *login* path (distinct from ncp-ping!)
+`ncp-ping <h>` UP does NOT mean `@L <h>` works for FEP hosts — ping is answered by the ncpdov;
+`@L` needs the `ncp-telnet -s` bridge to accept an RFC. Current `ncp-telnet -o` results:
+- **host 6 (Multics): `Open refused`.** `fep6` bridge is running again, but its listener isn't
+  being accepted through the freshly-restarted imp06/ncp06. I restarted imp06 earlier (to attach
+  hi4 for host 198); that killed `fep6`, and neither an `arpanet-fep` restart nor a `fepctl
+  stop/start 6` restored `@L`.
+- **host 11 (WAITS): `Open refused`.** Regression from this session: the running host 11 predates
+  the FEP-migration commit (4880782), so it does NOT expose simulator line port 1025; `fep11` fails
+  to start ("line port 1025 not listening"). Its old `waitsconnect` bridge is now gone. So host 11
+  `@L` is currently down until WAITS is rebooted with the new config.
+- **hosts 1 (Sigma), 65 (OS/360): `Open refused`** — expected/pre-existing: their backing
+  simulators aren't running on this box (ports 4003/16515 down). Separate bring-up task.
+- `make check` / `mini/verify-imp-routing.sh` reflects this: 6 pass / 3 fail (the FEP hosts).
+
+### What I caused vs pre-existing
+The imp06 restart (needed to marry host 198) knocked out `fep6`; the `arpanet-fep` restart during
+debugging brought host 11's half-migrated FEP config into play while `waitsconnect` was gone. The
+ITS/TENEX layer and the ncp-ping mesh were NOT disturbed.
+
+### What I want to try next (in priority order)
+1. **Coordinated `mini/arpanet-recover.sh recover`** in a window — the designed path: it restarts
+   hosts in order (FEP hosts, incl. WAITS with the new line-1025 config, before the IMP farm; ITS
+   after) and re-registers the FEP login bridges on healthy NCP/IMP. Most likely one-shot fix for
+   both 6 and 11. Cost: cycles everything (~10 min), briefly drops the working ITS hosts.
+2. If targeting instead of full recover:
+   - host 11: `host11ctl.sh stop 11 && host11ctl.sh start 11` (reboots WAITS exposing line 1025),
+     then `fepctl.sh start 11`; verify `ncp-telnet -o 11`.
+   - host 6: find why `fep6`'s `ncp-telnet -s` listen isn't accepted on `ncp06` after the imp06
+     restart — likely the `ncp06` daemon needs a restart via noc (not just the fep screen). Compare
+     against a known-good FEP host once one exists.
+3. **Extend `arpanet-recover.sh reconcile`** to cover FEP hosts: it currently checks ITS via
+   ncp-ping and Multics via the 6180 salutation, but NOT the `@L` login bridge. It should verify
+   `ncp-telnet -o <h>` for FEP hosts and, on failure, restart the fep bridge (and reboot the host if
+   its line port isn't listening). This is the gap that let host 6/11 `@L` break silently.
+
 ## Accuracy line (Kurt's rule; congruent with Oscar/Lars)
 Everything here is host-side: `do.sh`/`hostctl`/`fepctl`/systemd orchestration and the SIMH
 **emulator** UDP bridge (`h316_hi.c`). The **guest** artifacts (ITS, IMP firmware, 1822/NCP) are
