@@ -200,21 +200,9 @@ start_network() {
 #  start_ncpds
 
   # Wait for the NOC to have created the FEP hosts' NCP sockets, then bring
-  # up the ncp-telnet/ncp-line bridges (hosts without their own NCP).
-  echo "Waiting for FEP NCP sockets (ncp01, ncp06, ncp65)..."
-  waited=0
-  while :; do
-    if [[ -S ncp01 && -S ncp06 && -S ncp65 ]]; then
-      break
-    fi
-    if (( waited >= 60 )); then
-      echo "ERROR: FEP NCP sockets did not appear within 60s (ncp01/ncp06/ncp65)" >&2
-      exit 1
-    fi
-    sleep 2
-    waited=$((waited + 2))
-  done
-  ./fepctl.sh start all
+  # up the ncp-telnet/ncp-line bridges (hosts without their own NCP). Shared
+  # with deploy/systemd/arpanet-fep.service via fep-wait-and-start.sh.
+  ./fep-wait-and-start.sh
 
   echo "ARPANET network started successfully!"
   echo ""

@@ -1,0 +1,27 @@
+[Unit]
+Description=ARPANET FEP bridges (front-end processors for hosts without native NCP)
+# The FEPs bind their source NCP sockets, which the NOC creates once each IMP is
+# RUNNING. Start after the NOC; fep-wait-and-start.sh then waits (bounded) for the
+# specific NCP sockets named in fep-hosts.conf before starting the bridges.
+After=arpanet-noc.service network-online.target
+Requires=arpanet-noc.service
+Wants=network-online.target
+
+[Service]
+# oneshot: ExecStart waits for sockets then starts the (screen-detached) FEP
+# bridges and returns; RemainAfterExit keeps the unit "active" so ExecStop fires.
+Type=oneshot
+RemainAfterExit=yes
+User=deltaprism
+Group=deltaprism
+WorkingDirectory=/home/deltaprism/arpanet/mini
+ExecStart=/home/deltaprism/arpanet/mini/fep-wait-and-start.sh
+ExecStop=/home/deltaprism/arpanet/mini/fepctl.sh stop all
+# Retry only if the bounded socket wait times out (real infra problem); a host
+# whose backing simulator is absent is skipped by fepctl, not a failure.
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=90
+
+[Install]
+WantedBy=multi-user.target

@@ -47,11 +47,19 @@ sudo systemctl enable --now arpanet-terminal-client.service
 sudo systemctl enable --now arpanet-simh-server.service
 sudo systemctl enable --now arpanet-static.service
 sudo systemctl enable --now cloudflared-arpanet.service
+sudo systemctl enable --now arpanet-fep.service
 ```
 
 ## Notes
 
 - `arpanet-host@.service` is for the hosted trio only: `6`, `70`, and `126`.
+- `arpanet-fep.service` starts the front-end-processor bridges (`fepctl.sh`) for
+  hosts that route through the IMP network without a native NCP (UCLA Sigma #1,
+  MIT Multics #6, UCLA-CCN OS/360 #65). It `After=`/`Requires=arpanet-noc` and
+  runs `mini/fep-wait-and-start.sh`, which waits (bounded 60 s) for the NCP
+  sockets named in `mini/fep-hosts.conf` before `fepctl.sh start all`. A host
+  whose backing simulator is not running on this box is skipped, not fatal, so
+  the unit comes up cleanly with whatever hosts are present.
 - `arpanet-host11.service` is for Stanford/SU-AI host `11`, which runs WAITS
   and uses the dedicated `mini/host11ctl.sh` lifecycle.
 - Host services are adopt-safe: if a host is already running and passes NCP

@@ -8,11 +8,21 @@ target="${2:?usage: fepctl.sh start|stop|status host|all}"
 rows() { grep -v '^#' "$CONF" | grep -v '^$'; }
 row_for() { rows | awk -F: -v h="$1" '$1==h'; }
 
+# In bulk (`start all`) a host whose NCP socket or backing simulator line is not
+# up is SKIPPED (a deployment need not run every host, e.g. OS/360 #65 is absent
+# on the droplet). An explicit single-host start stays fail-fast so the operator
+# hears about it. ALL_MODE is set from $target below.
 start_one() {
     local row="$1"
     IFS=: read -r host ncp port flags <<<"$row"
-    [[ -S "$ncp" ]] || { echo "fep$host: NCP socket $ncp missing (is ncpdov for host $host running?)" >&2; exit 1; }
-    ss -H -ltn | grep -q ":$port " || { echo "fep$host: simulator line port $port not listening" >&2; exit 1; }
+    if [[ ! -S "$ncp" ]]; then
+        echo "fep$host: NCP socket $ncp missing (is ncpdov for host $host running?)" >&2
+        [[ "$ALL_MODE" == 1 ]] && { echo "fep$host: skipped"; return; } || exit 1
+    fi
+    if ! ss -H -ltn | grep -q ":$port "; then
+        echo "fep$host: simulator line port $port not listening" >&2
+        [[ "$ALL_MODE" == 1 ]] && { echo "fep$host: skipped (host not running here)"; return; } || exit 1
+    fi
     screen -ls | grep -q "[.]fep$host[[:space:]]" && { echo "fep$host already running"; return; }
     # shellcheck disable=SC2086
     screen -dmS "fep$host" env NCP="$ncp" ./ncp-telnet -s -- ./fep-line.py "$host" "$port" $flags
@@ -88,5 +98,5 @@ stop_one() {
 
 status_one() { IFS=: read -r host _ <<<"$1"; screen -ls | grep -q "[.]fep$host[[:space:]]" && echo "fep$host: up" || echo "fep$host: down"; }
 
-if [[ "$target" == all ]]; then list=$(rows); else list=$(row_for "$target"); [[ -n "$list" ]] || { echo "no FEP entry for host $target" >&2; exit 1; }; fi
+if [[ "$target" == all ]]; then ALL_MODE=1; list=$(rows); else ALL_MODE=0; list=$(row_for "$target"); [[ -n "$list" ]] || { echo "no FEP entry for host $target" >&2; exit 1; }; fi
 while IFS= read -r row; do "${action}_one" "$row"; done <<<"$list"
