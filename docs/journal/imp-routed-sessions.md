@@ -87,6 +87,15 @@ the imp06 hi4 cold-boot race can still recur, but `arpanet-reconcile.service` no
 
 Paused mid-fix at Kurt's call. Read this before resuming.
 
+**Authoritative status command: `mini/arpanet-health.sh`.** Do NOT trust `ncp-ping`
+or `systemctl is-active` — both give false "up". The tool probes the real `@L`
+visitor login path per host and localizes failures. Tool-verified state 2026-09-04:
+`5 up` (69 TENEX, 70/126/134/198 ITS — all serve `@L` with real banners) and
+`4 down` — 11 WAITS (KA not running → `host11ctl.sh start 11`), 6 Multics
+(sim+bridge up but `@L` refused → restart fep6/ncp), 1 Sigma + 65 OS/360 (backing
+sims not running on this box). Note: host 11 is fully down (KA gone), not just its
+`@L` — this section's earlier wording understated it.
+
 ### Solid (do not re-litigate)
 - **Core NCP mesh: all 7 hosts `ncp-ping` UP** — 6, 11, 69, 70, 126, 134, 198.
 - **ITS hosts (70/126/134/198) + TENEX (69) route end-to-end** through the IMPs; `@L` works.

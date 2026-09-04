@@ -25,6 +25,16 @@ host unable to marry its IMP.
 - `deploy/README.md` corrected: host 6 uses its own unit; 134/198 and reconcile
   enabled.
 
+### Added: `arpanet-health.sh` — reliable health + diagnostic tool
+
+`ncp-ping` and `systemctl is-active` both lie (ping is answered by the IMP/ncpdov
+even when the guest is dead; a oneshot unit stays `active` after its screen dies).
+`mini/arpanet-health.sh` reports the truth: it probes the real `@L` visitor login
+path per host (socket-1 `ncp-telnet -o` for TENEX; `do.sh` for the rest) as ground
+truth, and localizes any failure to a layer (guest OS/sim, host↔IMP UDP link, IMP
+process, NCP socket, FEP bridge). `--fast` = layer probes only (instant, no mesh
+traffic); `<host>` = deep single-host diagnosis. Each down host prints the fix.
+
 ### Added: WAITS (host 11) routes through the generic FEP; `waitsconnect` retired
 
 `fep-line.py` gains `--delay` / `--send-after-connect` / `--logout-on-close`;
