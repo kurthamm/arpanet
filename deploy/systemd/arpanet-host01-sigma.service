@@ -1,0 +1,18 @@
+[Unit]
+Description=ARPANET UCLA Sigma 7 host 1 (CP-V, FEP-bridged via ncp01)
+After=arpanet-noc.service arpanet-fep.service
+Requires=arpanet-noc.service
+
+[Service]
+Type=oneshot
+User=deltaprism
+Group=deltaprism
+WorkingDirectory=/home/deltaprism/arpanet/mini
+RemainAfterExit=yes
+ExecStart=/usr/bin/flock /tmp/arpanet-host01.lock /home/deltaprism/arpanet/mini/host01-sigma/host01-sigmactl.sh start
+ExecStop=/usr/bin/flock /tmp/arpanet-host01.lock /home/deltaprism/arpanet/mini/host01-sigma/host01-sigmactl.sh stop
+TimeoutStartSec=300
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

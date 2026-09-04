@@ -21,6 +21,8 @@ The unit files live in `deploy/systemd/`:
 - `arpanet-noc.service`
 - `arpanet-host@.service` — ITS hosts only (`70`, `126`, `134`, `198`)
 - `arpanet-host06-multics.service` — MIT-MULTICS host `6` (DPS8M; NOT the ITS template)
+- `arpanet-host01-sigma.service` — UCLA Sigma 7 host `1` (CP-V)
+- `arpanet-host65-os360.service` — UCLA-CCN OS/360 host `65` (Hercules MVT)
 - `arpanet-host11.service`
 - `arpanet-reconcile.service` — post-boot self-heal (re-marry hosts to their IMPs)
 - `arpanet-fep.service`
@@ -47,6 +49,10 @@ sudo systemctl enable --now arpanet-fep.service
 # ITS PDP-10 KA template, which has no host-6 config and must stay masked):
 sudo systemctl mask arpanet-host@6.service
 sudo systemctl enable --now arpanet-host06-multics.service
+# Other FEP-bridged host OSes (their sims need their own units so a reboot brings
+# them back; the FEP only bridges an already-running sim):
+sudo systemctl enable --now arpanet-host01-sigma.service
+sudo systemctl enable --now arpanet-host65-os360.service
 # ITS PDP-10 hosts (MIT-DMS, HILTON-KA1, MIT-AI, MIT-ML):
 sudo systemctl enable --now arpanet-host@70.service
 sudo systemctl enable --now arpanet-host@126.service

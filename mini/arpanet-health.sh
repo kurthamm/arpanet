@@ -118,7 +118,13 @@ diagnose() {
       waits) if   [ "$os_up" = 0 ]; then DIAG="WAITS not running (no host$num KA / line $lpx down) -> host11ctl.sh start $num"
              elif [ "$fep_up" = 0 ]; then DIAG="FEP bridge $fep down -> fepctl.sh start $num"
              else DIAG="WAITS + bridge up but @L refused -> fepctl restart $num"; fi;;
-      fep)   if   [ "$os_up" = 0 ]; then DIAG="backing simulator not running (line $lpx down)"
+      fep)   if   [ "$os_up" = 0 ]; then
+               case "$num" in
+                 1)  DIAG="deployed but sim not running (line $lpx down) -> host01-sigma/host01-sigmactl.sh start";;
+                 6)  DIAG="deployed but sim not running (line $lpx down) -> systemctl start arpanet-host06-multics";;
+                 65) DIAG="deployed but sim not running (line $lpx down) -> host65-ucla-ccnctl.sh start";;
+                 *)  DIAG="deployed but sim not running (line $lpx down)";;
+               esac
              elif [ "$ncp_up" = 0 ]; then DIAG="NCP socket $ncp missing"
              elif [ "$fep_up" = 0 ]; then DIAG="FEP bridge $fep down -> fepctl.sh start $num"
              else DIAG="sim+bridge up but @L refused -> restart $fep / ncp daemon"; fi;;
