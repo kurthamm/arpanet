@@ -282,18 +282,6 @@ static int find_listen (uint32_t socket)
   return -1;
 }
 
-static int find_client_in_listeners(const struct sockaddr_un *client_addr)
-{
-  for (int i = 0; i < CONNECTIONS; i++) {
-    if (listening[i].sock != 0 &&
-        listening[i].client.len > 0 &&
-        strncmp(listening[i].client.addr.sun_path, client_addr->sun_path, sizeof(client_addr->sun_path)) == 0) {
-      return i;
-    }
-  }
-  return -1;
-}
-
 static void debug_print_listeners(void) {
     int found = 0;
     fprintf(stderr, "--- DEBUG: Listener State Dump ---\n");
@@ -326,16 +314,16 @@ static void destroy (int i)
   connection[i].rfc_timeout = NULL;
   connection[i].cls_timeout = NULL;
 
-  // OSCAR - new code
-  // Clear the corresponding listening entry as well, if this connection index
-  // was also used for a listener.
-  if (listening[i].sock != 0) { // Check if this index is a listener
-      fprintf(stderr, "DEBUG: destroy: Clearing listener entry for socket %u at index %d.\n", listening[i].sock, i);
-      listening[i].sock = 0;
-      listening[i].size = 0;
-      listening[i].client.len = 0;
-  }
-  // OSCAR - end
+  // NOTE: listening[] is a separate, independently-indexed table from
+  // connection[]. A connection index reaching this point (whether from a
+  // normal close or a full reset()) must never clear listening[i]: index i
+  // here is a *connection* slot, and any listener that happens to occupy
+  // listening[i] is almost certainly unrelated (process_rts() explicitly
+  // allocates a fresh connection index for each accepted client while
+  // leaving the listener's own slot untouched -- see the "int listener = i"
+  // comment there). There is no "unlisten" wire message, so listeners are
+  // only ever reclaimed via the client_is_alive() staleness check in
+  // app_listen(); destroy() must leave listening[] alone.
 
   debug_print_listeners();
 }
@@ -1433,8 +1421,14 @@ static void reset (void)
   int i;
   for (i = 0; i < CONNECTIONS; i ++) {
     destroy (i);
-    listening[i].sock = 0;
   }
+  // listening[] deliberately left untouched: an IMP reset invalidates
+  // in-flight connections (torn down above via destroy()), but an
+  // application's registered listen socket is host-local state that does
+  // not depend on IMP/connection state and has no way to be re-established
+  // -- the listening server is never told its listener was cleared, so
+  // clearing it here left the FEP permanently unable to accept new
+  // sessions after any IMP reset.
   memset (hosts, 0, sizeof hosts);
 }
 
@@ -1966,7 +1960,6 @@ static void app_interrupt (void)
 static void app_close (void)
 {
   int i = app[1];
-  int listener_idx = -1; // Initialize listener_idx
   fprintf (stderr, "NCP: Application close, connection %u.\n", i);
   connection[i].flags &= ~CONN_APPS;
   connection[i].flags |= CONN_CLOSE;
@@ -1978,18 +1971,11 @@ static void app_close (void)
   ncp_cls (connection[i].host, connection[i].snd.lsock, connection[i].snd.rsock);
   unless_cls (i, cls_timeout);
 
-  // OSCAR - new code
-  // Check if this closing application was also a listener
-  listener_idx = find_client_in_listeners(&client);
-  if (listener_idx != -1) {
-      fprintf(stderr, "DEBUG: app_close: Application closing connection %u was also listening on socket %u (index %d). Clearing listener.\n",
-               i, listening[listener_idx].sock, listener_idx);
-      listening[listener_idx].sock = 0; // Clear the socket
-      listening[listener_idx].size = 0; // Clear the size
-      listening[listener_idx].client.len = 0; // Clear client info
-  }
-  debug_print_listeners();
-  // OSCAR - end
+  // NOTE: closing this connection must not touch listening[] -- a listener
+  // is host-local server state independent of any particular connection,
+  // and there is no legitimate case where closing one implies the closing
+  // client's separate listen registration (if any) should be torn down.
+  // See destroy() and reset() for the same reasoning.
 }
 
 static void application (void)
