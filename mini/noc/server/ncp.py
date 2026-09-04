@@ -139,10 +139,16 @@ class NCPController:
             self.process_manager.kill(self._process)
         self._set_state(ProcessState.STOPPED)
 
+    # Gap between killing an ncpdov and respawning it, so its UDP sockets are released
+    # before the fresh daemon binds them (same rationale as IMPController).
+    FORCE_RESTART_GAP = 10.0
+
     def force_restart(self):
-        """Force restart, bypassing policy."""
+        """Force restart, bypassing policy, with a socket-release spacing delay."""
         self._restart_policy.reset()
         if self._process:
+            # _handle_exit reschedules via call_later(get_delay()); make it a real gap.
+            self._restart_policy._next_delay = self.FORCE_RESTART_GAP
             self.process_manager.kill(self._process)
         else:
             self.start()
