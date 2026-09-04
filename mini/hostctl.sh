@@ -221,6 +221,18 @@ verify_host() {
     return 1
 }
 
+# Restart an ITS host: reboot the ITS simulator so it re-attaches to its (live)
+# IMP at its own boot. ITS connecting to an already-running IMP is the supported
+# direction; ITS cannot *reconnect* after a drop (the upstream reconnect path is
+# broken), so a fresh boot is how it re-marries.
+#
+# We deliberately do NOT restart the IMP here. Restarting a live mesh IMP while
+# one of its host interfaces has no peer trips the H316 hi_link_error and crashes
+# the fresh IMP (observed repeatedly on imp62); it also islands the IMP from the
+# mesh for ~1 min. The durable fix for "the IMP link died" is the h316_hi.c
+# peer-loss resilience change (the emulator no longer permanently detaches), after
+# which an ITS-only reboot always suffices. If an IMP itself is down/crashed, use
+# the coordinated `./arpanet-recover.sh recover` (brings hosts up, then IMPs).
 restart_host() {
     local host="$1"
     stop_host "$host"
