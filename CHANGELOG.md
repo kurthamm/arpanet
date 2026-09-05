@@ -2,11 +2,31 @@
 
 ## 2026-09-05
 
-### State: all 9 hosts up and serving @L through the IMPs
+### State: all 10 hosts up and serving @L through the IMPs
 
-Verified roster (via `mini/arpanet-health.sh`): MIT-MULTICS (6), Stanford WAITS (11),
-BBN-TENEX (69), MIT-DMS (70), HILTON-KA1 (126), MIT-AI (134), MIT-ML (198), UCLA
-Sigma (1), UCLA-CCN OS/360 (65) — every host answers `@L` over the IMP network.
+Verified roster (via `mini/arpanet-health.sh`, 10 up / 0 not-up): MIT-MULTICS (6),
+Stanford WAITS (11), BBN-TENEX (69), MIT-DMS (70), HILTON-KA1 (126), MIT-AI (134),
+MIT-ML (198), UCLA Sigma (1), UCLA-CCN OS/360 (65), and **PiDP-10 ITS (41)** — every
+host answers `@L` over the IMP network.
+
+### Added: PiDP-10 (host 41) is a first-class ARPANET host — power-on auto-boot
+The home PiDP-10 now boots ITS onto the ARPANET on power-on alone (no front-panel
+`READ IN`, no switch fiddling). Root cause was the Pi's `its-arpa51/boot.pidp` parking
+at a blinky wait-loop until a manual `READ IN`; changed it to auto-boot the disk
+(bare `b ptr` -> DSKDMP -> the in-file `expect` sends `ITS`). Front-panel selection
+stays `0005` = its-arpa51. Also cleared a duplicate/root-owned `imp41` trap that jammed
+the imp62<->imp41 trunk. `@L 41` now serves a full ITS login through the IMPs; added to
+`arpanet-health.sh` (reports UP via the @L truth probe; its layers are remote on the Pi).
+
+### Fixed: FEP bridge whack-a-mole — one-shot bridge now auto-respawns
+Root-caused the recurring FEP-host outages (Multics/6, Sigma/1, OS360/65, WAITS/11
+"randomly going down"): the `ncp-telnet -s` bridge serves a SINGLE connection then exits
+(`NCP listen error` on re-listen), so every visitor login killed that host's bridge and
+nothing restarted it. `mini/fepctl.sh` now runs each bridge in a respawn loop (inetd-
+style; re-arms the listener instantly), with a greppable pgroup-leader marker so
+`stop` still tears the whole tree down cleanly. Proven: a bridge survives repeated
+logins (was dying after one). Also added a retry to the `arpanet-health.sh` @L probe so
+a transient post-login ITS stall no longer reads as DOWN.
 
 ### Added: sigma CPU idle detection (94% busy-spin -> ~57% idle)
 The open-SIMH XDS Sigma sim had no idle support; it busy-spun an idle CP-V. Added the

@@ -35,6 +35,7 @@ HOSTS=(
   "126:HILTON-KA1:its:5:ITS PDP-10|turist:62:21621:21622:10015:-:-"
   "134:MIT-AI:its:5:Artificial Intelligence|turist:6:22061:22062:18015:-:-"
   "198:MIT-ML:its:5:Math Lab|turist:6:23061:23062:19015:-:-"
+  "41:PiDP-10-ITS:its:5:Welcome to ITS|turist|ITS PDP-10:-:-:-:-:-:-"
   "11:SU-AI-WAITS:waits:5:WAITS|login|PLEASE LOG:11:20111:20112:1025:ncp11:fep11"
   "6:MIT-MULTICS:fep:0:HSLA|Multics|MR12:6:-:-:6180:ncp06:fep6"
   "1:UCLA-Sigma:fep:0:Sigma|MUX:-:-:-:4003:ncp01:fep1"
@@ -53,18 +54,25 @@ its_ka_up()   { pgrep -f "pdp10-ka-fixed ./mini-run" 2>/dev/null | while read -r
 # TENEX serves login on NCP socket 1 (ncp-telnet -o 69), not the default @L path, so
 # probe it directly; every other host answers the generic @L visitor path via do.sh.
 atl_probe() {
-  local num="$1" sess="$2" rex="$3" type="$4" out line
-  if [ "$type" = tenex ]; then
-    out="$( (sleep 2; printf '\r'; sleep 6) | timeout 25 env NCP=ncp31 "$HERE/ncp-telnet" -o "$num" 2>&1 | tr -d '\r' )"
-  else
-    out="$( (printf '@L %s\r\n' "$num"; sleep 6) | SESSION_NUMBER="$sess" timeout 25 "$DOSH" 2>&1 | tr -d '\r' )"
-  fi
-  line="$(printf '%s' "$out" | sed 's/\[NOECHO\]//g' | grep -ivE '^\s*$|TELNET to host' | head -1 | cut -c1-46)"
+  local num="$1" sess="$2" rex="$3" type="$4" out line attempt result=REFUSED
+  # Two attempts: an ITS host probed right after its previous login can briefly
+  # not answer (guest mid-cleanup). A real visitor just retries and gets in, so
+  # a single BANNER on either attempt is the truth. BANNER short-circuits, so an
+  # all-healthy sweep pays no extra time.
+  for attempt in 1 2; do
+    if [ "$type" = tenex ]; then
+      out="$( (sleep 2; printf '\r'; sleep 6) | timeout 25 env NCP=ncp31 "$HERE/ncp-telnet" -o "$num" 2>&1 | tr -d '\r' )"
+    else
+      out="$( (printf '@L %s\r\n' "$num"; sleep 6) | SESSION_NUMBER="$sess" timeout 25 "$DOSH" 2>&1 | tr -d '\r' )"
+    fi
+    line="$(printf '%s' "$out" | sed 's/\[NOECHO\]//g' | grep -ivE '^\s*$|TELNET to host' | head -1 | cut -c1-46)"
+    if printf '%s' "$out" | grep -qiE "$rex"; then result=BANNER; break
+    elif printf '%s' "$out" | grep -qiE 'open refused|cannot be reached|not up|host down'; then result=REFUSED
+    elif [ -n "$line" ]; then result=OPEN; fi
+    [ "$attempt" = 1 ] && sleep 3
+  done
   printf '%s\n' "${line:-}" >&3
-  if printf '%s' "$out" | grep -qiE "$rex"; then echo BANNER
-  elif printf '%s' "$out" | grep -qiE 'open refused|cannot be reached|not up|host down'; then echo REFUSED
-  elif [ -n "$line" ]; then echo OPEN
-  else echo REFUSED; fi
+  echo "$result"
 }
 
 # Diagnose one host -> sets STATUS ("UP"/"DOWN"/"DEGRADED") and DIAG (why).
