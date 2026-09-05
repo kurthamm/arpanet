@@ -60,13 +60,15 @@ bug that stopped ITS from answering network logins). The work spans two lines: t
 | **#6 MIT** | **Multics** (DPS8M MR12.8) | **no dir** ("hope"; upstream #6 was ITS) | no | **built new** |
 | **#65 UCLA** | **OS/360 MVT** (Hercules) + `ccn_frontdoor.py` | **no dir** | no | **built new** |
 | **#69 BBN** | **BBN-TENEX** (SIMH PDP-10 KI) | **no dir** (not even planned) | no | **NATIVE-NCP LOGIN DONE + HARDENED + DEPLOYED** — `@L 69` → real BBN-TENEX `@` EXEC, credentialed DEMO login via **`ATPTY`** (JSYS 274; NETSER not needed). Login server **NETLIT-1e** (re-listen hardened: 0 s, no crash; 5/5 gate). Baked into a **golden SIMH snapshot**; `arpanet-host69.service` restores it and is **enabled**. Going live in phases (`docs/host69-go-live-plan.md`); full journal `docs/host69-ncp-login-investigation.md` §10. |
+| **#49 HAMM-KA0** | **ITS** (physical PiDP-10, KA10) | **no** (Kurt's hardware) | no | **built new + NATIVE-NCP DONE (2026-09-05)** — Kurt's home PiDP-10 over a Tailscale IMP62↔IMP49 trunk. Power-on auto-boots ITS; `@L 49` serves a full login through the IMPs. A deliberately *fictional* private node at an IMP number vacant in Dec 1973 (renumbered off host 41 = real NORSAR). See `docs/pidp10-host-identity.md`. |
 
 ### Network seam — how each host actually reaches visitors (the honesty that matters)
 Running a real OS is *not* the same as being an authentic ARPANET host. **As of 2026-09-04
 (`feature/imp-routed-sessions`) every visitor session flows THROUGH the IMP network — the
 terminal-line bypass is gone** (`docs/journal/imp-routed-sessions.md`). By integration method:
 - **Native period NCP** (the host's own OS speaks 1822/NCP on its IMP — the golden route):
-  **ITS** (#70/134/198/126 — all four verified) and **BBN-TENEX** (#69).
+  **ITS** (#70/134/198/126 — all four verified), **BBN-TENEX** (#69), and **HAMM-KA0** (#49 —
+  Kurt's physical PiDP-10 KA10/ITS, reached over the Tailscale IMP62↔IMP49 trunk; `@L 49` verified).
 - **FEP** (Oscar's period-correct front-end: a Linux `ncpdov` + `ncp-telnet -s -- fep-line.py`
   bridges the host onto its IMP port, so session data still crosses the IMPs): **Sigma 7 / CP-V**
   (#1), **Multics** (#6), **OS/360 MVT** (#65). Supervised by `arpanet-fep.service`.
