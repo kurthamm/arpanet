@@ -27,8 +27,8 @@ https://github.com/kurthamm/pidp10-arpanet-node
 
 Purpose:
 
-- Physical PiDP-10 replica integration.
-- Pi-side IMP41 configuration.
+- Physical PiDP-10 replica integration (`HAMM-KA0`, host `49` / octal `061` / IMP 49; see `docs/pidp10-host-identity.md`).
+- Pi-side IMP49 configuration.
 - Tailscale or overlay-network setup notes.
 - ARPA51 ITS boot profile and validation.
 

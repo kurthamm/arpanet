@@ -14,7 +14,7 @@ This document covers the DigitalOcean-hosted ARPANET platform:
 - Cloudflare Tunnel and Tailscale access.
 - Runtime supervision and health checks.
 
-This document does not move PiDP-10 host `41` into the main hosted lifecycle. Host `41` is a physical external node and remains managed by the PiDP companion repository and the Pi-side runtime.
+This document does not move PiDP-10 host `49` (`HAMM-KA0`) into the main hosted lifecycle. Host `49` is a physical external node and remains managed by the PiDP companion repository and the Pi-side runtime. See `docs/pidp10-host-identity.md`.
 
 ## Target Server
 
@@ -139,7 +139,7 @@ Treat each host as an independent system attached to the IMP network:
 | `134` | `206` | DigitalOcean hosted MIT-AI PDP-10 | Main ARPANET repo tooling |
 | `198` | `306` | DigitalOcean hosted MIT-ML PDP-10 | Main ARPANET repo tooling |
 | `11` | `013` | DigitalOcean hosted Stanford/SU-AI WAITS PDP-10 | Dedicated `host11ctl.sh` / `arpanet-host11.service` |
-| `41` | `051` | Physical PiDP-10 replica | PiDP companion repo / Pi-side tooling |
+| `49` | `061` | Physical PiDP-10 replica `HAMM-KA0` (native NCP `@L 49` through the IMPs) | PiDP companion repo / Pi-side tooling |
 
 The browser terminal may connect to these hosts, but it must not restart or
 mutate any host.
@@ -148,7 +148,7 @@ mutate any host.
 Stanford/SU-AI host `11` uses `mini/host11ctl.sh`. UCLA-NMC host `1` uses
 `mini/host01-sigma/host01-sigmactl.sh`. MIT-MULTICS host `6` uses
 `mini/host06-multicsctl.sh`. Do not extend the PDP-10 tool to manage PiDP-10
-host `41`.
+host `49`.
 
 ## Known Fragility
 
@@ -161,7 +161,7 @@ The original runtime relies heavily on `screen` and broad process cleanup. This 
 - Startup timing matters: hosts and NCP daemons can start before IMPs are fully converged.
 - Site-specific PiDP/Tailscale changes can leak into upstream-friendly files if not kept separate.
 - The hosted host `tk` listeners must be unique per host; `134`, `70`, `126`, and `198` now use `18012`, `17012`, `10012`, and `19012` respectively.
-- Browser access to hosted hosts `6`, `65`, `70`, `126`, `134`, `198`, and PiDP host `41` uses simulator terminal lines or host-specific front doors. ARPANET reachability is validated separately with NCP ping and the IMP62/IMP41 link.
+- Browser access to hosted hosts `6`, `65`, `70`, `126`, `134`, and `198` uses simulator terminal lines or host-specific front doors; PiDP host `49` (`HAMM-KA0`) is reached by native NCP `@L 49` through the IMPs (the golden route). ARPANET reachability is validated separately with NCP ping and the IMP62↔IMP49 link.
 - Browser access to UCLA-NMC host `1` uses the SIMH Sigma 7 CP-V mux on
   localhost TCP `4003`. It is not yet a working recovered UCLA-NMC SEX/NCP
   attachment.
@@ -216,7 +216,7 @@ for host in 31 6 70 126 134 198; do
 done
 ```
 
-If NCP still fails, diagnose from the NOC and IMP logs. Do not restart unrelated hosts or change PiDP host `41` as part of this hosted-host diagnosis.
+If NCP still fails, diagnose from the NOC and IMP logs. Do not restart unrelated hosts or change PiDP host `49` as part of this hosted-host diagnosis.
 
 ## Target Service Model
 
@@ -237,7 +237,7 @@ Recommended service split:
 - `arpanet-static.service`: local static HTTP server for the public site.
 - `cloudflared-arpanet.service`: Cloudflare Tunnel ingress.
 
-Each unit should have a single ownership boundary. Restarting one hosted PDP-10 should not restart the other hosted PDP-10s, Stanford host `11`, the PiDP-10, or the entire IMP network unless explicitly required.
+Each unit should have a single ownership boundary. Restarting one hosted PDP-10 should not restart the other hosted PDP-10s, Stanford host `11`, the PiDP-10 (`HAMM-KA0`, host `49`), or the entire IMP network unless explicitly required.
 
 ## Service Safety Requirements
 
@@ -270,7 +270,7 @@ Expected checks:
 
 - Hosted hosts `70`, `126`, `134`, and `198` have exactly one simulator owner each.
 - NCP ping works for hosted hosts.
-- PiDP host `41` is checked only when its Tailscale/IMP link is intentionally configured.
+- PiDP host `49` (`HAMM-KA0`) is checked only when its Tailscale/IMP link is intentionally configured.
 - No duplicate `ncpdov` processes own the same NCP path.
 - No stale browser `ncp-telnet` or `local-host-terminal.py` process remains after sessions close.
 - Terminal relay and static server are reachable locally.
@@ -328,9 +328,9 @@ Public site tests:
 PiDP tests should be separate and run only after hosted hosts are stable:
 
 - Tailscale path between droplet and Pi is active.
-- IMP62 to IMP41 UDP path is configured as site-local runtime config.
-- NCP ping to `41` works.
-- Browser `@L 41` behavior is tested without restarting hosted hosts. If NCP ping works but historical NCP TELNET stalls at `TELNET to host 051.`, keep the browser route on the PiDP SIMH terminal line and diagnose the Pi-side TELNET/TELSER path separately in the companion repository.
+- IMP62 to IMP49 UDP path is configured as site-local runtime config.
+- NCP ping to `49` works.
+- Browser `@L 49` reaches a native NCP ITS login on `HAMM-KA0` through the IMPs (the golden route: `do.sh` → `dotelnet.sh` → `ncp-telnet -o 49`), tested without restarting hosted hosts. See `docs/pidp10-host-identity.md`.
 
 ## Rollback and Reference
 
