@@ -55,3 +55,17 @@ Repeated `ncp-telnet -o` probes + a second ki + gdb churn during this investigat
 islanded the live mesh (load spiked to 31). Recovered by killing the rig + restarting
 `arpanet-host69.service`. Keep rig probing minimal; never run the reproduction against the
 live imp05.
+
+## CONCLUSION 2026-09-05: genlck spin is inherent TENEX behavior, not an emulator bug
+Ran the rig on a CPU-freed box and traced it fully. The `genlck` HOLDER is the KI10
+clock-interrupt / metering path (`apclki`/`kimuos`/`mtime`/`kissav`/`kislod`); the scheduler
+spins on `genlck` while that handler holds it, and link-up makes the scheduler run enough to
+contend heavily. Checked the two emulator suspects and ruled both out:
+- **RTC rate = 60 Hz** for the KI (`kx10_cpu.c`: `rtc_tps` is 500 only under `#if KS`; the KI
+  build uses 60) — the clock is NOT over-firing.
+- **imp_eth_srv poll is already adaptive** (10k fast window -> 100k quiet) — not the driver.
+So the busy-when-link-up state is inherent guest behavior: a real KI10 ran the same NCP-fork +
+scheduler + metering work (at ~1 MIPS, so it "pegged" its slow CPU too). There is no emulator
+bug to fix. The host-side **CPUQuota cap on the ki is the correct management** of legitimate
+emulation-speed CPU use — not a workaround for a bug. `SET CPU IDLE` can't help because TENEX
+genuinely does not idle while the link is up. Closing the genlck line of investigation.

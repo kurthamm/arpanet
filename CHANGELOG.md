@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-09-05
+
+### State: all 9 hosts up and serving @L through the IMPs
+
+Verified roster (via `mini/arpanet-health.sh`): MIT-MULTICS (6), Stanford WAITS (11),
+BBN-TENEX (69), MIT-DMS (70), HILTON-KA1 (126), MIT-AI (134), MIT-ML (198), UCLA
+Sigma (1), UCLA-CCN OS/360 (65) — every host answers `@L` over the IMP network.
+
+### Added: sigma CPU idle detection (94% busy-spin -> ~57% idle)
+The open-SIMH XDS Sigma sim had no idle support; it busy-spun an idle CP-V. Added the
+IDLE modifier + `sim_idle(TMR_RTC)` in the wait path (patch + recipe in
+`mini/host01-sigma/patches/`), enabled `set cpu idle`. Real idle detection, no cap.
+
+### Deployed: ncpdov FEP-bridge IMP-reset fix (live on all daemons)
+The `ncp.c` listener-survives-IMP-reset fix is now running in all 23 `ncpdov` daemons.
+FEP bridges no longer permanently refuse after an IMP reset.
+
+### Investigated: TENEX genlck idle-spin — inherent, not an emulator bug
+Root-caused on an isolated rig to a `genlck` spinlock; the holder is the KI10
+clock-interrupt/metering path. The RTC is a correct 60 Hz and the IMP poll is adaptive,
+so the link-up busy state is inherent TENEX behavior (a real KI10 did it too, slower) —
+the host-side CPUQuota cap is the appropriate management, not a bug workaround. See
+`docs/host69-idle-rig-findings.md`.
+
 ## 2026-09-04
 
 ### Fixed: fragile post-reboot recovery — hosts left down, wrong up/down signals
