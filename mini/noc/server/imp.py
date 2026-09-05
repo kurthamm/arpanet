@@ -159,12 +159,20 @@ class IMPController:
             self._set_state(ProcessState.STARTING)
             self._output_buffer = b""
 
+    # Gap between killing an IMP and respawning it. A near-zero-gap restart respawns
+    # h316ov before the OS releases the old UDP host/trunk sockets, which crashes the
+    # fresh IMP on bind (observed repeatedly on imp62). ~10s reliably clears them.
+    FORCE_RESTART_GAP = 10.0
+
     def force_restart(self):
-        """Force restart, bypassing policy."""
+        """Force restart, bypassing policy, with a socket-release spacing delay."""
         self._restart_policy.reset()
+        # _handle_exit schedules the respawn via call_later(get_delay()); make that a
+        # real gap instead of the 1s initial_delay so the UDP sockets are freed first.
+        self._restart_policy._next_delay = self.FORCE_RESTART_GAP
         if self._process:
             self.process_manager.kill(self._process)
-        # Will restart via _handle_exit
+        # Will restart via _handle_exit (call_later with FORCE_RESTART_GAP)
 
     def write(self, data: bytes):
         """Write raw data to the IMP process (for attached mode)."""

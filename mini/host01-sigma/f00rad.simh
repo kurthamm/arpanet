@@ -29,4 +29,5 @@ attach rad runtime/f00rad/rad
 attach dpb1 runtime/f00rad/sys1
 attach dpb2 runtime/f00rad/sys2
 
+set cpu idle
 boot rad

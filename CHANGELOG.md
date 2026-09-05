@@ -1,5 +1,69 @@
 # Changelog
 
+## 2026-09-05
+
+### State: all 9 hosts up and serving @L through the IMPs
+
+Verified roster (via `mini/arpanet-health.sh`): MIT-MULTICS (6), Stanford WAITS (11),
+BBN-TENEX (69), MIT-DMS (70), HILTON-KA1 (126), MIT-AI (134), MIT-ML (198), UCLA
+Sigma (1), UCLA-CCN OS/360 (65) — every host answers `@L` over the IMP network.
+
+### Added: sigma CPU idle detection (94% busy-spin -> ~57% idle)
+The open-SIMH XDS Sigma sim had no idle support; it busy-spun an idle CP-V. Added the
+IDLE modifier + `sim_idle(TMR_RTC)` in the wait path (patch + recipe in
+`mini/host01-sigma/patches/`), enabled `set cpu idle`. Real idle detection, no cap.
+
+### Deployed: ncpdov FEP-bridge IMP-reset fix (live on all daemons)
+The `ncp.c` listener-survives-IMP-reset fix is now running in all 23 `ncpdov` daemons.
+FEP bridges no longer permanently refuse after an IMP reset.
+
+### Investigated: TENEX genlck idle-spin — inherent, not an emulator bug
+Root-caused on an isolated rig to a `genlck` spinlock; the holder is the KI10
+clock-interrupt/metering path. The RTC is a correct 60 Hz and the IMP poll is adaptive,
+so the link-up busy state is inherent TENEX behavior (a real KI10 did it too, slower) —
+the host-side CPUQuota cap is the appropriate management, not a bug workaround. See
+`docs/host69-idle-rig-findings.md`.
+
+## 2026-09-04
+
+### Fixed: fragile post-reboot recovery — hosts left down, wrong up/down signals
+
+**Problem:** After a reboot, hosts 70/126/134/198/6 came up unreliably or not at
+all. `arpanet-host@6` ran the ITS PDP-10 KA template though host 6 is MIT-MULTICS,
+so it died on an unbound `$dest` and spun holding the single global `flock`,
+starving the real ITS hosts until they timed out and stayed `failed`. MIT-MULTICS
+had no systemd unit at all (started by hand → gone on reboot). imp06 (four MIT
+hosts) could lose the boot-race attaching its last host interface (hi4), leaving a
+host unable to marry its IMP.
+
+**Fix (host-side orchestration only; guests untouched):**
+- Per-host locks (`/tmp/arpanet-hostctl-%i.lock`) — hosts start in parallel; one
+  bad host can't starve the rest.
+- Fast `isup` probe in `hostctl.sh` so the unit adopts an already-up host instead
+  of paying the 240s `verify` loop first; `host_dest()` shared; unknown host fails
+  clean instead of spinning on nounset.
+- `arpanet-host06-multics.service` for MIT-MULTICS; `arpanet-host@6` masked.
+- `arpanet-recover.sh reconcile` + `arpanet-reconcile.service`: post-boot self-heal
+  that re-marries a host to its IMP, restarting the IMP (crash-safe, all peers
+  present) only when its host interface actually detached.
+- `deploy/README.md` corrected: host 6 uses its own unit; 134/198 and reconcile
+  enabled.
+
+### Added: `arpanet-health.sh` — reliable health + diagnostic tool
+
+`ncp-ping` and `systemctl is-active` both lie (ping is answered by the IMP/ncpdov
+even when the guest is dead; a oneshot unit stays `active` after its screen dies).
+`mini/arpanet-health.sh` reports the truth: it probes the real `@L` visitor login
+path per host (socket-1 `ncp-telnet -o` for TENEX; `do.sh` for the rest) as ground
+truth, and localizes any failure to a layer (guest OS/sim, host↔IMP UDP link, IMP
+process, NCP socket, FEP bridge). `--fast` = layer probes only (instant, no mesh
+traffic); `<host>` = deep single-host diagnosis. Each down host prints the fix.
+
+### Added: WAITS (host 11) routes through the generic FEP; `waitsconnect` retired
+
+`fep-line.py` gains `--delay` / `--send-after-connect` / `--logout-on-close`;
+`fep-hosts.conf` adds `11:ncp11:1025`. Host 11 now bridges like Sigma/Multics/OS-360.
+
 ## 2026-06-09
 
 ### Fixed: IMP host interface IPv4/IPv6 mismatch (silent connection failure)

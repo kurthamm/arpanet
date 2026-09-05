@@ -1,8 +1,10 @@
 # IMP-routed sessions — put every visitor session back through the IMP network
 
-**Effort:** `feature/imp-routed-sessions`. **State: ✅ core done** (all hosts route through the
-IMPs; emulator restart-fragility fixed at the root). Prompted by Oscar Vermeulen's 2026-08-29
-email (full text in `docs/superpowers/2026-09-03-turnover.md` §1).
+**Effort:** `feature/imp-routed-sessions`. **State: ✅ core done** (all 9 hosts route `@L` through the
+IMPs on the new FEP/IMP config; reboot-durable with boot-time self-heal). Restart-fragility is
+handled at the orchestration layer (`arpanet-reconcile`), not the emulator — the earlier `h316_hi.c`
+resilience was reverted (be6f99e). Live status: `mini/arpanet-health.sh`. Prompted by Oscar
+Vermeulen's 2026-08-29 email (full text in `docs/superpowers/2026-09-03-turnover.md` §1).
 
 ## Why this exists
 During the 2026-06 DigitalOcean migration (`do.sh`, commit 110ac57) `@L` to most hosts was wired
@@ -59,6 +61,85 @@ Two routes, both through the IMPs (no third "bypass" option):
   `mini/h316ov.bak-predetachfix`). **Fleet-wide activation = next restart of each IMP** (one
   coordinated `arpanet-recover.sh` in a maintenance window).
 
+## 2026-09-04 — reboot recovery + reliability hardening (all 7 hosts durable)
+A full reboot exposed how fragile recovery was; hardened it end-to-end (host-side only).
+Root causes and fixes:
+- **`arpanet-host@6` was the ITS KA template, but host 6 is MIT-MULTICS (DPS8M).** It died on an
+  unbound `$dest` and spun every 5s holding the *single global* `flock`, starving the real ITS
+  hosts (70/126) so they timed out and stayed `failed`. Fix: **per-host locks**
+  (`/tmp/arpanet-hostctl-%i.lock`) so hosts start in parallel and can't starve each other; host 6
+  gets its own `arpanet-host06-multics.service`; `arpanet-host@6` masked.
+- **The unit ran `verify` (240s loop) *before* starting a down host** → 4 min wasted per cold host.
+  Fix: fast `isup` probe (single ping) to adopt an already-up host; the long `verify` runs only
+  after a real start.
+- **imp06 (busiest IMP — all four MIT hosts hi1-4 = MULTICS/DMS/AI/ML) lost the boot-race attaching
+  hi4**, so host 198 booted fine but could never marry. The IMP-side UDP socket was simply absent.
+  Fix: **`arpanet-recover.sh reconcile`** self-heal — for a down host, if the IMP interface is up it
+  fresh-boots the host; if the interface detached it restarts the IMP *with all host peers present*
+  (crash-safe) then re-marries. `arpanet-reconcile.service` runs it once at boot; a healthy boot is
+  a fast no-op. Verified live: no-op and light (fresh-boot) paths.
+- Diagnosis lesson: **`ncp-ping` conflates OS-down / IMP-link-dead / IMP-unreachable**; a console
+  "IN OPERATION" ≠ on-the-net. Ground truth for the host↔IMP link is `sudo ss -unap` (UDP, both
+  ends must be ESTAB). See the `arpanet-recovery-fragility` / `imp06-hi4-boot-race` memories.
+
+Result: hosts 6, 11, 69, 70, 126, 134, 198 all NCP-UP, systemd `active` + `enabled`. Residual:
+the imp06 hi4 cold-boot race can still recur, but `arpanet-reconcile.service` now auto-heals it.
+
+## 2026-09-04 (pause) — HANDOFF: FEP @L login layer is broken (6 + 11)
+
+Paused mid-fix at Kurt's call. Read this before resuming.
+
+**Authoritative status command: `mini/arpanet-health.sh`.** Do NOT trust `ncp-ping`
+or `systemctl is-active` — both give false "up". The tool probes the real `@L`
+visitor login path per host and localizes failures. Tool-verified state 2026-09-04:
+`5 up` (69 TENEX, 70/126/134/198 ITS — all serve `@L` with real banners) and
+`4 down` — 11 WAITS (KA not running → `host11ctl.sh start 11`), 6 Multics
+(sim+bridge up but `@L` refused → restart fep6/ncp), 1 Sigma + 65 OS/360 (backing
+sims not running on this box). Note: host 11 is fully down (KA gone), not just its
+`@L` — this section's earlier wording understated it.
+
+### Solid (do not re-litigate)
+- **Core NCP mesh: all 7 hosts `ncp-ping` UP** — 6, 11, 69, 70, 126, 134, 198.
+- **ITS hosts (70/126/134/198) + TENEX (69) route end-to-end** through the IMPs; `@L` works.
+  systemd `active`+`enabled`; per-host locks + `isup` + `arpanet-reconcile` self-heal in place.
+- MIT-MULTICS **OS** is up (6180 LISTEN, salutation verified).
+
+### Broken: the FEP `@L` *login* path (distinct from ncp-ping!)
+`ncp-ping <h>` UP does NOT mean `@L <h>` works for FEP hosts — ping is answered by the ncpdov;
+`@L` needs the `ncp-telnet -s` bridge to accept an RFC. Current `ncp-telnet -o` results:
+- **host 6 (Multics): `Open refused`.** `fep6` bridge is running again, but its listener isn't
+  being accepted through the freshly-restarted imp06/ncp06. I restarted imp06 earlier (to attach
+  hi4 for host 198); that killed `fep6`, and neither an `arpanet-fep` restart nor a `fepctl
+  stop/start 6` restored `@L`.
+- **host 11 (WAITS): `Open refused`.** Regression from this session: the running host 11 predates
+  the FEP-migration commit (4880782), so it does NOT expose simulator line port 1025; `fep11` fails
+  to start ("line port 1025 not listening"). Its old `waitsconnect` bridge is now gone. So host 11
+  `@L` is currently down until WAITS is rebooted with the new config.
+- **hosts 1 (Sigma), 65 (OS/360): `Open refused`** — expected/pre-existing: their backing
+  simulators aren't running on this box (ports 4003/16515 down). Separate bring-up task.
+- `make check` / `mini/verify-imp-routing.sh` reflects this: 6 pass / 3 fail (the FEP hosts).
+
+### What I caused vs pre-existing
+The imp06 restart (needed to marry host 198) knocked out `fep6`; the `arpanet-fep` restart during
+debugging brought host 11's half-migrated FEP config into play while `waitsconnect` was gone. The
+ITS/TENEX layer and the ncp-ping mesh were NOT disturbed.
+
+### What I want to try next (in priority order)
+1. **Coordinated `mini/arpanet-recover.sh recover`** in a window — the designed path: it restarts
+   hosts in order (FEP hosts, incl. WAITS with the new line-1025 config, before the IMP farm; ITS
+   after) and re-registers the FEP login bridges on healthy NCP/IMP. Most likely one-shot fix for
+   both 6 and 11. Cost: cycles everything (~10 min), briefly drops the working ITS hosts.
+2. If targeting instead of full recover:
+   - host 11: `host11ctl.sh stop 11 && host11ctl.sh start 11` (reboots WAITS exposing line 1025),
+     then `fepctl.sh start 11`; verify `ncp-telnet -o 11`.
+   - host 6: find why `fep6`'s `ncp-telnet -s` listen isn't accepted on `ncp06` after the imp06
+     restart — likely the `ncp06` daemon needs a restart via noc (not just the fep screen). Compare
+     against a known-good FEP host once one exists.
+3. **Extend `arpanet-recover.sh reconcile`** to cover FEP hosts: it currently checks ITS via
+   ncp-ping and Multics via the 6180 salutation, but NOT the `@L` login bridge. It should verify
+   `ncp-telnet -o <h>` for FEP hosts and, on failure, restart the fep bridge (and reboot the host if
+   its line port isn't listening). This is the gap that let host 6/11 `@L` break silently.
+
 ## Accuracy line (Kurt's rule; congruent with Oscar/Lars)
 Everything here is host-side: `do.sh`/`hostctl`/`fepctl`/systemd orchestration and the SIMH
 **emulator** UDP bridge (`h316_hi.c`). The **guest** artifacts (ITS, IMP firmware, 1822/NCP) are
@@ -81,14 +162,46 @@ considered and **rejected** — Lars/Oscar themselves worked around it rather th
   behavior immediately — mind that on the production droplet.
 
 ## Status / remaining
+_Authoritative live status: run `mini/arpanet-health.sh` (real `@L` probe, not ncp-ping). As of
+2026-09-04: **9 up / 0 down** — 6 MULTICS, 1 Sigma, 65 OS/360, 11 WAITS, 70/126/134/198 ITS, 69 TENEX._
+
+Done:
 - [x] Merge; Task 5b (8 sources); Task 7 (ITS native ×4); host 65 online; Task 4b (FEP systemd);
-      Task 8 (reliable ITS-only restart); `h316_hi.c` peer-loss resilience (built/validated/deployed).
-- [ ] **Fleet-wide `h316ov` activation** — coordinated `arpanet-recover.sh` in a window so every IMP
-      picks up the resilient binary; then confirm an IMP survives a host-down restart end-to-end.
-- [ ] **Task 6** — fold WAITS (#11) into the generic FEP (`fep-line.py`), retire the bespoke
-      `waitsconnect`. WAITS routing was restored via `waitsconnect` this session but is the last
-      one-off bridge.
-- [ ] **Task 9** — host 41 (PiDP-10) native NCP.
-- [ ] **Task 10** — `make check` / `mini/verify-imp-routing.sh` (assert no bypass; every host routes).
-- [ ] **noc per-IMP restart flakiness** — `impctl restart <imp>` is less reliable than a manual
-      spaced stop/start; worth hardening in `noc-server.py`/`impctl` (separate from the emulator fix).
+      Task 8 (reliable ITS-only restart).
+- [x] **Task 6** — WAITS (#11) folded into the generic FEP (`fep-line.py` gains `--delay` /
+      `--send-after-connect` / `--logout-on-close`; `fep-hosts.conf` adds `11:ncp11:1025`); the
+      bespoke `waitsconnect` is retired (commit 4880782). No one-off bridges remain.
+- [x] **Reboot durability (2026-09-04)** — every host has an enabled systemd unit incl. new
+      `arpanet-host06-multics` / `arpanet-host01-sigma` / `arpanet-host65-os360`; bogus `arpanet-host@6`
+      masked; per-host locks + fast `isup` in `hostctl`; `host11ctl verify` checks the real sim not
+      ncp-ping; boot-time `arpanet-reconcile.service` self-heals detached IMP interfaces AND missing
+      FEP bridges.
+- [x] **Health/diagnostic tool** — `mini/arpanet-health.sh` (real `@L` truth + per-layer localization).
+
+In process — OWNER: Kurt (do not worry about these here):
+- [~] **host 41 (local PiDP-10)** — native NCP is Kurt's in-flight work (external PiDP-10 over
+      Tailscale). Reachable today; native-NCP conversion (was "Task 9") is his to drive.
+- [~] **TENEX (#69)** — in-flight under its own host69 knowledge spine. Serving `@L` now; Kurt owns it.
+
+Done (2026-09-04 improvements pass):
+- [x] **Task 10 — gate on the real signal** — `verify-imp-routing.sh` now delegates its live check to
+      `arpanet-health.sh` (real `@L` probe); dropped the `ncp16` ncp-ping false-positive and the retired
+      waitsconnect reference. `make check` = 9 passed. host 69/41 reported INFO-only (in-flight).
+- [x] **noc force-restart spacing** — `IMPController`/`NCPController.force_restart` now leave a 10s gap
+      before respawn so UDP sockets release first (the imp62 crash-on-restart). Effective next NOC restart.
+
+Open (this effort):
+- [ ] **reconcile @L blind spot (partial)** — reconcile ensures a FEP bridge is RUNNING but not that it
+      SERVES `@L`. An auto-`@L`-recycle was attempted and REVERTED: the probe false-negatived and a rapid
+      stop/start broke all 4 working bridges (had to restore by hand). Needs a reliable probe + spaced
+      recycle before re-attempting. Documented limitation, not landmined.
+- [ ] **imp06 hi4 boot-race, root cause + lifecycle unify (deferred, high-risk)** — reconcile auto-heals
+      the race every boot, so this is low-urgency. A true root fix is emulator-level (`h316_hi`, reverted)
+      + fleet mesh restart; unifying the 4 host lifecycles is a broad refactor. Both need a dedicated,
+      validated effort with mesh churn — not a live-system quick change.
+
+Decision needed:
+- [ ] **"Fleet-wide `h316ov` activation" is superseded** — the `h316_hi.c` peer-loss resilience it
+      depended on was REVERTED (be6f99e); `arpanet-reconcile` now covers "IMP interface detached" at the
+      orchestration layer. Either re-do the emulator resilience and roll it fleet-wide, or formally close
+      this task in favor of reconcile.
