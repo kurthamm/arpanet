@@ -35,7 +35,7 @@ HOSTS=(
   "126:HILTON-KA1:its:5:ITS PDP-10|turist:62:21621:21622:10015:-:-"
   "134:MIT-AI:its:5:Artificial Intelligence|turist:6:22061:22062:18015:-:-"
   "198:MIT-ML:its:5:Math Lab|turist:6:23061:23062:19015:-:-"
-  "41:PiDP-10-ITS:its:5:Welcome to ITS|turist|ITS PDP-10:-:-:-:-:-:-"
+  "49:HAMM-KA0:its:5:Welcome to ITS|turist|ITS PDP-10:-:-:-:-:-:-"
   "11:SU-AI-WAITS:waits:5:WAITS|login|PLEASE LOG:11:20111:20112:1025:ncp11:fep11"
   "6:MIT-MULTICS:fep:0:HSLA|Multics|MR12:6:-:-:6180:ncp06:fep6"
   "1:UCLA-Sigma:fep:0:Sigma|MUX:-:-:-:4003:ncp01:fep1"

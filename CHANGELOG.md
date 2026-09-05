@@ -9,7 +9,19 @@ Stanford WAITS (11), BBN-TENEX (69), MIT-DMS (70), HILTON-KA1 (126), MIT-AI (134
 MIT-ML (198), UCLA Sigma (1), UCLA-CCN OS/360 (65), and **PiDP-10 ITS (41)** — every
 host answers `@L` over the IMP network.
 
-### Added: PiDP-10 (host 41) is a first-class ARPANET host — power-on auto-boot
+### Renamed/renumbered: the PiDP-10 is now HAMM-KA0, host 49 (was host 41)
+Research against the Dec 1973 host status (RFC 597, parsed directly) showed host 41 /
+octal 051 is IMP 41 — the real Norwegian **NORSAR** node — so the PiDP-10 was
+accidentally impersonating a real site. Renumbered to a slot that was genuinely vacant
+in 1973: **host 49 / octal 061 / IMP 49**, named **HAMM-KA0** ("Hamm Computer
+Laboratory") — KA0 = its KA10 running ITS. Changes: Pi `imp41.simh` `num=49`; ITS local
+host number `IMPUS` set to 061 via a boot-time DDT deposit in `boot.pidp` (host-side, not
+an image edit); droplet `dotelnet.sh` (061→49, `-o`) and `arpanet-health.sh` roster.
+Verified: `ncp-ping 49` replies (host 061), `@L 49` serves a full ITS login, health = UP.
+(Remaining: ITS greets as "Unknown ITS PDP-10" until host 061 is added to ITS's own
+host table — a guest-side edit.)
+
+### Added: PiDP-10 is a first-class ARPANET host — power-on auto-boot
 The home PiDP-10 now boots ITS onto the ARPANET on power-on alone (no front-panel
 `READ IN`, no switch fiddling). Root cause was the Pi's `its-arpa51/boot.pidp` parking
 at a blinky wait-loop until a manual `READ IN`; changed it to auto-boot the disk
