@@ -46,25 +46,24 @@
         <h2 class="section-title">What Works Today</h2>
         <div class="callout">This page describes Kurt Hamm's hosted deployment and companion PiDP-10 integration. It is not official upstream ARPANET project documentation.</div>
         <p>This hosted implementation can accept an external simulated IMP over a stable network link. That external IMP can then attach to a local host simulator, including a PiDP-10 running ITS with NCP enabled.</p>
-        <p>The tested example in this deployment is a physical PiDP-10 replica attached as ARPANET host <code>41</code>, shown by NCP as octal host <code>051</code>. The ARPANET path is verified with the IMP62-to-IMP41 link and <code>ncp-ping 41</code>.</p>
-        <p>The browser terminal path is separate: this site's <code>@L 41</code> command attaches to the PiDP-10 SIMH MTY terminal line over Tailscale. That keeps the public terminal usable even when historical NCP TELNET is unreliable.</p>
+        <p>The tested example in this deployment is a physical PiDP-10 replica attached as ARPANET host <code>49</code> (<b>HAMM-KA0</b>), shown by NCP as octal host <code>061</code>. The ARPANET path is verified with the IMP62-to-IMP49 link and <code>ncp-ping 49</code>.</p>
+        <p>The public terminal reaches it the same way as every other host: <code>@L 49</code> is a native NCP login carried through the IMP mesh (the golden route) over the IMP62&#8596;IMP49 trunk &mdash; not a separate terminal-line bypass.</p>
         <div class="callout">This is not a promise that every replica machine is plug-and-play. It is a working pattern that can be reproduced and adapted.</div>
     </div>
 
     <div class="section">
         <h2 class="section-title">Architecture</h2>
-        <div class="diagram">Browser terminal path:
+        <div class="diagram">Session path (native NCP through the IMPs):
   this site's hosted terminal
   -> WebSocket relay on the DigitalOcean droplet
-  -> PiDP-10 SIMH MTY terminal over Tailscale
-  -> physical PiDP-10 replica running ITS
-
-ARPANET validation path:
-  Kurt's ARPANET simulation host
+  -> NCP client (ncp-telnet -o 49)
   -> simulated IMP mesh
   -> IMP62 site-local remote link
-  -> Pi IMP41 over Tailscale UDP
-  -> PiDP-10 NCP host 41 / octal 051</div>
+  -> Pi IMP49 over Tailscale UDP
+  -> physical PiDP-10 replica running ITS (HAMM-KA0, host 49 / octal 061)
+
+ARPANET reachability check:
+  ncp-ping 49  ->  reply from host 061</div>
     </div>
 
     <div class="section grid">
@@ -81,19 +80,19 @@ ARPANET validation path:
         <div class="card">
             <h2 class="section-title">Tested PiDP-10 Pattern</h2>
             <ul>
-                <li>Pi-side H316 IMP configured as IMP <code>41</code>.</li>
+                <li>Pi-side H316 IMP configured as IMP <code>49</code>.</li>
                 <li>PiDP-10 KA10 simulator running a separate ARPA51 ITS profile.</li>
                 <li>NCP-capable KA10 simulator rebuilt with PiDP front-panel support.</li>
                 <li>Tailscale or equivalent overlay network for stable UDP routing.</li>
                 <li>Droplet-side IMP62 link loaded from site-local runtime configuration.</li>
-                <li>This site's hosted terminal command <code>@L 41</code> attaches to the PiDP SIMH MTY line, not historical NCP TELNET.</li>
+                <li>This site's hosted terminal command <code>@L 49</code> reaches HAMM-KA0 as a native NCP login through the IMPs.</li>
             </ul>
         </div>
     </div>
 
     <div class="section">
         <h2 class="section-title">Reproduce the PiDP-10 Example</h2>
-        <p>The detailed, reproducible PiDP-10 integration for this deployment is maintained in a companion repository. It includes the ARPA51 profile, IMP41 bridge, Tailscale notes, validation steps, troubleshooting, and front-panel-capable simulator build notes. The main ARPANET fork documents the browser terminal routing used by this deployment.</p>
+        <p>The detailed, reproducible PiDP-10 integration for this deployment is maintained in a companion repository. It includes the ARPA51 profile, IMP49 bridge, Tailscale notes, validation steps, troubleshooting, and front-panel-capable simulator build notes. The main ARPANET fork documents the browser terminal routing used by this deployment.</p>
         <div class="button-row">
             <a class="button" href="https://github.com/kurthamm/pidp10-arpanet-node" target="_blank" rel="noopener">PiDP-10 ARPANET Node Docs</a>
             <a class="button" href="https://github.com/kurthamm/arpanet/tree/main" target="_blank" rel="noopener">This Deployment's ARPANET Fork</a>

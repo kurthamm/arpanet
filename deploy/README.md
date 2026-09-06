@@ -91,9 +91,9 @@ sudo systemctl enable --now cloudflared-arpanet.service
 - Host services are adopt-safe: if a host is already running and passes NCP
   verification, starting the service records the unit active without stopping
   the working runtime.
-- The browser launcher `do.sh` routes `@L 41` / `@L 051` to the external
-  PiDP SIMH MTY terminal over Tailscale. Host `41` ARPANET reachability is
-  validated separately through the IMP62/IMP41 link.
+- The browser launcher `do.sh` routes `@L 49` / `@L 061` to the external
+  PiDP-10 (HAMM-KA0) as a native NCP login through the IMPs. Host `49` ARPANET
+  reachability is validated through the IMP62/IMP49 link.
 - Cloudflare Tunnel is kept in its own unit so the public edge can restart
   independently of the hosted IMP/NOC and browser relay services.
 - Tailscale remains a separate operator setup step and is not managed by these
