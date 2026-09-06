@@ -1730,7 +1730,7 @@ requestAnimationFrame(drawLoop);
 connectWS();
     </script>
 
-	<script src="arpa/assets/js/arpanet-nodes.js?v=20260618-garnet2"></script>
+	<script src="arpa/assets/js/arpanet-nodes.js?v=20260906-hamm3"></script>
 
 <script>
 // Terminal definitions
@@ -1877,7 +1877,7 @@ document.addEventListener('DOMContentLoaded', function() {
             '',
             '31    TIP/IMP    CAMBRIDGE, MASS.     CCA TENEX HOST 037',
             '62    TIP        WASHINGTON, D.C.     ICCC TERMINALS',
-            '41    IMP        HOME REPLICA SITE    051 PIDP-10',
+            '49    IMP        COLUMBIA, S.C.       061 HAMM-KA0',
             '',
             'HOST CHECK',
             '006  MIT-MULTICS UP',
@@ -1886,14 +1886,14 @@ document.addEventListener('DOMContentLoaded', function() {
             '176  HILTON-KA1 UP',
             '306  MIT-ML     UP',
             '013  SU-AI      UP',
-            '051  PIDP-10    UP',
+            '061  HAMM-KA0   UP',
             '',
             'NOTES',
             'MIT IMP 06 CARRIES THE THREE HOSTED PDP-10 SYSTEMS.',
             'STANFORD 11 CARRIES THE HOSTED SU-AI WAITS SYSTEM.',
             'CCA 31 IS A SEPARATE CAMBRIDGE TIP/IMP, NOT MIT IMP 06.',
             'HILTON 62 IS A TERMINAL TIP FOR THE 1972 ICCC DEMO.',
-            'HOME 41 IS THIS IMPLEMENTATION\'S PIDP-10 REPLICA SITE.'
+            'HAMM 49 IS KURT\'S PHYSICAL PIDP-10, COLUMBIA, S.C.'
         ].join('\r\n');
         nccCharQueue = textToSend.split('');
         nccTerm.write('\x1b[2J\x1b[H');

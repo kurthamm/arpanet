@@ -16,6 +16,21 @@ knowledge-base doc `docs/pidp10-host-identity.md`):
 - **Greeting set:** `@L 49` now shows "Kurt Hamm PiDP-10 - Columbia, South Carolina" (the machine's
   `SYSNET;TELSER` greeting, keyed on the `KA` machine name; re-edited + reassembled).
 
+### Added: HAMM-KA0 (host 49) on the website — map node, host menu, and detail page
+The PiDP-10's renumber (41 → 49, "PiDP-10" → HAMM-KA0, octal 051 → 061) was propagated to the
+public site (previously stale — the old host-41 link routed to the real NORSAR slot):
+- **Interactive map (`arpa/assets/js/arpanet-nodes.js`):** added HAMM-KA0 (host 49) at Columbia,
+  S.C. with the `kurt`/live styling; moved HILTON out of its test-corner to Washington, D.C. and
+  wired the real trunk **HAMM (imp49) ⟷ HILTON (imp62) ⟷ CCA**, giving a clean SC → D.C. →
+  Cambridge spur.
+- **Terminal host menu (`arpanet_terminal2.html`):** replaced the stale host-41/PiDP-10 entry with
+  host 49 / HAMM-KA0.
+- **Home NCC status text (`arpanet_home.html`):** `41/051/PIDP-10` → `49/061/HAMM-KA0`.
+- **Detail page (`arpa/arpanet-node-49-HAMM-KA0.html`):** new per-node page (physical PiDP-10, ITS,
+  Columbia S.C. site, imp49↔imp62 seam), wired into the map click-through — fixes the 404 when
+  clicking the node.
+Host 69 (BBN-TENEX) intentionally left `planned` / off-menu — not ready yet.
+
 ## 2026-09-05
 
 ### State: all 10 hosts up and serving @L through the IMPs
