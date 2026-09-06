@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-06
+
+### Added: PiDP-10 (HAMM-KA0 / host 49) is now a persistent, crash-safe server
+Kurt's requirement: a stable server he can modify where changes persist and survive a power-off.
+Built + validated on the Pi (full doc in the companion repo `docs/persistence-crash-recovery.md`;
+knowledge-base doc `docs/pidp10-host-identity.md`):
+- **Persistence:** disabled the `its-arpa51/boot.pidp` per-boot disk-reset (line 20). That reset is
+  unique to arpa51 — stock `its`/`tops20`/`waits` persist natively — and was the only reason
+  changes didn't stick.
+- **Crash-safe boot:** a power-off leaves a dirty pack DSKDMP can't mount (`PKNMTD`). The boot now
+  puts the packs online (`L$1$ L$2$ L$3$`) then boots ITS, whose SALVAGER repairs the pack on
+  startup. Validated: a change made before a hard power-off was intact after recovery; files with
+  content persist (the SALVAGER only cleans empty/incomplete crashed dirs).
+- **Greeting set:** `@L 49` now shows "Kurt Hamm PiDP-10 - Columbia, South Carolina" (the machine's
+  `SYSNET;TELSER` greeting, keyed on the `KA` machine name; re-edited + reassembled).
+
 ## 2026-09-05
 
 ### State: all 10 hosts up and serving @L through the IMPs

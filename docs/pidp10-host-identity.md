@@ -64,12 +64,34 @@ the description **"Hamm Computer Laboratory"** (`-LAB` flavor), cf. real sites `
   `arpanet-health.sh` roster `49:HAMM-KA0`, README + CHANGELOG.
 - **Backups:** `imp41.simh.pre-renumber49-20260905`, `boot.pidp.pre-renumber49-20260905`.
 
-## Known open item
+## Greeting — SOLVED (2026-09-06)
 
-`@L 49` still greets **"Unknown ITS PDP-10"** — ITS prints its site name by looking up its own
-`IMPUS` (061) in its on-disk host table and finding no entry. Making it greet as *"Hamm Computer
-Laboratory"* requires adding host 061 → HAMM-KA0 to ITS's host table (a guest-side edit on the
-arpa51 disk), not yet done.
+`@L 49` now greets **"Kurt Hamm PiDP-10 - Columbia, South Carolina"**. The greeting is the
+Telnet server `SYSNET;TELSER`, keyed on the 2-letter machine name (`KA`). Kurt had added the
+`KA` branch to the Linux source in June 2026, but the packs were built *3 days earlier*, so the
+running TELSER predated the edit and fell through to the default `Unknown ITS PDP-10`. Fix:
+re-edit `SYSNET;TELSER` on the pack (ITS TECO — `ER`/`EW`/`Y`/`N`/`-18D`/`I`/`EE`, not DEC
+TECO's `EB`/`EX`) and reassemble `SYSBIN;TELSER` (`:MIDAS SYSBIN;TELSER_SYSNET;TELSER`, logged
+in — a turist can't write `SYSBIN`). The greeting change persists (see below).
+
+## Persistent + crash-safe (2026-09-06) — THE stable-server requirement
+
+host 49 is now a **persistent server whose modifications survive a power-off** — full details in
+the companion repo `docs/persistence-crash-recovery.md`. Summary:
+- **Persistence:** the arpa51 `boot.pidp` per-boot disk-reset (line 20, `!cp -a … rp03 …`) is
+  **disabled**. That reset — unique to `its-arpa51`; stock `its`/`tops20`/`waits` all persist —
+  was the only reason changes didn't stick.
+- **Crash-safe boot:** with the reset gone, a power-off leaves a dirty pack DSKDMP can't mount
+  (`PKNMTD`). The boot now recovers it: `boot.pidp` line 2 expect →
+  `send "L\e1\eL\e2\eL\e3\eITS\rIMPUS/61\r\eG\r"` — DSKDMP `L$1$ L$2$ L$3$` puts the packs
+  **online**, then `ITS` + `IMPUS/61` + `$G` starts ITS, whose **SALVAGER.317** repairs the
+  crashed pack (`CRASH; … KA ITS 1652 IN OPERATION`).
+- **Validated:** the banner (a real change) was applied, the sim hard-killed (power-off), and on
+  reboot the banner was intact + host 49 back up. **No data loss** — files with content persist;
+  the SALVAGER only deletes *empty/incomplete* crashed directories.
+- DSKDMP recovery primitives (from `system;dskdmp`): `S$` list packs, `L$n$` put disk n online.
+- Pi backups: `boot.pidp.pre-crashrec-20260906`, `boot.pidp.pre-persist-20260906`. Golden clean
+  packs remain at `src/its/out/pdp10-ka/rp03.*` for rollback.
 
 ## Sources
 
