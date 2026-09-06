@@ -23,8 +23,8 @@ The box (4 vCPU) sat at load ~7–8. Recon of everything running:
 - The load came from **two unthrottled processes we added**:
   1. **imp62** — had `set nothrottle` → ~92% of a core. **Fixed**: removed `nothrottle` so it
      inherits the farm's 15% (commit pending). imp62 is load-bearing: it carries
-     **host126/HILTON-KA1** (hi2, 21621↔21622) **and** the **PiDP-10 (host 41) Tailscale
-     bridge** (mi2 → 100.105.230.31:11141 → the Pi's IMP41). See the topology note in the spine.
+     **host126/HILTON-KA1** (hi2, 21621↔21622) **and** the **PiDP-10 (host 49, HAMM-KA0) Tailscale
+     bridge** (mi2 → 100.105.230.31:11141 → the Pi's IMP 49). See the topology note in the spine.
   2. **the host69 ki** — ~90–97% of a core, busy-spinning **even when idle**. This doc.
 
 ## 2. Dead end #1 — `SET THROTTLE` (documented to self-disable)

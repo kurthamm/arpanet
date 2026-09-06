@@ -14,13 +14,15 @@ This branch documents and supports two related but separate work streams:
 From the hosted terminal page:
 
 ```text
+@L 1
 @L 6
-@L 134
+@L 11
+@L 49
+@L 65
 @L 70
 @L 126
+@L 134
 @L 198
-@L 11
-@L 41
 ```
 
 Host `1` / octal `001` is UCLA-NMC's historically correct address at IMP #1.
@@ -73,7 +75,7 @@ mini/arpanet-health.sh
 
 ## Repository Split
 
-The PiDP-10 work is intentionally kept in a separate companion repository because it documents home-lab replica hardware, IMP41 bridging, and overlay networking. Site-specific PiDP-10/Tailscale configuration should stay out of this repository unless it becomes a generic upstream-supported scenario.
+The PiDP-10 work is intentionally kept in a separate companion repository because it documents home-lab replica hardware, IMP bridging, and overlay networking. Site-specific PiDP-10/Tailscale configuration should stay out of this repository unless it becomes a generic upstream-supported scenario.
 
 ---
 # arpanet
