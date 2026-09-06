@@ -24,28 +24,34 @@ start_one() {
         [[ "$ALL_MODE" == 1 ]] && { echo "fep$host: skipped (host not running here)"; return; } || exit 1
     fi
     screen -ls | grep -q "[.]fep$host[[:space:]]" && { echo "fep$host already running"; return; }
+    # ncp-telnet -s serves a SINGLE connection then exits (its NCP re-listen fails
+    # with "NCP listen error"), so a bare bridge dies after the first visitor logs
+    # in -- the historical FEP "whack-a-mole". Wrap it in a respawn loop so the
+    # listener re-arms immediately and the FEP host stays reachable across unlimited
+    # logins (inetd-style). arg0 "fepbridge$host" makes the loop greppable; it is
+    # the screen window's process-group leader, so stop_one tears the whole tree
+    # (loop + ncp-telnet + fep-line.py) down atomically via its pgroup.
     # shellcheck disable=SC2086
-    screen -dmS "fep$host" env NCP="$ncp" ./ncp-telnet -s -- ./fep-line.py "$host" "$port" $flags
-    echo "fep$host: ARPANET TELNET server on $ncp -> line port $port"
+    screen -dmS "fep$host" bash -c '
+        while true; do
+            env NCP="$1" ./ncp-telnet -s -- ./fep-line.py "$2" "$3" $4 || true
+            sleep 0.5
+        done' "fepbridge$host" "$ncp" "$host" "$port" "$flags"
+    echo "fep$host: ARPANET TELNET server on $ncp -> line port $port (auto-respawn)"
 }
 
 # Find the ncp-telnet -s server for $host and its fep-line.py children by
 # exact command line. `screen -X quit` does not reliably kill this tree, so
 # stop_one below verifies and force-kills rather than trusting it.
 fep_pids() {
-    local host="$1" pids=""
-    if pids="$(pgrep -f "ncp-telnet -s -- \./fep-line\.py $host ")"; then
-        :
-    else
-        pids=""
-    fi
-    local more=""
-    if more="$(pgrep -f "fep-line\.py $host ")"; then
-        :
-    else
-        more=""
-    fi
-    printf '%s\n%s\n' "$pids" "$more" | sed '/^$/d' | sort -u
+    local host="$1" pids="" more="" loop=""
+    # The respawn-loop wrapper (pgroup leader). Listed FIRST so stop_one kills its
+    # process group first -- that atomically takes down the loop AND its current
+    # ncp-telnet/fep-line.py children, leaving nothing to respawn.
+    loop="$(pgrep -f "fepbridge$host " || true)"
+    pids="$(pgrep -f "ncp-telnet -s -- \./fep-line\.py $host " || true)"
+    more="$(pgrep -f "fep-line\.py $host " || true)"
+    printf '%s\n%s\n%s\n' "$loop" "$pids" "$more" | sed '/^$/d' | sort -u
 }
 
 stop_one() {

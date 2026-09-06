@@ -29,15 +29,16 @@ fi
 
 # Normalize octal-style ARPANET host spelling used in the UI/docs.
 # ncp-telnet expects decimal input and prints octal host numbers.
-if [[ "$DEST" == "051" ]]; then
-    DEST=41
+# HAMM-KA0 (Kurt's PiDP-10) is host 49 / octal 061 on IMP 49.
+if [[ "$DEST" == "061" ]]; then
+    DEST=49
 fi
 
 #echo "IMP=$IMP"
 #echo "DEST=$DEST"
 
 TELNET_MODE=""
-if [[ "${4-}" =~ ^[oO]$ || "$DEST" == "70" || "$DEST" == "106" || "$DEST" == "41" || "$DEST" == "051" ]]; then
+if [[ "${4-}" =~ ^[oO]$ || "$DEST" == "70" || "$DEST" == "106" || "$DEST" == "49" || "$DEST" == "061" ]]; then
     TELNET_MODE="-o"
 fi
 

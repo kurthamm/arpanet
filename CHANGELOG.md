@@ -1,12 +1,75 @@
 # Changelog
 
+## 2026-09-06
+
+### Added: PiDP-10 (HAMM-KA0 / host 49) is now a persistent, crash-safe server
+Kurt's requirement: a stable server he can modify where changes persist and survive a power-off.
+Built + validated on the Pi (full doc in the companion repo `docs/persistence-crash-recovery.md`;
+knowledge-base doc `docs/pidp10-host-identity.md`):
+- **Persistence:** disabled the `its-arpa51/boot.pidp` per-boot disk-reset (line 20). That reset is
+  unique to arpa51 — stock `its`/`tops20`/`waits` persist natively — and was the only reason
+  changes didn't stick.
+- **Crash-safe boot:** a power-off leaves a dirty pack DSKDMP can't mount (`PKNMTD`). The boot now
+  puts the packs online (`L$1$ L$2$ L$3$`) then boots ITS, whose SALVAGER repairs the pack on
+  startup. Validated: a change made before a hard power-off was intact after recovery; files with
+  content persist (the SALVAGER only cleans empty/incomplete crashed dirs).
+- **Greeting set:** `@L 49` now shows "Kurt Hamm PiDP-10 - Columbia, South Carolina" (the machine's
+  `SYSNET;TELSER` greeting, keyed on the `KA` machine name; re-edited + reassembled).
+
+### Added: HAMM-KA0 (host 49) on the website — map node, host menu, and detail page
+The PiDP-10's renumber (41 → 49, "PiDP-10" → HAMM-KA0, octal 051 → 061) was propagated to the
+public site (previously stale — the old host-41 link routed to the real NORSAR slot):
+- **Interactive map (`arpa/assets/js/arpanet-nodes.js`):** added HAMM-KA0 (host 49) at Columbia,
+  S.C. with the `kurt`/live styling; moved HILTON out of its test-corner to Washington, D.C. and
+  wired the real trunk **HAMM (imp49) ⟷ HILTON (imp62) ⟷ CCA**, giving a clean SC → D.C. →
+  Cambridge spur.
+- **Terminal host menu (`arpanet_terminal2.html`):** replaced the stale host-41/PiDP-10 entry with
+  host 49 / HAMM-KA0.
+- **Home NCC status text (`arpanet_home.html`):** `41/051/PIDP-10` → `49/061/HAMM-KA0`.
+- **Detail page (`arpa/arpanet-node-49-HAMM-KA0.html`):** new per-node page (physical PiDP-10, ITS,
+  Columbia S.C. site, imp49↔imp62 seam), wired into the map click-through — fixes the 404 when
+  clicking the node.
+Host 69 (BBN-TENEX) intentionally left `planned` / off-menu — not ready yet.
+
 ## 2026-09-05
 
-### State: all 9 hosts up and serving @L through the IMPs
+### State: all 10 hosts up and serving @L through the IMPs
 
-Verified roster (via `mini/arpanet-health.sh`): MIT-MULTICS (6), Stanford WAITS (11),
-BBN-TENEX (69), MIT-DMS (70), HILTON-KA1 (126), MIT-AI (134), MIT-ML (198), UCLA
-Sigma (1), UCLA-CCN OS/360 (65) — every host answers `@L` over the IMP network.
+Verified roster (via `mini/arpanet-health.sh`, 10 up / 0 not-up): MIT-MULTICS (6),
+Stanford WAITS (11), BBN-TENEX (69), MIT-DMS (70), HILTON-KA1 (126), MIT-AI (134),
+MIT-ML (198), UCLA Sigma (1), UCLA-CCN OS/360 (65), and **PiDP-10 ITS (41)** — every
+host answers `@L` over the IMP network.
+
+### Renamed/renumbered: the PiDP-10 is now HAMM-KA0, host 49 (was host 41)
+Research against the Dec 1973 host status (RFC 597, parsed directly) showed host 41 /
+octal 051 is IMP 41 — the real Norwegian **NORSAR** node — so the PiDP-10 was
+accidentally impersonating a real site. Renumbered to a slot that was genuinely vacant
+in 1973: **host 49 / octal 061 / IMP 49**, named **HAMM-KA0** ("Hamm Computer
+Laboratory") — KA0 = its KA10 running ITS. Changes: Pi `imp41.simh` `num=49`; ITS local
+host number `IMPUS` set to 061 via a boot-time DDT deposit in `boot.pidp` (host-side, not
+an image edit); droplet `dotelnet.sh` (061→49, `-o`) and `arpanet-health.sh` roster.
+Verified: `ncp-ping 49` replies (host 061), `@L 49` serves a full ITS login, health = UP.
+(Remaining: ITS greets as "Unknown ITS PDP-10" until host 061 is added to ITS's own
+host table — a guest-side edit.)
+
+### Added: PiDP-10 is a first-class ARPANET host — power-on auto-boot
+The home PiDP-10 now boots ITS onto the ARPANET on power-on alone (no front-panel
+`READ IN`, no switch fiddling). Root cause was the Pi's `its-arpa51/boot.pidp` parking
+at a blinky wait-loop until a manual `READ IN`; changed it to auto-boot the disk
+(bare `b ptr` -> DSKDMP -> the in-file `expect` sends `ITS`). Front-panel selection
+stays `0005` = its-arpa51. Also cleared a duplicate/root-owned `imp41` trap that jammed
+the imp62<->imp41 trunk. `@L 41` now serves a full ITS login through the IMPs; added to
+`arpanet-health.sh` (reports UP via the @L truth probe; its layers are remote on the Pi).
+
+### Fixed: FEP bridge whack-a-mole — one-shot bridge now auto-respawns
+Root-caused the recurring FEP-host outages (Multics/6, Sigma/1, OS360/65, WAITS/11
+"randomly going down"): the `ncp-telnet -s` bridge serves a SINGLE connection then exits
+(`NCP listen error` on re-listen), so every visitor login killed that host's bridge and
+nothing restarted it. `mini/fepctl.sh` now runs each bridge in a respawn loop (inetd-
+style; re-arms the listener instantly), with a greppable pgroup-leader marker so
+`stop` still tears the whole tree down cleanly. Proven: a bridge survives repeated
+logins (was dying after one). Also added a retry to the `arpanet-health.sh` @L probe so
+a transient post-login ITS stall no longer reads as DOWN.
 
 ### Added: sigma CPU idle detection (94% busy-spin -> ~57% idle)
 The open-SIMH XDS Sigma sim had no idle support; it busy-spun an idle CP-V. Added the

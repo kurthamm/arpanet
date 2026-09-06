@@ -1,6 +1,6 @@
 # Hosted Terminal Operation
 
-This fork supports the hosted browser terminal for the ARPANET simulation, Stanford/SU-AI host `11` / octal `013`, and, when configured locally, an external PiDP-10 host at ARPANET host `41` / octal `051`.
+This fork supports the hosted browser terminal for the ARPANET simulation, Stanford/SU-AI host `11` / octal `013`, and, when configured locally, an external PiDP-10 host `HAMM-KA0` at ARPANET host `49` / octal `061` (see `docs/pidp10-host-identity.md`).
 
 ## Browser Commands
 
@@ -13,7 +13,7 @@ Use the hosted terminal page and type one of these commands at the TIP prompt:
 @L 126
 @L 198
 @L 11
-@L 41
+@L 49
 ```
 
 Expected routing:
@@ -33,8 +33,8 @@ Expected routing:
 | `@L 306` | host `306` | Accepted octal spelling for the same MIT-ML host. |
 | `@L 11` | host `013` | Hosted Stanford/SU-AI WAITS PDP-10, reached through the `waitsconnect` ARPANET TELNET bridge from `ncp16`. |
 | `@L 013` | host `013` | Accepted octal spelling for the same Stanford host. |
-| `@L 41` | host `051` | External PiDP-10, reached through its Pi-side SIMH terminal line over Tailscale. |
-| `@L 051` | host `051` | Accepted spelling for the same PiDP-10 host. |
+| `@L 49` | host `061` | External PiDP-10 `HAMM-KA0`, native NCP login through the IMPs (the golden route): `do.sh` → `dotelnet.sh` → `ncp-telnet -o 49` reaches a full ITS login over the IMP62↔IMP49 trunk. See `docs/pidp10-host-identity.md`. |
+| `@L 061` | host `061` | Accepted octal spelling for the same PiDP-10 host. |
 
 Some ITS hosts may display `Unknown ITS PDP-10` and `It's a lovely day to be a turist!`. That text is an ITS/TELSER banner and does not by itself indicate wrong routing. Use the `TELNET to host ...` line and NCP tests for routing verification.
 
@@ -45,21 +45,23 @@ The browser terminal path is intentionally separate from the ARPANET health path
 - `@L 1` and `@L 001` run `mini/local-host-terminal.py` and connect to the SIMH Sigma 7 CP-V mux on localhost port `4003`.
 - `@L 6`, `@L 134`, `@L 70`, `@L 126`, and `@L 198` run `mini/local-host-terminal.py` and connect to localhost-only terminal lines (`6180`, `18015`, `17015`, `10015`, and `19015`).
 - `@L 11` and `@L 013` use `mini/waitsconnect` through `NCP=ncp16 ./ncp-telnet -c 11`. The older DCS port `2040` accepts a SIMH connection banner but does not provide the visitor-facing WAITS login path.
-- `@L 41` and `@L 051` use the same helper to connect to the PiDP-10 MTY line at the Pi's Tailscale address.
+- `@L 49` and `@L 061` route through `do.sh` → `dotelnet.sh` → `NCP=ncp31 ./ncp-telnet -o 49`, serving a native NCP ITS login through the IMPs over the IMP62↔IMP49 Tailscale trunk (the golden route). See `docs/pidp10-host-identity.md`.
 - This does not open public emulator ports; the browser still reaches the relay only through Cloudflare Tunnel.
 - ARPANET connectivity for the MIT hosts and PiDP host is validated with `NCP=ncp31 ./ncp-ping`. Stanford/SU-AI is validated with `NCP=ncp16 ./ncp-ping`.
 
 This split keeps the hosted machines usable while preserving NCP reachability checks separately. In the DigitalOcean runtime, `ncp31` is the only reliable application NCP source, and the MIT hosted images may reject ARPANET TELNET from host `037` even while NCP echo works.
 
-## PiDP-10 Host 41 Routing
+## PiDP-10 Host 49 Routing (HAMM-KA0)
 
-The browser launcher treats host `41` specially:
+The browser launcher treats host `49` specially:
 
-- `@L 41` and `@L 051` route to host label `051`.
-- The relay attaches to the PiDP-10 SIMH MTY line over Tailscale.
-- Users should not need to type `@O 41` for the hosted page.
+- `@L 49` and `@L 061` route to host label `061`.
+- The relay serves a native NCP ITS login through the IMPs via `do.sh` → `dotelnet.sh` → `ncp-telnet -o 49` (the golden route), not a terminal-line bypass.
+- Users should not need to type `@O 49` for the hosted page.
 
-The site-local IMP41 link is intentionally not committed as a generic upstream setting. Keep deployment-specific IMP41/Tailscale details in the companion repository:
+See `docs/pidp10-host-identity.md` for the full host identity (HAMM-KA0, host `49` / octal `061` / IMP 49, "Hamm Computer Laboratory").
+
+The site-local IMP49 link is intentionally not committed as a generic upstream setting. Keep deployment-specific IMP49/Tailscale details in the companion repository:
 
 ```text
 https://github.com/kurthamm/pidp10-arpanet-node
@@ -71,7 +73,7 @@ On the DigitalOcean droplet, the main fork will also honor an ignored local over
 mini/imp62.local.simh
 ```
 
-That keeps the PiDP/Tailscale wiring out of the tracked `imp62.simh` while still allowing the live deployment to enable host `41` when the local file exists.
+That keeps the PiDP/Tailscale wiring out of the tracked `imp62.simh` while still allowing the live deployment to enable host `49` when the local file exists.
 
 ## Direct Validation
 
@@ -82,7 +84,7 @@ NCP=ncp31 ./ncp-ping -c1 134
 NCP=ncp31 ./ncp-ping -c1 70
 NCP=ncp31 ./ncp-ping -c1 126
 NCP=ncp31 ./ncp-ping -c1 198
-NCP=ncp31 ./ncp-ping -c1 41
+NCP=ncp31 ./ncp-ping -c1 49
 NCP=ncp16 ./ncp-ping -c1 11
 ```
 
@@ -106,8 +108,8 @@ printf '@L 126\r\n' | SESSION_NUMBER=0 ../do.sh
 printf '@L 176\r\n' | SESSION_NUMBER=0 ../do.sh
 printf '@L 198\r\n' | SESSION_NUMBER=0 ../do.sh
 printf '@L 306\r\n' | SESSION_NUMBER=0 ../do.sh
-printf '@L 41\r\n' | SESSION_NUMBER=0 ../do.sh
-printf '@L 051\r\n' | SESSION_NUMBER=0 ../do.sh
+printf '@L 49\r\n' | SESSION_NUMBER=0 ../do.sh
+printf '@L 061\r\n' | SESSION_NUMBER=0 ../do.sh
 ```
 
 Those commands should print the matching `TELNET to host ...` line and a banner from the target simulator terminal.

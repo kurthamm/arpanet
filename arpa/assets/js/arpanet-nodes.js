@@ -44,10 +44,14 @@ const arpanetNodes = [
 
 
 
-//this is for testing, remove together with modem3:31 line in CCA above:
-  { node: 62, modem1: 31, name: 'HILTON - IMP', name1: 'HILTON', name2: 'IMP', x: 10, y: 10, rx: 25, ry: 12, 		host: 62 },
-  { name: 'HILTON-KA1', name1: 'HILTON', name2: 'KA', x: 10, y: 10, rx: 33, ry: 18, 	host: 126, hostname: 'HILTON-KA1', computer: 'PDP-10', system: 'ITS', status: 'Server', liveStatus: 'live', origin: 'kurt', scenstat: 0, mapHidden: true },
-  { name: 'HILTON-KA0', name1: 'HILTON', name2: 'KA', x: 10, y: 10, rx: 33, ry: 18, 	host: 62, hostname: 'HILTON-KA0', computer: 'PDP-10', system: 'ITS', status: 'Server' },
+// HILTON — 1972 ICCC demo site, Washington, D.C. (Kurt's fictional IMP #62), uplink to CCA (Cambridge).
+  { node: 62, modem1: 31, modem2: 49, name: 'HILTON - IMP', name1: 'HILTON', name2: 'IMP', x: 1122, y: 690, rx: 25, ry: 12, 		host: 62 },
+  { name: 'HILTON-KA1', name1: 'HILTON', name2: 'KA', x: 1050, y: 645, rx: 33, ry: 18, 	host: 126, hostname: 'HILTON-KA1', computer: 'PDP-10', system: 'ITS', status: 'Server', liveStatus: 'live', origin: 'kurt', scenstat: 0, mapHidden: true },
+  { name: 'HILTON-KA0', name1: 'HILTON', name2: 'KA', x: 1050, y: 690, rx: 33, ry: 18, 	host: 62, hostname: 'HILTON-KA0', computer: 'PDP-10', system: 'ITS', status: 'Server', origin: 'kurt' },
+
+  // HAMM-KA0 — Kurt's physical PiDP-10, Columbia, S.C. (IMP #49), trunked south off HILTON (imp62).
+  { node: 49, modem1: 62, name: 'HAMM - IMP', name1: 'HAMM', name2: 'IMP', x: 1122, y: 800, rx: 18, ry: 13, 		host: 49, lat: 34.0007, lon: -81.0348 },
+  { name: 'HAMM-KA0', name1: 'HAMM', name2: 'KA0', x: 1050, y: 800, rx: 33, ry: 18, 	host: 49, hostname: 'HAMM-KA0', computer: 'PDP-10 (KA10)', system: 'ITS', status: 'Server', liveStatus: 'live', origin: 'kurt', scenario: 'HAMM-KA0 ITS === HOST #49', scenstat: 0 },
 
 
 
@@ -138,6 +142,8 @@ const nodeDetailPageOverrides = {
   HILTON: null,
   'HILTON-KA0': null,
   'HILTON-KA1': null,
+  HAMM: 'arpa/arpanet-node-49-HAMM-KA0.html',
+  'HAMM-KA0': 'arpa/arpanet-node-49-HAMM-KA0.html',
   LBL: 'arpa/arpanet-node-36-LBL.html'
 };
 

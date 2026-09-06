@@ -178,9 +178,16 @@ Done:
       FEP bridges.
 - [x] **Health/diagnostic tool** — `mini/arpanet-health.sh` (real `@L` truth + per-layer localization).
 
+Done (2026-09-05):
+- [x] **host 49 HAMM-KA0 (PiDP-10)** — native NCP DONE, and made a first-class host. Power-on
+      auto-boots ITS onto the ARPANET (boot.pidp: blinky-wait → `b ptr`); `@L 49` serves a full ITS
+      login through the IMPs; in `arpanet-health.sh` as `49:HAMM-KA0` = UP. **Renumbered from host
+      41** — host 41 / octal 051 = IMP 41 is the real Norwegian NORSAR node (verified by parsing
+      RFC 597), so the PiDP-10 was impersonating a real site; moved to host 49 / octal 061 / IMP 49,
+      a slot vacant in the Dec 1973 host status, named **HAMM-KA0** ("Hamm Computer Laboratory").
+      Full rationale + the ARPANET host-number research: `docs/pidp10-host-identity.md`.
+
 In process — OWNER: Kurt (do not worry about these here):
-- [~] **host 41 (local PiDP-10)** — native NCP is Kurt's in-flight work (external PiDP-10 over
-      Tailscale). Reachable today; native-NCP conversion (was "Task 9") is his to drive.
 - [~] **TENEX (#69)** — in-flight under its own host69 knowledge spine. Serving `@L` now; Kurt owns it.
 
 Done (2026-09-04 improvements pass):
