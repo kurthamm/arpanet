@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-09-18
+
+### Finished: HAMM-KA0 (host 49) — full ITS games live + greeting restored
+The PiDP-10 replica on Tailscale is complete. Building on the 2026-09-09/10 full-ITS
+rebuild + cutover (games baked into the pack), this pass closed the last gaps:
+- **Greeting restored on the live pack** (no downtime, no rebuild): TECO-edited
+  `SYSNET;TELSER` to add the `KA` machine-name branch, wrote version 176, and
+  `:MIDAS SYSBIN;TELSER_SYSNET;TELSER` reassembled the telnet server. `@L 49` now greets
+  **"Kurt Hamm PiDP-10 - Columbia, South Carolina"** again. (Also permanently baked into the
+  build source — see `pidp10-arpanet-node`.)
+- **Games launch-confirmed over `@L 49`** (log in first: `:login <name>` — authentic ITS):
+  - `:advent` — Colossal Cave · `:zork` — Zork (MDL; "West of House") · `:chess` / `:chess2` —
+    chess (added `SYS3;TS CHESS/CHESS2` links → `GAMES;` so they launch by name) ·
+    `:lisp gjd;sine lisp` — Spacewar (draws on the Type 340; view via `pdp type340`/rpdp/VNC).
+  - Eliza is present (`GAMES;ELIZA FASL`) and loads in Lisp
+    (`:lisp` → `n` → `(load (quote ((games) eliza fasl)))`); its start-function name still needs
+    pinning from source (minor follow-up).
+
 ## 2026-09-06
 
 ### Added: PiDP-10 (HAMM-KA0 / host 49) is now a persistent, crash-safe server
