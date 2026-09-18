@@ -122,6 +122,10 @@ in the emulator (`h316_hi.c` no longer permanently detaches on a transient host-
       + `docs/host69-go-live-plan.md` (4-phase go-live) + `netser-build/` (NETLIT source, `emulator-fork/`,
       `investigation-2026-06-28/` artifacts). Login DONE + hardened + deployed; going live in phases.
 - [x] **its-network-login** — `docs/journal/its-network-login.md` (the activation story for #70/134/198/126).
+- [x] **hamm-ka0-full-its** — `docs/journal/hamm-ka0-full-its.md` (2026-09: HAMM-KA0 host 49 rebuilt to
+      full ITS from source — games/Lisp/SHRDLU, greeting restored, all five games launchable; the
+      "out-of-phase pack" + "Lisp-game→`:command`" lessons. Reproducible how-to in the companion repo
+      `pidp10-arpanet-node/docs/full-its-games-rebuild.md`).
 - [x] **imp-routed-sessions** — `docs/journal/imp-routed-sessions.md` (2026-09-04: every host put back
       THROUGH the IMPs — native NCP for ITS, FEP for Sigma/Multics/OS-360; bypass removed; source
       rotation restored; FEP under systemd; `h316_hi.c` peer-loss resilience. Prompted by Oscar's mail).
