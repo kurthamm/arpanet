@@ -14,9 +14,8 @@ rebuild + cutover (games baked into the pack), this pass closed the last gaps:
   - `:advent` — Colossal Cave · `:zork` — Zork (MDL; "West of House") · `:chess` / `:chess2` —
     chess (added `SYS3;TS CHESS/CHESS2` links → `GAMES;` so they launch by name) ·
     `:lisp gjd;sine lisp` — Spacewar (draws on the Type 340; view via `pdp type340`/rpdp/VNC).
-  - Eliza is present (`GAMES;ELIZA FASL`) and loads in Lisp
-    (`:lisp` → `n` → `(load (quote ((games) eliza fasl)))`); its start-function name still needs
-    pinning from source (minor follow-up).
+  - **Eliza** — `:lisp` → `n` → `(load (quote |dsk:games;eliza fasl|))` → `(^g)` → "SPEAK UP!"
+    (entry function is `(^g)`, per `games;eliza.(init)`; confirmed talking).
 
 ## 2026-09-06
 
