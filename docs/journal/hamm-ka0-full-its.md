@@ -32,9 +32,13 @@ hardware**, over the real IMP/NCP network. This is the arc from reduced pack →
    regenerated `sources.tape`) so *every future build* includes it; **and** re-applied to the
    **live** pack (TECO edit + `:MIDAS` reassemble of the telnet server) so `@L 49` greets
    *"Kurt Hamm PiDP-10 - Columbia, South Carolina"* now — no downtime.
-5. **Games launchable:** `:advent`, `:zork`, `:chess` / `:chess2` (via `SYS3;→GAMES;` links),
-   `:eliza` (an autostart Lisp band + link), and Spacewar via `:lisp gjd;sine lisp` (Type-340
-   display). Log in first (`:login <name>` — turist can't play; authentic ITS).
+5. **Made every game one-command.** `:advent` and `:zork` worked already; `:eliza` needed an
+   autostart Lisp band (SUSPEND) + link. Everything else — Spacewar (`:spcwar`), chess, Trek,
+   Adventure 350/448, MacHack, Maze, Life, Nim, etc. — are pre-built `GAMES;TS *` executables, so
+   they just needed a `SYS3;→GAMES;` **link** each (`:link sys3;ts NAME,games;ts NAME`). Linked them
+   all: `:advent :zork :chess :chess2 :eliza :spcwar :tvwar :trek :adv350 :adv448 :animal :bkg :ckr
+   :dazdrt :guess :maze :mlife :nimlin :o :sprout :c :ocm`. Log in first (`:login <name>` — turist
+   can't play; authentic ITS). Display games (Spacewar/TV-war/MacHack) draw on the **Type 340**.
 6. **Studied the Interim Computer Museum / SDF vintage-systems cluster** — same ITS 1652, same
    chess/SHRDLU/Type-340 demos. Validation, plus the key difference: they bridge each machine over
    telnet; **we route real IMP/1822/NCP** between hosts. See
@@ -58,6 +62,10 @@ hardware**, over the real IMP/NCP network. This is the arc from reduced pack →
   toplevel otherwise drops you straight into the game before `suspend` runs), then
   `:link sys3;ts NAME,games;ts NAME`. Suspend to `((games) …)`, **not** `((sys3) …)` — `sys3`
   parses as a *device*. (Pattern cribbed from `animal.133`'s own `DUMP`.)
+- **Most games are already dumped executables** (`GAMES;TS *`) — just `:link` them into `SYS3;` for
+  `:name` launch; only a true Lisp-source game (Eliza) needs the SUSPEND-band trick. And beware:
+  `:lisp gjd;sine lisp` is **not** Spacewar (it only regenerates the display sine table) — the game
+  is `GAMES;TS SPCWAR` (`:spcwar`). Verify a game's real launcher before documenting it.
 - **Driving ITS reliably:** the CTY console needs a **`^Z` wake** before it accepts input; drive it
   with a **raw pipe** (`telnet <console>`), never fragile `expect` pattern-matching (which only
   captured the herald). Games require `:login <name>`.
@@ -72,7 +80,8 @@ hardware**, over the real IMP/NCP network. This is the arc from reduced pack →
   (`@L 49`) and on the website (map node + detail page).
 - Spacewar & MacHack chess are **Type-340 display games** — seen via `pdp type340` / `rpdp` / VNC
   (viewer on the user's own machine), not over a text `@L`.
-- Optional polish: a `:spacewar` one-command (same band trick); a map-coordinate nudge.
+- Every game is one-command now (`:name`); Spacewar is `:spcwar`/`:spacewar`. Optional: map-
+  coordinate nudge on the website node.
 
 ## Cross-references
 - Companion (reproducible how-to): `pidp10-arpanet-node/docs/full-its-games-rebuild.md`,

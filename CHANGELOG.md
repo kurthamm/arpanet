@@ -17,8 +17,13 @@ rebuild + cutover (games baked into the pack), this pass closed the last gaps:
   - **Eliza** — `:eliza` (made it a one-command: `SUSPEND`ed an autostart Lisp band with
     `(sstatus toplevel '(^g))` to `GAMES;TS ELIZA`, then linked `SYS3;TS ELIZA`; launches straight
     to "SPEAK UP!"). Entry fn `(^g)` per `games;eliza.(init)`.
-  - So all five are one command: `:advent` `:zork` `:chess` `:eliza`, and Spacewar via
-    `:lisp gjd;sine lisp` (display game — needs the Type 340 anyway).
+  - **Correction:** Spacewar is the `GAMES;TS SPCWAR` executable → `:spcwar` (also `:spacewar`),
+    *not* `:lisp gjd;sine lisp` (that only builds the sine table). Spacewar / MacHack / TV-war are
+    **Type-340 display games** — view via `pdp type340` / rpdp / VNC.
+  - **Then made EVERY game one-command** — linked all `GAMES;TS *` into `SYS3;` so `:name` works:
+    `:adv350 :adv448 :animal :bkg :ckr :dazdrt :guess :maze :mlife :nimlin :o :sprout :trek
+    :tvwar :c :ocm` (plus `:advent :zork :chess :chess2 :eliza :spcwar`). `:trek` and `:spcwar`
+    launch-confirmed. (Log in first — `:login <name>` — turist can't play, per authentic ITS.)
 
 ## 2026-09-06
 
